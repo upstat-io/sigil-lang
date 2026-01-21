@@ -135,15 +135,18 @@ sigil/
 ### Operators (by precedence, highest first)
 
 1. `.` `[]` `()` `.await` `?` — access, call, await, propagate
-2. `!` `-` — unary not, negate
+2. `!` `-` `~` — unary not, negate, bitwise not
 3. `*` `/` `%` `div` — multiply, divide, modulo, floor div
 4. `+` `-` — add/concat, subtract
 5. `..` `..=` — exclusive range, inclusive range
 6. `<` `>` `<=` `>=` — comparison
 7. `==` `!=` — equality
-8. `&&` — logical and (short-circuit)
-9. `||` — logical or (short-circuit)
-10. `??` — coalesce (None/Err to default)
+8. `&` — bitwise and
+9. `^` — bitwise xor
+10. `|` — bitwise or
+11. `&&` — logical and (short-circuit)
+12. `||` — logical or (short-circuit)
+13. `??` — coalesce (None/Err to default)
 
 ### Expressions
 
@@ -216,10 +219,23 @@ sigil/
 
 ### Imports
 
-- `use module { item1, item2 }` — selective
-- `use module { item as alias }` — with alias
-- `use long.path as short` — module alias
-- `pub use module { item }` — re-export
+**Relative (local files)** — path in quotes, relative to current file:
+- `use './math' { add, subtract }` — same directory
+- `use '../utils' { helper }` — parent directory
+- `use './http/client' { get }` — subdirectory
+
+**Module (stdlib/packages)** — dot-separated, no quotes:
+- `use std.math { sqrt, abs }` — standard library
+- `use std.time { Duration }` — standard library
+
+**Private imports** — `::` prefix for non-public items:
+- `use './math' { ::internal_helper }` — explicit private access
+- `use '../utils' { pub_fn, ::priv_fn }` — mixed
+
+**Aliases and re-exports**:
+- `use './math' { add as plus }` — with alias
+- `use std.net.http as http` — module alias
+- `pub use './internal' { Widget }` — re-export
 
 ### Doc Comments
 
