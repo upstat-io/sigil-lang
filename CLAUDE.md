@@ -170,6 +170,7 @@ sigil/
 - `x -> x + 1` — single param
 - `(a, b) -> a + b` — multiple params
 - `() -> 42` — no params
+- `(x: int) -> int = x * 2` — typed lambda with explicit signature
 
 **Loops**
 - `for item in items do expr` — imperative
