@@ -112,25 +112,29 @@ sigil check file.si
 3. **$ prefix for config** - Distinguishes configuration from regular variables
 4. **Explicit imports** - No implicit module loading
 5. **Expression-based** - Everything is an expression that returns a value
-6. **Dual syntax for patterns** - Both positional and named property syntax supported
+6. **Named-only patterns** - Patterns use `.name:` property syntax exclusively (no positional)
 
 ## Pattern Syntax
 
-Patterns support both positional and named property syntax:
+Patterns use named property syntax with `.name:` prefix:
 
-### Positional (concise)
-```
-@factorial (n: int) -> int = recurse(n <= 1, 1, n * self(n - 1))
-@sum (arr: [int]) -> int = fold(arr, 0, +)
-```
-
-### Named Properties (explicit)
 ```
 @fibonacci (n: int) -> int = recurse(
     .cond: n <= 1,
     .base: n,
     .step: self(n - 1) + self(n - 2),
-    .memo: true
+    .memo: true,
+)
+
+@sum (arr: [int]) -> int = fold(
+    .over: arr,
+    .init: 0,
+    .with: +,
+)
+
+@doubled (arr: [int]) -> [int] = map(
+    .over: arr,
+    .transform: x -> x * 2,
 )
 ```
 
