@@ -139,15 +139,16 @@ sigil/
 2. `!` `-` `~` — unary not, negate, bitwise not
 3. `*` `/` `%` `div` — multiply, divide, modulo, floor div
 4. `+` `-` — add/concat, subtract
-5. `..` `..=` — exclusive range, inclusive range
-6. `<` `>` `<=` `>=` — comparison
-7. `==` `!=` — equality
-8. `&` — bitwise and
-9. `^` — bitwise xor
-10. `|` — bitwise or
-11. `&&` — logical and (short-circuit)
-12. `||` — logical or (short-circuit)
-13. `??` — coalesce (None/Err to default)
+5. `<<` `>>` — left shift, right shift
+6. `..` `..=` — exclusive range, inclusive range
+7. `<` `>` `<=` `>=` — comparison
+8. `==` `!=` — equality
+9. `&` — bitwise and
+10. `^` — bitwise xor
+11. `|` — bitwise or
+12. `&&` — logical and (short-circuit)
+13. `||` — logical or (short-circuit)
+14. `??` — coalesce (None/Err to default)
 
 ### Expressions
 
