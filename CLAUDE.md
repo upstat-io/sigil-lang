@@ -110,6 +110,7 @@ sigil/
 **Tests**
 - `@test_name tests @target () -> void = run(...)`
 - `@test_name tests @a tests @b () -> void = ...` — multiple targets
+- `#[skip("reason")] @test_name tests @target ...` — skipped test
 
 ### Types
 
