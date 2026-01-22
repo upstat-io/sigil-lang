@@ -2,67 +2,80 @@
 path: docs/sigil_lang/**
 ---
 
-# AI Guidance for Sigil Language Documentation
+# Sigil Documentation Synchronization Rules
 
-## CRITICAL: Keep Everything in Sync
+When editing files in `docs/sigil_lang/`, follow these todos based on what you're changing.
 
-**All documentation within a version MUST be kept synchronized.**
+## If file is changed in `design/`
 
-When making changes to ANY file in a version directory, you MUST update ALL related files:
+- [ ] Synchronize change to corresponding `spec/` file (use formal, normative tone)
+- [ ] Synchronize change to `/CLAUDE.md` if it affects syntax, types, or patterns
+- [ ] Update `guide/` examples if user-facing behavior changed
+- [ ] Fix any cross-references between design and spec
+- [ ] Ask user: "Should I create a draft proposal in `docs/sigil_lang/drafts/` for this change to be applied to the compiler?"
 
-```
-docs/sigil_lang/
-└── 0.1-alpha/           # Everything in here versions together
-    ├── spec/            # Formal specification (normative)
-    ├── design/          # Design rationale (informative)
-    ├── guide/           # User guide (tutorial)
-    └── modules/         # Standard library docs
-```
+## If file is changed in `spec/`
 
-### Synchronization Rules
+- [ ] Synchronize change to corresponding `design/` file (use explanatory tone)
+- [ ] Synchronize change to `/CLAUDE.md` if it affects syntax, types, or patterns
+- [ ] Update `guide/` examples to match new spec
+- [ ] Update `modules/` docs if stdlib affected
+- [ ] Fix any cross-references between spec and design
+- [ ] Ask user: "Should I create a draft proposal in `docs/sigil_lang/drafts/` for this change to be applied to the compiler?"
 
-1. **Spec changes require design updates** — If the spec changes, update corresponding design docs
-2. **Design changes may require spec updates** — If design docs describe new features, spec must define them
-3. **Guide must match spec** — User guide examples must be valid per the spec
-4. **Module docs must match spec** — Standard library docs must use correct syntax/types
+## If file is changed in `guide/`
 
-### Before ANY Change, Ask:
+- [ ] Verify all examples are valid per current `spec/`
+- [ ] If examples require spec changes, update `spec/` first
+- [ ] Update `/CLAUDE.md` if new syntax patterns are demonstrated
 
-- "Does this change affect the spec?" → Update spec files
-- "Does this change affect design rationale?" → Update design files
-- "Does this change affect user examples?" → Update guide files
-- "Does this change affect stdlib docs?" → Update module files
-- "Do cross-references need updating?" → Fix all links
+## If file is changed in `modules/`
 
-## Version Structure
+- [ ] Verify all type signatures match `spec/`
+- [ ] Verify all examples are valid per current `spec/`
+- [ ] Update `design/` if new stdlib rationale needed
 
-```
-docs/sigil_lang/
-├── README.md            # Documentation overview
-└── {version}/           # e.g., 0.1-alpha, 0.2-beta, 1.0
-    ├── spec/            # Language specification
-    │   ├── README.md    # Spec organization
-    │   ├── CLAUDE.md    # Spec-specific AI guidance
-    │   ├── index.md     # Spec table of contents
-    │   └── *.md         # Spec sections
-    ├── design/          # Design documentation
-    │   ├── 00-index.md  # Design table of contents
-    │   └── */           # Design sections
-    ├── guide/           # User guide
-    └── modules/         # Standard library documentation
-        └── std/         # std module docs
-```
+## If `/CLAUDE.md` is changed
 
-## Version Semantics
+- [ ] Verify change is consistent with `spec/`
+- [ ] Verify change is consistent with `design/`
+- [ ] If CLAUDE.md introduces something not in spec/design, update those first
 
-| Version | Meaning |
-|---------|---------|
-| `X.Y-alpha` | Unstable, expect breaking changes |
-| `X.Y-beta` | Feature-complete, stabilizing |
-| `X.Y-rc` | Release candidate |
-| `X.Y` | Stable release |
+## If adding a new type
 
-## Document Types
+- [ ] Add formal definition to `spec/06-types.md`
+- [ ] Add rationale to `design/03-type-system/`
+- [ ] Add usage examples to `guide/`
+- [ ] Update `modules/` if stdlib uses the type
+- [ ] Update `/CLAUDE.md` Types section
+- [ ] Ask user: "Should I create a draft proposal for compiler implementation?"
+
+## If adding a new pattern
+
+- [ ] Add formal definition to `spec/10-patterns.md`
+- [ ] Add detailed explanation to `design/02-syntax/04-patterns-reference.md`
+- [ ] Add tutorial examples to `guide/`
+- [ ] Add to `design/appendices/D-pattern-quick-reference.md`
+- [ ] Update `/CLAUDE.md` Patterns section
+- [ ] Ask user: "Should I create a draft proposal for compiler implementation?"
+
+## If changing syntax
+
+- [ ] Update grammar productions in `spec/`
+- [ ] Update `spec/03-lexical-elements.md` if tokens changed
+- [ ] Update `design/02-syntax/` explanations
+- [ ] Update `design/appendices/A-grammar-reference.md`
+- [ ] Update ALL example code in ALL files to use new syntax
+- [ ] Update `/CLAUDE.md` to reflect new syntax
+- [ ] Ask user: "Should I create a draft proposal for compiler implementation?"
+
+## If creating a new version
+
+- [ ] Copy entire version directory: `cp -r 0.1-alpha 0.2-alpha`
+- [ ] Update version references in all files
+- [ ] Update root `docs/sigil_lang/README.md` to list new version
+
+## Reference: Document Types
 
 | Type | Location | Purpose | Tone |
 |------|----------|---------|------|
@@ -71,16 +84,7 @@ docs/sigil_lang/
 | **Guide** | `guide/` | Teach HOW to use Sigil | Tutorial |
 | **Modules** | `modules/` | Document standard library | Reference |
 
-## When Creating New Versions
-
-1. Copy entire version directory: `cp -r 0.1-alpha 0.2-alpha`
-2. Update version references in all files
-3. Make changes to new version
-4. Update root README.md to list new version
-
-## Cross-Reference Format
-
-Within a version, use relative paths:
+## Reference: Cross-Reference Format
 
 ```markdown
 // From spec to design
@@ -93,45 +97,10 @@ See [Spec: Types](../spec/06-types.md)
 See [Expressions](09-expressions.md)
 ```
 
-## Checklist for ANY Documentation Change
+## Never Do These
 
-- [ ] Identify all affected document types (spec/design/guide/modules)
-- [ ] Update spec if syntax or semantics changed
-- [ ] Update design if rationale changed
-- [ ] Update guide if user-facing behavior changed
-- [ ] Update modules if stdlib affected
-- [ ] Fix all cross-references
-- [ ] Verify version consistency
-
-## Common Synchronization Scenarios
-
-### Adding a New Type
-
-1. `spec/06-types.md` — Add formal type definition
-2. `design/03-type-system/*.md` — Add rationale if needed
-3. `guide/` — Add usage examples
-4. `modules/` — Update if stdlib uses the type
-
-### Adding a New Pattern
-
-1. `spec/10-patterns.md` — Add formal pattern definition
-2. `design/02-syntax/04-patterns-reference.md` — Add detailed explanation
-3. `guide/` — Add tutorial examples
-4. `design/appendices/D-pattern-quick-reference.md` — Add to quick ref
-
-### Changing Syntax
-
-1. `spec/` — Update grammar productions
-2. `spec/03-lexical-elements.md` — Update if tokens changed
-3. `design/02-syntax/` — Update syntax explanations
-4. `design/appendices/A-grammar-reference.md` — Update grammar summary
-5. ALL example code in ALL files — Must use new syntax
-
-## NEVER Do These
-
-- Change spec without checking design docs
-- Change design without checking spec
-- Add examples that don't compile
+- Change spec without updating design
+- Change design without updating spec
+- Add examples that don't match the spec
 - Leave broken cross-references
-- Forget to update the version's index files
-- Mix content from different versions
+- Update docs without updating `/CLAUDE.md` when syntax/types/patterns change

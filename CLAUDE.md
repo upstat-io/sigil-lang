@@ -262,7 +262,7 @@ sigil/
 - Space after `//`: `// comment`
 
 **Breaking**
-- Pattern args 2+ properties: always stack vertically
+- Pattern args: always stack vertically (even single property)
 - Long signatures: break after `->` or break params
 - Long binary expressions: break before operator
 
