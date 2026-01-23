@@ -21,6 +21,44 @@ General-purpose, expression-based language with strict static typing, type infer
 | `library/std/` | Standard library |
 | `tests/spec/` | Specification conformance tests |
 
+## Reference Repos
+
+External language repos for reference when implementing compiler features:
+
+| Path | Purpose |
+|------|---------|
+| `~/lang_repos/rust/` | Rust compiler - diagnostics, suggestions, applicability levels |
+| `~/lang_repos/golang/` | Go compiler - error handling, go fix tool |
+| `~/lang_repos/typescript/` | TypeScript compiler - diagnostics, code fixes, quick fixes |
+
+These are shallow clones. To update: `cd ~/lang_repos/<name> && git pull --depth 1`
+
+**Key Rust files** (diagnostics/suggestions):
+- `compiler/rustc_errors/src/lib.rs` - Core diagnostic types, `CodeSuggestion`, `Substitution`
+- `compiler/rustc_errors/src/diagnostic.rs` - `Diag`, suggestion methods
+- `compiler/rustc_errors/src/json.rs` - JSON serialization for machine consumption
+- `compiler/rustc_lint_defs/src/lib.rs` - `Applicability` enum (MachineApplicable, MaybeIncorrect, etc.)
+
+**Key Go files** (diagnostics/fixes):
+- `src/cmd/compile/internal/base/print.go` - Compiler error queuing and flushing
+- `src/go/types/errors.go` - Type-checker multi-part error building
+- `src/internal/types/errors/codes.go` - Error code registry (100+ codes)
+- `src/cmd/vendor/golang.org/x/tools/go/analysis/diagnostic.go` - `Diagnostic`, `SuggestedFix`, `TextEdit`
+- `src/cmd/vendor/golang.org/x/tools/go/analysis/analysis.go` - `Analyzer`, `Pass` definitions
+- `src/internal/analysis/driverutil/fix.go` - Three-way merge for fix application
+- `src/cmd/fix/main.go` - `go fix` tool entry point
+- `src/cmd/vet/main.go` - `go vet` tool entry point
+- `src/cmd/vendor/golang.org/x/tools/go/analysis/passes/modernize/` - Modern fix examples
+
+**Key TypeScript files** (diagnostics/code fixes):
+- `src/compiler/types.ts` - `Diagnostic`, `DiagnosticCategory`, `CodeFixAction` types
+- `src/compiler/diagnosticMessages.json` - All diagnostic message definitions
+- `src/services/codeFixProvider.ts` - Registration system, `errorCodeToFixes` multimap
+- `src/services/textChanges.ts` - `ChangeTracker` for building edits
+- `src/services/types.ts` - `CodeFixRegistration`, `CodeFixContext` interfaces
+- `src/services/services.ts` - LSP entry points (`getCodeFixesAtPosition`)
+- `src/services/codefixes/*.ts` - 73 individual fix implementations
+
 ## CLI
 
 | Command | Action |
@@ -33,7 +71,8 @@ General-purpose, expression-based language with strict static typing, type infer
 ## Files & Tests
 
 - `.si` source, `.test.si` tests in `_test/` subdirectory
-- Test syntax: `@test_name tests @target () -> void = run(...)`
+- Targeted test: `@test_name tests @target () -> void = run(...)`
+- Free-floating test: `@test_name () -> void = run(...)`
 - Private access via `::` prefix; every function (except `@main`) requires tests
 
 ---
@@ -80,10 +119,12 @@ General-purpose, expression-based language with strict static typing, type infer
 - `self` — instance in methods; `Self` — implementing type
 
 **Tests**
-- `@test_name tests @target () -> void = run(...)`
+- `@test_name tests @target () -> void = run(...)` — targeted test
+- `@test_name () -> void = run(...)` — free-floating test
 - `@test_name tests @a tests @b () -> void = ...` — multiple targets
-- `#[skip("reason")] @test_name tests @target ...` — skipped test
-- `// #compile-fail` + `// #error: message` — compile-fail test
+- `#[skip("reason")] @test_name ...` — skipped test
+- `#[compile_fail("error")] @test_name ...` — compile-fail test
+- `#[fail("error")] @test_name ...` — expected failure test
 
 ### Types
 
@@ -147,8 +188,10 @@ General-purpose, expression-based language with strict static typing, type infer
 - `map["key"]` — returns `Option<V>` (`None` if key missing)
 
 **Access**
-- `value.field`, `value.method()`, `value.method(arg)`
-- Multi-argument calls require named arguments: `func(.a: 1, .b: 2)`
+- `value.field`, `value.method()`, `value.method(.arg: value)`
+- User-defined function calls: positional for single-arg, named for multi-arg
+- Type conversions: positional allowed (`int(x)`, `float(x)`, `str(x)`, `byte(x)`)
+- All other builtins: named arguments required
 - Named arguments must stack vertically:
   ```
   func(
@@ -185,7 +228,8 @@ Patterns are distinct from function calls. Two categories:
 - `find(.over: items, .where: fn)` or `find(.over: items, .map: fn)` (find_map)
 - `collect(.range: 0..10, .transform: fn)`
 - `recurse(.cond: base_case, .base: val, .step: self(...), .memo: true, .parallel: threshold)`
-- `parallel(.task1: expr1, .task2: expr2)` or `parallel(.tasks: list, .max_concurrent: n)`
+- `parallel(.tasks: [...], .max_concurrent: n, .timeout: duration)` → `[Result<T, E>]`
+- `spawn(.tasks: [...], .max_concurrent: n)` → `void` (fire and forget)
 - `timeout(.op: expr, .after: 5s)`
 - `retry(.op: expr, .attempts: 3, .backoff: strategy)`
 - `cache(.key: k, .op: expr, .ttl: 5m)`
@@ -265,8 +309,17 @@ Capabilities track effects and async behavior. Functions must declare required c
 
 ### Comments
 
-- `// comment` — line comment (to end of line)
+- `// comment` — line comment (must be on its own line, no inline comments)
 - Doc comments use special markers (see below)
+
+**Important:** Inline comments are not allowed. Comments must appear on their own line:
+
+```sigil
+// This is valid
+let x = 42
+
+let y = 42  // This is a syntax error
+```
 
 ### Doc Comments
 
@@ -313,15 +366,33 @@ Capabilities track effects and async behavior. Functions must declare required c
 
 **Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `Ordering` (`Less`/`Equal`/`Greater`)
 **Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Clone`, `Default`
-**Functions**: `print`, `len`, `is_empty`, `str`, `int`, `float`, `byte`, `panic`, `is_some`, `is_none`, `is_ok`, `is_err`, `assert`, `assert_some`, `assert_none`, `assert_ok`, `assert_err`, `assert_panics`
 
-**Multi-arg prelude functions** (use named arguments):
+**Type conversions** (positional allowed):
+- `int(x)`, `float(x)`, `str(x)`, `byte(x)`
+
+**Single-arg builtins** (named arguments required):
+- `len(.collection: c)` → `int`
+- `is_empty(.collection: c)` → `bool`
+- `is_some(.opt: o)` → `bool`
+- `is_none(.opt: o)` → `bool`
+- `is_ok(.result: r)` → `bool`
+- `is_err(.result: r)` → `bool`
+- `assert(.cond: b)` → `void`
+- `assert_some(.opt: o)` → `void`
+- `assert_none(.opt: o)` → `void`
+- `assert_ok(.result: r)` → `void`
+- `assert_err(.result: r)` → `void`
+- `assert_panics(.expr: e)` → `void`
+- `print(.msg: s)` → `void`
+- `panic(.msg: s)` → `Never`
+
+**Multi-arg builtins** (named arguments required):
 - `compare(.left: a, .right: b)` → `Ordering`
 - `min(.left: a, .right: b)` → smallest value
 - `max(.left: a, .right: b)` → largest value
-- `assert_eq(.actual: val, .expected: exp)` → void
-- `assert_ne(.actual: val, .unexpected: other)` → void
-- `assert_panics_with(.expr: e, .message: msg)` → void
+- `assert_eq(.actual: val, .expected: exp)` → `void`
+- `assert_ne(.actual: val, .unexpected: other)` → `void`
+- `assert_panics_with(.expr: e, .message: msg)` → `void`
 
-**Option methods**: `.map(fn)`, `.unwrap_or(default)`, `.ok_or(err)`, `.and_then(fn)`, `.filter(pred)`
-**Result methods**: `.map(fn)`, `.map_err(fn)`, `.unwrap_or(default)`, `.ok()`, `.err()`, `.and_then(fn)`
+**Option methods**: `.map(.transform: fn)`, `.unwrap_or(.default: v)`, `.ok_or(.err: e)`, `.and_then(.then: fn)`, `.filter(.predicate: fn)`
+**Result methods**: `.map(.transform: fn)`, `.map_err(.transform: fn)`, `.unwrap_or(.default: v)`, `.ok()`, `.err()`, `.and_then(.then: fn)`
