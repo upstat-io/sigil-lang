@@ -148,7 +148,14 @@ General-purpose, expression-based language with strict static typing, type infer
 
 **Access**
 - `value.field`, `value.method()`, `value.method(arg)`
-- `func(.a: 1, .b: 2)` — named arguments (all must be named if any are)
+- Multi-argument calls require named arguments: `func(.a: 1, .b: 2)`
+- Named arguments must stack vertically:
+  ```
+  func(
+      .a: 1,
+      .b: 2,
+  )
+  ```
 
 **Lambdas**
 - `x -> x + 1` — single param
@@ -306,7 +313,15 @@ Capabilities track effects and async behavior. Functions must declare required c
 
 **Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `Ordering` (`Less`/`Equal`/`Greater`)
 **Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Clone`, `Default`
-**Functions**: `print`, `len`, `is_empty`, `str`, `int`, `float`, `byte`, `compare`, `min`, `max`, `panic`, `is_some`, `is_none`, `is_ok`, `is_err`, `assert`, `assert_eq`, `assert_ne`, `assert_some`, `assert_none`, `assert_ok`, `assert_err`, `assert_panics`, `assert_panics_with`
+**Functions**: `print`, `len`, `is_empty`, `str`, `int`, `float`, `byte`, `panic`, `is_some`, `is_none`, `is_ok`, `is_err`, `assert`, `assert_some`, `assert_none`, `assert_ok`, `assert_err`, `assert_panics`
+
+**Multi-arg prelude functions** (use named arguments):
+- `compare(.left: a, .right: b)` → `Ordering`
+- `min(.left: a, .right: b)` → smallest value
+- `max(.left: a, .right: b)` → largest value
+- `assert_eq(.actual: val, .expected: exp)` → void
+- `assert_ne(.actual: val, .unexpected: other)` → void
+- `assert_panics_with(.expr: e, .message: msg)` → void
 
 **Option methods**: `.map(fn)`, `.unwrap_or(default)`, `.ok_or(err)`, `.and_then(fn)`, `.filter(pred)`
 **Result methods**: `.map(fn)`, `.map_err(fn)`, `.unwrap_or(default)`, `.ok()`, `.err()`, `.and_then(fn)`
