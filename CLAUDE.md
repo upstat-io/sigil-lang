@@ -1,77 +1,45 @@
 # Sigil
 
-## Overview
+General-purpose, expression-based language with strict static typing, type inference, and mandatory testing. Designed for AI-first development: explicit, predictable, tooling-friendly.
 
-**What is Sigil?**
-- General-purpose programming language built on declarative patterns and mandatory testing
-- Designed for AI-first development: explicit, predictable, tooling-friendly
-- Expression-based with strict static typing and type inference
+## Core Concepts
 
-**Core Philosophy**
-- Patterns as first-class constructs (`map`, `filter`, `fold`, `recurse`, `parallel`)
-- Mandatory testing: every function must have tests or compilation fails
-- Explicit over implicit: `@` for functions, `$` for config, `.name:` for named args
-- One canonical format: zero configuration formatter
-- Types document intent; comments add what types cannot express
+- **Patterns over loops**: `map`, `filter`, `fold`, `recurse`, `parallel` as first-class constructs
+- **Mandatory testing**: every function requires tests or compilation fails
+- **Explicit sigils**: `@` functions, `$` config, `.name:` named args
+- **No null/exceptions**: `Option<T>` for optional, `Result<T, E>` for fallible
+- **Capabilities for effects**: `uses Http`, `uses Async` — explicit, injectable, testable
+- **Zero-config formatting**: one canonical style, enforced
 
-**Design Principles**
-- Context-sensitive keywords: pattern names (`map`, `filter`) usable as identifiers outside patterns
-- Named-only pattern args: `.property: value` syntax, never positional
-- No semicolons: newlines separate statements, commas separate pattern elements
-- No null: use `Option<T>` (`Some`/`None`) for optional values
-- No exceptions: use `Result<T, E>` (`Ok`/`Err`) for fallible operations
+## Key Paths
 
-## Project Structure
+| Path | Purpose |
+|------|---------|
+| `compiler/sigilc/` | Rust compiler (lexer, parser, types, interpreter, codegen) |
+| `docs/sigil_lang/0.1-alpha/spec/` | **Formal specification** (authoritative) |
+| `docs/sigil_lang/0.1-alpha/design/` | Design rationale |
+| `library/std/` | Standard library |
+| `tests/spec/` | Specification conformance tests |
 
-```
-sigil/
-├── compiler/sigilc/src/   # Rust compiler
-│   ├── lexer/             # Tokenizer (logos)
-│   ├── parser/            # Recursive descent
-│   ├── ast/               # AST definitions
-│   ├── types/             # Type checker
-│   ├── eval/              # Tree-walking interpreter
-│   └── codegen/           # C code generator
-├── library/std/           # Standard library (Sigil)
-├── docs/sigil_lang/       # Language documentation
-│   └── 0.1-alpha/         # Current version
-│       ├── spec/          # Formal specification
-│       ├── design/        # Design rationale
-│       └── modules/       # Stdlib API docs
-├── tests/
-│   ├── run-pass/          # Should compile and run
-│   └── compile-fail/      # Should fail to compile
-└── examples/              # Example programs
-```
+## CLI
 
-## CLI Commands
+| Command | Action |
+|---------|--------|
+| `sigil run file.si` | Run program |
+| `sigil test` | Run all tests (parallel) |
+| `sigil check file.si` | Check test coverage |
+| `sigil fmt src/` | Format files |
 
-- `sigil run file.si` — run program
-- `sigil build file.si` — compile to C
-- `sigil emit file.si` — emit C code
-- `sigil test` — run all tests (parallel)
-- `sigil test file.test.si` — run specific tests
-- `sigil check file.si` — check test coverage
-- `sigil fmt src/` — format files
-- `sigil fmt --check src/` — check formatting (CI)
+## Files & Tests
 
-## Test Convention
-
-- Test files: `_test/` subdirectory, named `*.test.si`
-- Test declaration: `@test_name tests @target () -> void = run(...)`
-- Test files can access private items from parent module
-- Every function (except `@main`) requires at least one test
-
-## Current Implementation Status
-
-- Lexer, parser, AST: complete
-- Type checker: complete
-- Tree-walking interpreter: complete
-- C code generator: basic
-- Test runner: parallel execution, mandatory coverage
-- Pattern system: named property syntax, memoization
+- `.si` source, `.test.si` tests in `_test/` subdirectory
+- Test syntax: `@test_name tests @target () -> void = run(...)`
+- Private access via `::` prefix; every function (except `@main`) requires tests
 
 ---
+
+> **For compiler/language work**: consult `spec/` and `design/` docs.
+> **For writing Sigil code**: use reference below.
 
 ## Sigil Coding Rules
 
@@ -83,11 +51,13 @@ sigil/
 - `@name<T> (x: T) -> T` — generic
 - `@name<T: Trait> (x: T) -> T` — constrained generic
 - `@name<T: A + B> (x: T) -> T` — multiple bounds
+- `@name<T> (...) -> T where T: Clone, U: Default = ...` — where clause
 - `@name (...) -> Type uses Capability = ...` — capability
 
-**Config Variables**
+**Config Variables** (compile-time constants, must use literals)
 - `$name = value`
 - `pub $name = value` — public
+- `use './config' { $timeout }` — import config
 
 **Type Definitions**
 - `type Name = { field: Type }` — struct
@@ -100,29 +70,33 @@ sigil/
 **Traits**
 - `trait Name { @method (self) -> Type }` — required method
 - `trait Name { @method (self) -> Type = expr }` — default impl
+- `trait Name { type Item }` — associated type
 - `trait Child: Parent { ... }` — inheritance
 
 **Implementations**
 - `impl Type { @method (self) -> Type = ... }` — inherent
 - `impl Trait for Type { ... }` — trait impl
 - `impl<T: Bound> Trait for Container<T> { ... }` — generic
+- `self` — instance in methods; `Self` — implementing type
 
 **Tests**
 - `@test_name tests @target () -> void = run(...)`
 - `@test_name tests @a tests @b () -> void = ...` — multiple targets
 - `#[skip("reason")] @test_name tests @target ...` — skipped test
+- `// #compile-fail` + `// #error: message` — compile-fail test
 
 ### Types
 
 **Primitives**: `int`, `float`, `bool`, `str`, `char`, `byte`, `void`, `Never`
 **Special**: `Duration` (`30s`, `100ms`), `Size` (`4kb`, `10mb`)
 **Collections**: `[T]` list, `{K: V}` map, `Set<T>` set
-**Compound**: `(T, U)` tuple, `()` unit, `(T) -> U` function
+**Compound**: `(T, U)` tuple, `()` unit, `(T) -> U` function, `dyn Trait` trait object
 **Generic**: `Option<T>`, `Result<T, E>`, `Range<T>`, `Channel<T>`, `Ordering`
+**No implicit conversions**: use `int(x)`, `float(x)`, `str(x)` explicitly
 
 ### Literals
 
-- **Integer**: `42`, `1_000_000`
+- **Integer**: `42`, `1_000_000`, `0xFF` (hex)
 - **Float**: `3.14`, `2.5e-8`
 - **String**: `"hello"`, `"line1\nline2"` (escapes: `\\`, `\"`, `\n`, `\t`, `\r`)
 - **Char**: `'a'`, `'\n'`, `'λ'` (escapes: `\\`, `\'`, `\n`, `\t`, `\r`, `\0`)
@@ -135,7 +109,7 @@ sigil/
 
 ### Operators (by precedence, highest first)
 
-1. `.` `[]` `()` `.await` `?` — access, call, await, propagate
+1. `.` `[]` `()` `?` — access, call, propagate
 2. `!` `-` `~` — unary not, negate, bitwise not
 3. `*` `/` `%` `div` — multiply, divide, modulo, floor div
 4. `+` `-` — add/concat, subtract
@@ -160,16 +134,21 @@ sigil/
 - `let x = value` — immutable
 - `let mut x = value` — mutable
 - `let x: Type = value` — annotated
+- `let x = value` then `let x = x + 1` — shadowing allowed
 - `let { x, y } = point` — struct destructure
+- `let { x: px, y: py } = point` — destructure with rename
+- `let { position: { x, y } } = entity` — nested destructure
 - `let (a, b) = tuple` — tuple destructure
 - `let [head, ..tail] = list` — list destructure
 
 **Indexing**
-- `list[0]`, `list[# - 1]` — `#` is length inside brackets
-- `map["key"]`
+- `list[0]`, `list[# - 1]` — `#` is length inside brackets (panics on out-of-bounds)
+- `str[0]` — returns single-codepoint `str` (panics on out-of-bounds)
+- `map["key"]` — returns `Option<V>` (`None` if key missing)
 
 **Access**
 - `value.field`, `value.method()`, `value.method(arg)`
+- `func(.a: 1, .b: 2)` — named arguments (all must be named if any are)
 
 **Lambdas**
 - `x -> x + 1` — single param
@@ -183,29 +162,29 @@ sigil/
 - `for x in items if x > 0 yield x` — with guard
 - `loop(expr)` with `break`, `continue`
 
-### Patterns (named args only: `.name:`)
+### Patterns
 
-**Sequential**
+Patterns are distinct from function calls. Two categories:
+
+**function_seq** — Sequential expressions (order matters)
 - `run(let x = a, let y = b, result)`
-
-**Error handling**
 - `try(let x = fallible()?, Ok(x))`
-
-**Matching**
 - `match(value, Pattern -> expr, _ -> default)`
 
-**Data patterns**
+**function_exp** — Named expressions (`.name: expr`, each on own line)
 - `map(.over: items, .transform: fn)`
 - `filter(.over: items, .predicate: fn)`
 - `fold(.over: items, .init: val, .op: fn)`
-- `find(.over: items, .where: fn)`
+- `find(.over: items, .where: fn)` or `find(.over: items, .map: fn)` (find_map)
 - `collect(.range: 0..10, .transform: fn)`
-- `recurse(.cond: base_case, .base: val, .step: self(...), .memo: true)`
-
-**Concurrency**
-- `parallel(.task1: expr1, .task2: expr2)`
+- `recurse(.cond: base_case, .base: val, .step: self(...), .memo: true, .parallel: threshold)`
+- `parallel(.task1: expr1, .task2: expr2)` or `parallel(.tasks: list, .max_concurrent: n)`
 - `timeout(.op: expr, .after: 5s)`
 - `retry(.op: expr, .attempts: 3, .backoff: strategy)`
+- `cache(.key: k, .op: expr, .ttl: 5m)`
+- `validate(.rules: [...], .then: value)`
+- `with(.acquire: expr, .use: r -> expr, .release: r -> expr)`
+- `for(.over: items, .match: pattern, .default: fallback)`
 
 **Match patterns**
 - `42` — literal
@@ -239,6 +218,49 @@ sigil/
 - `use std.net.http as http` — module alias
 - `pub use './internal' { Widget }` — re-export
 
+**Extension imports** — bring trait extension methods into scope:
+- `extension std.iter.extensions { Iterator.count, Iterator.last }`
+- `extension './my_extensions' { Iterator.sum }` — local extensions
+
+**Extension definitions** — add methods to existing traits:
+- `extend Iterator { @count (self) -> int = ... }` — define extension
+- `extend Iterator where Self.Item: Add { @sum (self) -> Self.Item = ... }` — constrained
+
+### Capabilities
+
+Capabilities track effects and async behavior. Functions must declare required capabilities.
+
+**Declaring capabilities**
+- `@fetch (url: str) -> Result<str, Error> uses Http = ...`
+- `@save (data: str) -> Result<void, Error> uses FileSystem, Async = ...`
+
+**Providing capabilities** — `with...in` expression:
+- `with Http = RealHttp { base_url: "https://api.example.com" } in fetch("/data")`
+- `with Http = MockHttp { responses: {...} } in test_fetch()` — for testing
+
+**The Async capability** — replaces `async/await`:
+- `uses Async` — function may suspend (non-blocking I/O)
+- No `uses Async` — function blocks until complete (synchronous)
+- No `.await` expression — suspension declared at function level, not call site
+- Concurrency via `parallel(...)` pattern
+
+**Standard capabilities**:
+- `Http` — HTTP client (`get`, `post`, `put`, `delete`)
+- `FileSystem` — file I/O (`read`, `write`, `exists`, `delete`)
+- `Clock` — time (`now`, `today`)
+- `Random` — random numbers (`int`, `float`)
+- `Cache` — caching (`get`, `set`, `delete`)
+- `Logger` — logging (`debug`, `info`, `warn`, `error`)
+- `Env` — environment variables (`get`)
+- `Async` — marker for functions that may suspend
+
+**Pure functions**: no `uses` clause = no side effects, cannot suspend
+
+### Comments
+
+- `// comment` — line comment (to end of line)
+- Doc comments use special markers (see below)
+
 ### Doc Comments
 
 - `// #Description` — main description
@@ -262,7 +284,8 @@ sigil/
 - Space after `//`: `// comment`
 
 **Breaking**
-- Pattern args: always stack vertically (even single property)
+- Named params (`.name:`): always stack vertically (even single property)
+- List literals: inline, bump brackets and wrap values at column width if too long
 - Long signatures: break after `->` or break params
 - Long binary expressions: break before operator
 
@@ -283,4 +306,7 @@ sigil/
 
 **Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `Ordering` (`Less`/`Equal`/`Greater`)
 **Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Clone`, `Default`
-**Functions**: `print`, `len`, `str`, `int`, `float`, `compare`, `panic`, `assert`, `assert_eq`
+**Functions**: `print`, `len`, `is_empty`, `str`, `int`, `float`, `byte`, `compare`, `min`, `max`, `panic`, `is_some`, `is_none`, `is_ok`, `is_err`, `assert`, `assert_eq`, `assert_ne`, `assert_some`, `assert_none`, `assert_ok`, `assert_err`, `assert_panics`, `assert_panics_with`
+
+**Option methods**: `.map(fn)`, `.unwrap_or(default)`, `.ok_or(err)`, `.and_then(fn)`, `.filter(pred)`
+**Result methods**: `.map(fn)`, `.map_err(fn)`, `.unwrap_or(default)`, `.ok()`, `.err()`, `.and_then(fn)`
