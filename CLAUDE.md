@@ -77,10 +77,27 @@ These are shallow clones. To update: `cd ~/lang_repos/<name> && git pull --depth
 
 ---
 
-> **For compiler/language work**: consult `spec/` and `design/` docs.
-> **For writing Sigil code**: use reference below.
+## ⚠️ IMPORTANT: This Is NOT The Specification
 
-## Sigil Coding Rules
+**The syntax reference below is a QUICK REFERENCE ONLY — not the authoritative specification.**
+
+| What you want | Where to look |
+|---------------|---------------|
+| **Authoritative language spec** | `docs/sigil_lang/0.1-alpha/spec/` |
+| **Design rationale & decisions** | `docs/sigil_lang/0.1-alpha/design/` |
+| **Quick syntax reminder** | The reference below |
+
+**If this quick reference contradicts the spec, the spec is correct.** Always consult the spec for:
+- Compiler/language implementation work
+- Edge cases and exact semantics
+- Grammar productions and formal definitions
+- Any ambiguity in behavior
+
+The reference below is a condensed cheat sheet for writing Sigil code quickly.
+
+---
+
+## Sigil Quick Reference
 
 ### Declarations
 
@@ -190,8 +207,8 @@ These are shallow clones. To update: `cd ~/lang_repos/<name> && git pull --depth
 **Access**
 - `value.field`, `value.method()`, `value.method(.arg: value)`
 - User-defined function calls: positional for single-arg, named for multi-arg
-- Type conversions: positional allowed (`int(x)`, `float(x)`, `str(x)`, `byte(x)`)
-- All other builtins: named arguments required
+- function_val (type conversions): positional allowed (`int(x)`, `float(x)`, `str(x)`, `byte(x)`)
+- function_exp (core functions): named arguments required
 - Named arguments must stack vertically:
   ```
   func(
@@ -214,7 +231,7 @@ These are shallow clones. To update: `cd ~/lang_repos/<name> && git pull --depth
 
 ### Patterns
 
-Patterns are distinct from function calls. Two categories:
+Patterns are distinct from function calls. Three categories:
 
 **function_seq** — Sequential expressions (order matters)
 - `run(let x = a, let y = b, result)`
@@ -236,6 +253,9 @@ Patterns are distinct from function calls. Two categories:
 - `validate(.rules: [...], .then: value)`
 - `with(.acquire: expr, .use: r -> expr, .release: r -> expr)`
 - `for(.over: items, .match: pattern, .default: fallback)`
+
+**function_val** — Type conversion functions (positional allowed)
+- `int(x)`, `float(x)`, `str(x)`, `byte(x)`
 
 **Match patterns**
 - `42` — literal
@@ -362,15 +382,23 @@ let y = 42  // This is a syntax error
 
 **Context-sensitive** (patterns only): `cache`, `collect`, `filter`, `find`, `fold`, `map`, `parallel`, `recurse`, `retry`, `run`, `timeout`, `try`, `validate`
 
+**Reserved built-in function names** (cannot be used for user-defined functions, but CAN be used as variable names):
+`int`, `float`, `str`, `byte`, `len`, `is_empty`, `is_some`, `is_none`, `is_ok`, `is_err`, `assert`, `assert_eq`, `assert_ne`, `assert_some`, `assert_none`, `assert_ok`, `assert_err`, `assert_panics`, `assert_panics_with`, `compare`, `min`, `max`, `print`, `panic`
+
+Built-in names are reserved **in call position only** (`name(`). The same names may be used as variables:
+- `let min = 5` — OK, variable binding
+- `min(.left: a, .right: b)` — OK, calls built-in function
+- `@min (...) -> int = ...` — Error, reserved function name
+
 ### Prelude (auto-imported)
 
 **Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `Ordering` (`Less`/`Equal`/`Greater`)
 **Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Clone`, `Default`
 
-**Type conversions** (positional allowed):
+**function_val** (type conversions, positional allowed):
 - `int(x)`, `float(x)`, `str(x)`, `byte(x)`
 
-**Single-arg builtins** (named arguments required):
+**function_exp** (core functions, named arguments required):
 - `len(.collection: c)` → `int`
 - `is_empty(.collection: c)` → `bool`
 - `is_some(.opt: o)` → `bool`
@@ -385,8 +413,6 @@ let y = 42  // This is a syntax error
 - `assert_panics(.expr: e)` → `void`
 - `print(.msg: s)` → `void`
 - `panic(.msg: s)` → `Never`
-
-**Multi-arg builtins** (named arguments required):
 - `compare(.left: a, .right: b)` → `Ordering`
 - `min(.left: a, .right: b)` → smallest value
 - `max(.left: a, .right: b)` → largest value

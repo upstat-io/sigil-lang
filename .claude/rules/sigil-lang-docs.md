@@ -1,5 +1,5 @@
 ---
-path: docs/sigil_lang/**
+path: **/docs/sigil_lang/**
 ---
 
 # Sigil Documentation Synchronization Rules
@@ -12,7 +12,7 @@ When editing files in `docs/sigil_lang/`, follow these todos based on what you'r
 - [ ] Synchronize change to `/CLAUDE.md` if it affects syntax, types, or patterns
 - [ ] Update `guide/` examples if user-facing behavior changed
 - [ ] Fix any cross-references between design and spec
-- [ ] Ask user: "Should I create a draft proposal in `docs/sigil_lang/drafts/` for this change to be applied to the compiler?"
+- [ ] Ask user: "Should I create a draft proposal in `docs/sigil_lang/proposals/drafts/` for this change to be applied to the compiler?"
 
 ## If file is changed in `spec/`
 
@@ -21,7 +21,7 @@ When editing files in `docs/sigil_lang/`, follow these todos based on what you'r
 - [ ] Update `guide/` examples to match new spec
 - [ ] Update `modules/` docs if stdlib affected
 - [ ] Fix any cross-references between spec and design
-- [ ] Ask user: "Should I create a draft proposal in `docs/sigil_lang/drafts/` for this change to be applied to the compiler?"
+- [ ] Ask user: "Should I create a draft proposal in `docs/sigil_lang/proposals/drafts/` for this change to be applied to the compiler?"
 
 ## If file is changed in `guide/`
 
