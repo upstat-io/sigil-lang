@@ -30,6 +30,10 @@ External language repos for reference when implementing compiler features:
 | `~/lang_repos/rust/` | Rust compiler - diagnostics, suggestions, applicability levels |
 | `~/lang_repos/golang/` | Go compiler - error handling, go fix tool |
 | `~/lang_repos/typescript/` | TypeScript compiler - diagnostics, code fixes, quick fixes |
+| `~/lang_repos/zig/` | Zig compiler - explicit errors, comptime, no hidden control flow |
+| `~/lang_repos/gleam/` | Gleam compiler - Result types, functional patterns, Rust-based |
+| `~/lang_repos/elm/` | Elm compiler - excellent error messages, Haskell-based |
+| `~/lang_repos/roc/` | Roc compiler - effects/abilities system, modern functional |
 
 These are shallow clones. To update: `cd ~/lang_repos/<name> && git pull --depth 1`
 
@@ -58,6 +62,45 @@ These are shallow clones. To update: `cd ~/lang_repos/<name> && git pull --depth
 - `src/services/types.ts` - `CodeFixRegistration`, `CodeFixContext` interfaces
 - `src/services/services.ts` - LSP entry points (`getCodeFixesAtPosition`)
 - `src/services/codefixes/*.ts` - 73 individual fix implementations
+
+**Key Zig files** (explicit errors, comptime):
+- `src/Compilation.zig` - Main compilation driver, error aggregation
+- `src/Sema.zig` - Semantic analysis, type checking
+- `src/Type.zig` - Type representation and operations
+- `src/Value.zig` - Compile-time value representation
+- `src/InternPool.zig` - Interned types and values (memory efficiency)
+- `src/Zcu.zig` - Zig Compilation Unit, module management
+- `src/main.zig` - CLI entry point, error formatting
+
+**Key Gleam files** (Result types, diagnostics):
+- `compiler-core/src/error.rs` - Main error type, formatting, `wrap_format!` macro
+- `compiler-core/src/diagnostic.rs` - `Diagnostic`, `Label`, `Location` using codespan
+- `compiler-core/src/warning.rs` - Warning types and formatting
+- `compiler-core/src/type_/error.rs` - Type error details, hints
+- `compiler-core/src/type_.rs` - Type representation, unification
+- `compiler-core/src/analyse.rs` - Semantic analysis
+- `compiler-core/src/exhaustiveness.rs` - Pattern match exhaustiveness checking
+
+**Key Elm files** (error messages, Haskell):
+- `compiler/src/Reporting/Error.hs` - Top-level error type, routing to specific modules
+- `compiler/src/Reporting/Error/Type.hs` - Type mismatch messages (famous for clarity)
+- `compiler/src/Reporting/Error/Syntax.hs` - Parse error messages with suggestions
+- `compiler/src/Reporting/Error/Canonicalize.hs` - Name resolution errors
+- `compiler/src/Reporting/Suggest.hs` - "Did you mean?" suggestions
+- `compiler/src/Reporting/Doc.hs` - Pretty printing document combinators
+- `compiler/src/Reporting/Render/` - Output rendering (terminal, JSON)
+- `compiler/src/Type/Solve.hs` - Constraint solving, unification
+
+**Key Roc files** (effects/abilities, error reporting):
+- `crates/reporting/src/report.rs` - `RocDocAllocator`, pretty printing, cycle display
+- `crates/reporting/src/error/type.rs` - Type error formatting, unification failures
+- `crates/reporting/src/error/canonicalize.rs` - Name resolution error messages
+- `crates/reporting/src/error/parse.rs` - Parse error formatting
+- `crates/compiler/solve/src/` - Constraint solving, abilities
+- `crates/compiler/types/src/` - Type representation
+- `crates/compiler/can/src/` - Canonicalization (name resolution)
+- `crates/compiler/constrain/src/` - Constraint generation
+- `crates/compiler/problem/src/` - Problem types (errors/warnings)
 
 ## CLI
 
