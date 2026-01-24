@@ -1,12 +1,53 @@
 # Sigil
 
-General-purpose, expression-based language with strict static typing, type inference, and mandatory testing. Designed for AI-first development: explicit, predictable, tooling-friendly.
+**Code That Proves Itself**
 
-## Core Concepts
+General-purpose, expression-based language with strict static typing, type inference, and mandatory testing. Sigil enforces code integrity — if it compiles, it has tests; if it has tests, they pass; if you change it, you'll know what broke.
+
+## Design Philosophy
+
+Sigil doesn't trust you. It verifies you.
+
+### The Three Pillars
+
+1. **Mandatory Verification**
+   - Every function requires tests or it doesn't compile
+   - Tests are bound to functions (`@test tests @target`)
+   - Contracts (`pre_check:`/`post_check:`) enforce invariants
+   - The compiler refuses to produce code it can't verify
+
+2. **Dependency-Aware Integrity**
+   - Tests are in the dependency graph, not external
+   - Change a function → its tests run
+   - Change a function → callers' tests run too
+   - Fast feedback because only affected tests execute
+   - **Causality Tracking**: know impact before changing, trace failures after
+
+3. **Explicit Effects**
+   - Capabilities declare what a function can do (`uses Http`)
+   - No hidden side effects
+   - Mocking is trivial (`with Http = MockHttp(...) in`)
+   - Tests are fast because everything is injectable
+
+### The Virtuous Cycle
+
+```
+Capabilities make mocking easy
+    → Tests are fast
+        → Dependency-aware testing is practical
+            → Mandatory testing isn't painful
+                → Code integrity is enforced
+                    → Code that works, stays working
+```
+
+## Core Features
 
 - **Patterns over loops**: `map`, `filter`, `fold`, `recurse`, `parallel` as first-class constructs
 - **Mandatory testing**: every function requires tests or compilation fails
-- **Explicit sigils**: `@` functions, `$` config, `.name:` named args
+- **Dependency-aware tests**: tests bound to functions, run on change propagation
+- **Causality tracking**: `sigil impact` shows blast radius, `sigil why` traces failures to source
+- **Contracts**: `pre_check:`/`post_check:` for function invariants
+- **Explicit sigils**: `@` functions, `$` config
 - **No null/exceptions**: `Option<T>` for optional, `Result<T, E>` for fallible
 - **Capabilities for effects**: `uses Http`, `uses Async` — explicit, injectable, testable
 - **Zero-config formatting**: one canonical style, enforced
@@ -17,7 +58,7 @@ General-purpose, expression-based language with strict static typing, type infer
 |------|---------|
 | `compiler/sigilc/` | Rust compiler (lexer, parser, types, interpreter, codegen) |
 | `docs/sigil_lang/0.1-alpha/spec/` | **Formal specification** (authoritative) |
-| `docs/sigil_lang/0.1-alpha/design/` | Design rationale |
+| `docs/sigil_lang/proposals/` | Proposals and decision rationale |
 | `library/std/` | Standard library |
 | `tests/spec/` | Specification conformance tests |
 
@@ -118,6 +159,14 @@ These are shallow clones. To update: `cd ~/lang_repos/<name> && git pull --depth
 - Free-floating test: `@test_name () -> void = run(...)`
 - Private access via `::` prefix; every function (except `@main`) requires tests
 
+## Program Entry
+
+- `@main () -> void` — basic entry, exit code 0
+- `@main () -> int` — return exit code
+- `@main (args: [str]) -> void` — with command-line args
+- `@main (args: [str]) -> int` — args and exit code
+- `args` contains arguments only (not program name)
+
 ---
 
 ## ⚠️ IMPORTANT: This Is NOT The Specification
@@ -127,7 +176,7 @@ These are shallow clones. To update: `cd ~/lang_repos/<name> && git pull --depth
 | What you want | Where to look |
 |---------------|---------------|
 | **Authoritative language spec** | `docs/sigil_lang/0.1-alpha/spec/` |
-| **Design rationale & decisions** | `docs/sigil_lang/0.1-alpha/design/` |
+| **Decision rationale** | `docs/sigil_lang/proposals/` |
 | **Quick syntax reminder** | The reference below |
 
 **If this quick reference contradicts the spec, the spec is correct.** Always consult the spec for:
@@ -153,10 +202,19 @@ The reference below is a condensed cheat sheet for writing Sigil code quickly.
 - `@name<T> (...) -> T where T: Clone, U: Default = ...` — where clause
 - `@name (...) -> Type uses Capability = ...` — capability
 
-**Config Variables** (compile-time constants, must use literals)
+**Config Variables** (compile-time constants)
 - `$name = value`
 - `pub $name = value` — public
+- `$name = $other * 2` — can reference other config
 - `use './config' { $timeout }` — import config
+
+**Const Functions** (compile-time evaluation)
+- `$name (param: Type) -> ReturnType = expression`
+- `$square (x: int) -> int = x * x`
+- `$factorial (n: int) -> int = if n <= 1 then 1 else n * $factorial(n: n - 1)`
+- Must be pure: no capabilities, no I/O, no mutable bindings
+- Called with constant args → evaluated at compile time
+- Called with runtime args → evaluated at runtime
 
 **Type Definitions**
 - `type Name = { field: Type }` — struct
@@ -188,12 +246,14 @@ The reference below is a condensed cheat sheet for writing Sigil code quickly.
 
 ### Types
 
-**Primitives**: `int`, `float`, `bool`, `str`, `char`, `byte`, `void`, `Never`
+**Primitives**: `int` (64-bit signed), `float` (64-bit IEEE 754), `bool`, `str` (UTF-8), `char`, `byte`, `void`, `Never`
 **Special**: `Duration` (`30s`, `100ms`), `Size` (`4kb`, `10mb`)
 **Collections**: `[T]` list, `{K: V}` map, `Set<T>` set
 **Compound**: `(T, U)` tuple, `()` unit, `(T) -> U` function, `dyn Trait` trait object
 **Generic**: `Option<T>`, `Result<T, E>`, `Range<T>`, `Channel<T>`, `Ordering`
 **No implicit conversions**: use `int(x)`, `float(x)`, `str(x)` explicitly
+**Integer overflow**: wraps (does not panic)
+**String indexing**: `str[i]` returns single codepoint as `str`
 
 ### Literals
 
@@ -248,15 +308,22 @@ The reference below is a condensed cheat sheet for writing Sigil code quickly.
 - `map["key"]` — returns `Option<V>` (`None` if key missing)
 
 **Access**
-- `value.field`, `value.method()`, `value.method(.arg: value)`
-- User-defined function calls: positional for single-arg, named for multi-arg
-- function_val (type conversions): positional allowed (`int(x)`, `float(x)`, `str(x)`, `byte(x)`)
-- function_exp (core functions): named arguments required
-- Named arguments must stack vertically:
+- `value.field`, `value.method()`, `value.method(arg: value)`
+- Built-in functions: positional allowed (`print("Hello")`, `len(items)`, `assert(x > 0)`)
+- Type conversions: positional allowed (`int(x)`, `float(x)`, `str(x)`, `byte(x)`)
+- User-defined functions: named arguments required (`fetch_user(id: 1)`)
+- Patterns: named arguments required (`map(over: items, transform: fn)`)
+- Evaluation: left-to-right, arguments in written order (not parameter order)
+- Formatting: width-based (inline if fits, stack if not):
   ```
-  func(
-      .a: 1,
-      .b: 2,
+  // Inline
+  send_email(to: a, subject: b, body: c)
+
+  // Stacked (exceeds line width)
+  send_email(
+      to: recipient_address,
+      subject: email_subject,
+      body: email_content,
   )
   ```
 
@@ -265,12 +332,23 @@ The reference below is a condensed cheat sheet for writing Sigil code quickly.
 - `(a, b) -> a + b` — multiple params
 - `() -> 42` — no params
 - `(x: int) -> int = x * 2` — typed lambda with explicit signature
+- Capture by value: lambdas snapshot outer variables, cannot mutate outer scope
 
 **Loops**
 - `for item in items do expr` — imperative
 - `for x in items yield x * 2` — collect
 - `for x in items if x > 0 yield x` — with guard
 - `loop(expr)` with `break`, `continue`
+- `break value` — exit loop with value
+- `continue` — skip iteration (in `for...yield`: skip element)
+- `continue value` — use value for this iteration (in `for...yield`)
+
+**Labeled Loops**
+- `loop:name(...)` — labeled loop
+- `for:name x in items do ...` — labeled for
+- `break:name` — break outer loop
+- `break:name value` — break outer loop with value
+- `continue:name` — continue outer loop
 
 ### Patterns
 
@@ -280,22 +358,23 @@ Patterns are distinct from function calls. Three categories:
 - `run(let x = a, let y = b, result)`
 - `try(let x = fallible()?, Ok(x))`
 - `match(value, Pattern -> expr, _ -> default)`
+- `catch(expr)` — catch panics, returns `Result<T, PanicInfo>`
 
-**function_exp** — Named expressions (`.name: expr`, each on own line)
-- `map(.over: items, .transform: fn)`
-- `filter(.over: items, .predicate: fn)`
-- `fold(.over: items, .init: val, .op: fn)`
-- `find(.over: items, .where: fn)` or `find(.over: items, .map: fn)` (find_map)
-- `collect(.range: 0..10, .transform: fn)`
-- `recurse(.cond: base_case, .base: val, .step: self(...), .memo: true, .parallel: threshold)`
-- `parallel(.tasks: [...], .max_concurrent: n, .timeout: duration)` → `[Result<T, E>]`
-- `spawn(.tasks: [...], .max_concurrent: n)` → `void` (fire and forget)
-- `timeout(.op: expr, .after: 5s)`
-- `retry(.op: expr, .attempts: 3, .backoff: strategy)`
-- `cache(.key: k, .op: expr, .ttl: 5m)`
-- `validate(.rules: [...], .then: value)`
-- `with(.acquire: expr, .use: r -> expr, .release: r -> expr)`
-- `for(.over: items, .match: pattern, .default: fallback)`
+**function_exp** — Named expressions (`name: expr`)
+- `map(over: items, transform: fn)`
+- `filter(over: items, predicate: fn)`
+- `fold(over: items, init: val, op: fn)`
+- `find(over: items, where: fn)` or `find(over: items, map: fn)` (find_map)
+- `collect(range: 0..10, transform: fn)`
+- `recurse(condition: base_case, base: value, step: self(...), memo: true, parallel: threshold)`
+- `parallel(tasks: [...], max_concurrent: n, timeout: duration)` → `[Result<T, E>]`
+- `spawn(tasks: [...], max_concurrent: n)` → `void` (fire and forget)
+- `timeout(op: expr, after: 5s)`
+- `retry(op: expr, attempts: 3, backoff: strategy)`
+- `cache(key: k, op: expr, ttl: 5m)`
+- `validate(rules: [...], then: value)`
+- `with(acquire: expr, use: r -> expr, release: r -> expr)`
+- `for(over: items, match: pattern, default: fallback)`
 
 **function_val** — Type conversion functions (positional allowed)
 - `int(x)`, `float(x)`, `str(x)`, `byte(x)`
@@ -401,14 +480,43 @@ let y = 42  // This is a syntax error
 **Spacing**
 - Space around binary operators: `a + b`, `x == y`
 - Space around arrows: `x -> x + 1`, `-> Type`
-- Space after colons: `x: int`, `.key: value`
+- Space after colons: `x: int`, `key: value`
 - Space after commas: `f(a, b, c)`
 - No space inside parens/brackets: `f(x)`, `[1, 2]`
 - Space after `//`: `// comment`
 
-**Breaking**
-- Named params (`.name:`): always stack vertically (even single property)
-- List literals: inline, bump brackets and wrap values at column width if too long
+**Named Arguments - Inline vs Stacked**
+
+Inline when ALL conditions met:
+- Total call fits in 100 chars
+- No single value exceeds ~30 chars
+- No complex values (list literals, nested calls with args)
+
+```sigil
+// Inline - short, simple values
+assert_eq(actual: result, expected: 10)
+map(over: items, transform: x -> x * 2)
+```
+
+Stack when ANY value is long or complex:
+
+```sigil
+// Stacked - long list literal
+assert_eq(
+    actual: open_doors(),
+    expected: [1, 4, 9, 16, 25, 36, 49, 64, 81, 100],
+)
+
+// Stacked - list literal in args
+map(
+    over: [1, 2, 3, 4, 5],
+    transform: x -> x * 2,
+)
+```
+
+**Other Breaking Rules**
+- `run`/`try`: always stack contents (block-like)
+- List literals: inline if short, stack if long
 - Long signatures: break after `->` or break params
 - Long binary expressions: break before operator
 
@@ -423,45 +531,45 @@ let y = 42  // This is a syntax error
 
 **Reserved**: `async`, `break`, `continue`, `do`, `else`, `false`, `for`, `if`, `impl`, `in`, `let`, `loop`, `match`, `mut`, `pub`, `self`, `Self`, `then`, `trait`, `true`, `type`, `use`, `uses`, `void`, `where`, `with`, `yield`
 
-**Context-sensitive** (patterns only): `cache`, `collect`, `filter`, `find`, `fold`, `map`, `parallel`, `recurse`, `retry`, `run`, `timeout`, `try`, `validate`
+**Context-sensitive** (patterns only): `cache`, `catch`, `collect`, `filter`, `find`, `fold`, `map`, `parallel`, `recurse`, `retry`, `run`, `timeout`, `try`, `validate`
 
 **Reserved built-in function names** (cannot be used for user-defined functions, but CAN be used as variable names):
 `int`, `float`, `str`, `byte`, `len`, `is_empty`, `is_some`, `is_none`, `is_ok`, `is_err`, `assert`, `assert_eq`, `assert_ne`, `assert_some`, `assert_none`, `assert_ok`, `assert_err`, `assert_panics`, `assert_panics_with`, `compare`, `min`, `max`, `print`, `panic`
 
 Built-in names are reserved **in call position only** (`name(`). The same names may be used as variables:
 - `let min = 5` — OK, variable binding
-- `min(.left: a, .right: b)` — OK, calls built-in function
+- `min(a, b)` — OK, calls built-in function
 - `@min (...) -> int = ...` — Error, reserved function name
 
 ### Prelude (auto-imported)
 
-**Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `Ordering` (`Less`/`Equal`/`Greater`)
+**Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `Ordering` (`Less`/`Equal`/`Greater`), `PanicInfo` (`message`, `location`)
 **Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Clone`, `Default`
 
 **function_val** (type conversions, positional allowed):
 - `int(x)`, `float(x)`, `str(x)`, `byte(x)`
 
-**function_exp** (core functions, named arguments required):
-- `len(.collection: c)` → `int`
-- `is_empty(.collection: c)` → `bool`
-- `is_some(.opt: o)` → `bool`
-- `is_none(.opt: o)` → `bool`
-- `is_ok(.result: r)` → `bool`
-- `is_err(.result: r)` → `bool`
-- `assert(.cond: b)` → `void`
-- `assert_some(.opt: o)` → `void`
-- `assert_none(.opt: o)` → `void`
-- `assert_ok(.result: r)` → `void`
-- `assert_err(.result: r)` → `void`
-- `assert_panics(.expr: e)` → `void`
-- `print(.msg: s)` → `void`
-- `panic(.msg: s)` → `Never`
-- `compare(.left: a, .right: b)` → `Ordering`
-- `min(.left: a, .right: b)` → smallest value
-- `max(.left: a, .right: b)` → largest value
-- `assert_eq(.actual: val, .expected: exp)` → `void`
-- `assert_ne(.actual: val, .unexpected: other)` → `void`
-- `assert_panics_with(.expr: e, .message: msg)` → `void`
+**Built-in functions** (positional):
+- `print(message)` → `void`
+- `len(collection)` → `int`
+- `is_empty(collection)` → `bool`
+- `is_some(option)` → `bool`
+- `is_none(option)` → `bool`
+- `is_ok(result)` → `bool`
+- `is_err(result)` → `bool`
+- `assert(condition)` → `void`
+- `assert_eq(actual, expected)` → `void`
+- `assert_ne(actual, unexpected)` → `void`
+- `assert_some(option)` → `void`
+- `assert_none(option)` → `void`
+- `assert_ok(result)` → `void`
+- `assert_err(result)` → `void`
+- `assert_panics(expr)` → `void`
+- `assert_panics_with(expr, message)` → `void`
+- `panic(message)` → `Never`
+- `compare(left, right)` → `Ordering`
+- `min(a, b)` → smallest value
+- `max(a, b)` → largest value
 
-**Option methods**: `.map(.transform: fn)`, `.unwrap_or(.default: v)`, `.ok_or(.err: e)`, `.and_then(.then: fn)`, `.filter(.predicate: fn)`
-**Result methods**: `.map(.transform: fn)`, `.map_err(.transform: fn)`, `.unwrap_or(.default: v)`, `.ok()`, `.err()`, `.and_then(.then: fn)`
+**Option methods**: `.map(transform: fn)`, `.unwrap_or(default: value)`, `.ok_or(error: value)`, `.and_then(transform: fn)`, `.filter(predicate: fn)`
+**Result methods**: `.map(transform: fn)`, `.map_err(transform: fn)`, `.unwrap_or(default: value)`, `.ok()`, `.err()`, `.and_then(transform: fn)`
