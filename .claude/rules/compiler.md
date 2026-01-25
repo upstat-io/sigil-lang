@@ -4,55 +4,90 @@ paths: **compiler**
 
 # Compiler Development
 
-## Crate Structure
-
-- `sigil_ir` - Core IR (tokens, spans, AST, arena, interning) - no deps
-- `sigil_diagnostic` - Errors, suggestions, emitters
-- `sigil_lexer` - Tokenization (logos)
-- `sigil_types` - Type definitions
-- `sigil_parse` - Parser (recursive descent)
-- `sigil-macros` - Diagnostic derives
-- `sigilc` - CLI, Salsa queries, typeck, eval, patterns
-
-**Principle**: Pure functions in library crates; Salsa queries in `sigilc`.
-
 ## Source of Truth
 
-1. Language Spec (`docs/sigil_lang/0.1-alpha/spec/`) - authoritative
-2. Language Design (`docs/sigil_lang/0.1-alpha/design/`) - rationale
-3. Compiler Design (`docs/compiler/design/`) - implementation
-4. Reference Repos (`~/lang_repos/`) - patterns
+1. **Language Specification** - `docs/sigil_lang/0.1-alpha/spec/` (authoritative)
+2. **Compiler Design** - `docs/compiler/design/` (implementation details)
+3. **Reference Repos** - `~/lang_repos/` (patterns from Rust, Go, TS, Zig, Gleam, Elm, Roc)
 
-## Salsa Types
+## Crate Structure
 
-Must derive: `Clone, Eq, PartialEq, Hash, Debug`. No function pointers, trait objects, or interior mutability.
+| Crate | Path | Purpose |
+|-------|------|---------|
+| `sigil_ir` | `compiler/sigil_ir/` | Core IR types (no dependencies) |
+| `sigil_diagnostic` | `compiler/sigil_diagnostic/` | Error reporting system |
+| `sigil_lexer` | `compiler/sigil_lexer/` | Tokenization |
+| `sigil_types` | `compiler/sigil_types/` | Type system definitions |
+| `sigil_parse` | `compiler/sigil_parse/` | Recursive descent parser |
+| `sigilc` | `compiler/sigilc/` | CLI, Salsa queries, typeck, eval, patterns |
 
-## Memory Rules
+## Salsa Compatibility
 
-- Arena: `ExprArena` + `ExprId`, not `Box<Expr>`
-- Interning: `Name` not `String`, compare with `==`
-- Registries: Build fully, then wrap in `Arc` (never `Arc<RwLock<T>>`)
+All types in query signatures must derive: `Clone, Eq, PartialEq, Hash, Debug`
+- No function pointers, trait objects, or interior mutability (`Arc<Mutex<T>>`)
+- Use `SharedRegistry<T>` pattern: build fully, then wrap in `Arc` (immutable)
+
+## Memory Management
+
+- **Expressions**: `ExprArena` + `ExprId`, not `Box<Expr>`
+- **Identifiers**: `Name` (interned), not `String`
+- **Shared values**: `Arc<T>` after construction, never `Arc<RwLock<T>>`
+
+## Change Categories
+
+### New Expression
+- Parser: `sigil_parse/src/grammar/expr.rs`
+- Type inference: `sigilc/src/typeck/infer/expr.rs`
+- Evaluator: `sigilc/src/eval/exec/expr.rs`
+- Spec: `docs/sigil_lang/0.1-alpha/spec/09-expressions.md`
+
+### New Pattern
+- Create: `sigilc/src/patterns/<name>.rs`
+- Register: `sigilc/src/patterns/registry.rs`
+- Add type checking + evaluation logic
+- Spec: `docs/sigil_lang/0.1-alpha/spec/10-patterns.md`
+- See: `docs/compiler/design/06-pattern-system/adding-patterns.md`
+
+### New Type Declaration
+- IR: `sigil_ir/src/ast/items/`
+- Parser: `sigil_parse/src/grammar/item.rs`
+- Type registry: `sigilc/src/typeck/checker/type_registration.rs`
+- Spec: `docs/sigil_lang/0.1-alpha/spec/06-types.md`
+
+### New Trait/Impl
+- IR: `sigil_ir/src/ast/items/`
+- Parser: `sigil_parse/src/grammar/item.rs`
+- Method dispatch: `sigilc/src/eval/methods.rs`
+
+### New Diagnostic
+- Problem type: `sigil_diagnostic/src/problem.rs`
+- Code fix: `sigil_diagnostic/src/fixes/`
+- Error codes: `docs/compiler/design/appendices/C-error-codes.md`
+
+### Control Flow
+- Lexer: `sigil_lexer/src/lib.rs` (if new keywords)
+- AST: `sigil_ir/src/ast/`
+- Parser: `sigil_parse/src/grammar/control.rs`
+- Type inference: `sigilc/src/typeck/infer/control.rs`
+- Evaluator: `sigilc/src/eval/exec/control.rs`
 
 ## Testing
 
-- `cargo t` - Rust tests
-- `cargo st` - Sigil language tests
-- `cargo stv` - Verbose Sigil tests
+- Unit tests in `#[cfg(test)]` modules, run with `cargo test`
+- Spec tests in `tests/spec/` validate language specification
+- Target ~300 lines/file, max 500 (grammar files may exceed)
 
-## File Paths by Task
+## Documentation Sync
 
-| Task | Files |
-|------|-------|
-| New token | `sigil_ir/src/token.rs`, `sigil_lexer/src/lib.rs` |
-| New AST node | `sigil_ir/src/ast/expr.rs` |
-| New expression | `sigil_parse/src/grammar/expr/`, `sigilc/src/typeck/infer/`, `sigilc/src/eval/exec/` |
-| New pattern | `sigilc/src/patterns/<name>.rs`, `sigilc/src/patterns/registry.rs` |
-| New type | `sigil_types/src/lib.rs`, `sigilc/src/typeck/type_registry/` |
-| New error | `sigil_diagnostic/src/lib.rs`, `sigilc/src/problem/` |
-| New test feature | `sigilc/src/test/discovery.rs`, `sigilc/src/test/runner.rs` |
+When modifying behavior:
+- Update spec if language semantics changed
+- Update `CLAUDE.md` if syntax/types/patterns changed
+- Update compiler design docs if architecture changed
 
-## Guidelines
+## Debugging
 
-- Target ~300 lines/file, max 500
-- Update spec/design docs when changing behavior
-- Debug: `SIGIL_DEBUG=tokens,ast,types,eval sigil run file.si`
+```bash
+SIGIL_DEBUG=tokens,ast,types,eval sigil run file.si
+```
+
+See `docs/compiler/design/appendices/D-debugging.md`
