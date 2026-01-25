@@ -40,9 +40,25 @@ Capabilities make mocking easy
                     → Code that works, stays working
 ```
 
+### Lean Core, Rich Libraries
+
+The compiler implements only constructs that require special syntax or static analysis. Everything else belongs in the standard library.
+
+**Compiler patterns** (require special handling):
+- `run`, `try`, `match` — sequential evaluation with bindings
+- `recurse` — self-referential recursion with `self()`
+- `parallel`, `spawn`, `timeout` — concurrency primitives
+- `cache`, `with` — capability-aware resource management
+
+**Stdlib methods** (no special syntax needed):
+- `map`, `filter`, `fold`, `find` — data transformation on collections
+- `retry`, `validate` — resilience and validation logic
+
+This separation keeps the compiler focused and maintainable while allowing the standard library to evolve independently. New data transformations don't require compiler changes.
+
 ## Core Features
 
-- **Patterns over loops**: `map`, `filter`, `fold`, `recurse`, `parallel` as first-class constructs
+- **Patterns over loops**: `recurse`, `parallel`, `for` patterns; `map`, `filter`, `fold` as stdlib methods
 - **Mandatory testing**: every function requires tests or compilation fails
 - **Dependency-aware tests**: tests bound to functions, run on change propagation
 - **Causality tracking**: `sigil impact` shows blast radius, `sigil why` traces failures to source
@@ -352,7 +368,7 @@ The reference below is a condensed cheat sheet for writing Sigil code quickly.
 
 ### Patterns
 
-Patterns are distinct from function calls. Three categories:
+Patterns are compiler constructs with special syntax. Three categories:
 
 **function_seq** — Sequential expressions (order matters)
 - `run(let x = a, let y = b, result)`
@@ -361,23 +377,25 @@ Patterns are distinct from function calls. Three categories:
 - `catch(expr)` — catch panics, returns `Result<T, PanicInfo>`
 
 **function_exp** — Named expressions (`name: expr`)
-- `map(over: items, transform: fn)`
-- `filter(over: items, predicate: fn)`
-- `fold(over: items, init: val, op: fn)`
-- `find(over: items, where: fn)` or `find(over: items, map: fn)` (find_map)
-- `collect(range: 0..10, transform: fn)`
 - `recurse(condition: base_case, base: value, step: self(...), memo: true, parallel: threshold)`
 - `parallel(tasks: [...], max_concurrent: n, timeout: duration)` → `[Result<T, E>]`
 - `spawn(tasks: [...], max_concurrent: n)` → `void` (fire and forget)
 - `timeout(op: expr, after: 5s)`
-- `retry(op: expr, attempts: 3, backoff: strategy)`
 - `cache(key: k, op: expr, ttl: 5m)`
-- `validate(rules: [...], then: value)`
 - `with(acquire: expr, use: r -> expr, release: r -> expr)`
 - `for(over: items, match: pattern, default: fallback)`
 
 **function_val** — Type conversion functions (positional allowed)
 - `int(x)`, `float(x)`, `str(x)`, `byte(x)`
+
+**Stdlib methods** (not compiler patterns — use method call syntax):
+- `items.map(transform: fn)` → `[U]`
+- `items.filter(predicate: fn)` → `[T]`
+- `items.fold(initial: val, op: fn)` → `U`
+- `items.find(where: fn)` → `Option<T>`
+- `range.collect()` → `[T]`
+- `retry(op: fn, attempts: n, backoff: strategy)` — in `std.resilience`
+- `validate(rules: [...], value: v)` — in `std.validate`
 
 **Match patterns**
 - `42` — literal
@@ -495,7 +513,7 @@ Inline when ALL conditions met:
 ```sigil
 // Inline - short, simple values
 assert_eq(actual: result, expected: 10)
-map(over: items, transform: x -> x * 2)
+items.map(transform: x -> x * 2)
 ```
 
 Stack when ANY value is long or complex:
@@ -508,8 +526,7 @@ assert_eq(
 )
 
 // Stacked - list literal in args
-map(
-    over: [1, 2, 3, 4, 5],
+[1, 2, 3, 4, 5].map(
     transform: x -> x * 2,
 )
 ```
@@ -531,7 +548,7 @@ map(
 
 **Reserved**: `async`, `break`, `continue`, `do`, `else`, `false`, `for`, `if`, `impl`, `in`, `let`, `loop`, `match`, `mut`, `pub`, `self`, `Self`, `then`, `trait`, `true`, `type`, `use`, `uses`, `void`, `where`, `with`, `yield`
 
-**Context-sensitive** (patterns only): `cache`, `catch`, `collect`, `filter`, `find`, `fold`, `map`, `parallel`, `recurse`, `retry`, `run`, `timeout`, `try`, `validate`
+**Context-sensitive** (compiler patterns only): `cache`, `catch`, `for`, `parallel`, `recurse`, `run`, `spawn`, `timeout`, `try`, `with`
 
 **Reserved built-in function names** (cannot be used for user-defined functions, but CAN be used as variable names):
 `int`, `float`, `str`, `byte`, `len`, `is_empty`, `is_some`, `is_none`, `is_ok`, `is_err`, `assert`, `assert_eq`, `assert_ne`, `assert_some`, `assert_none`, `assert_ok`, `assert_err`, `assert_panics`, `assert_panics_with`, `compare`, `min`, `max`, `print`, `panic`

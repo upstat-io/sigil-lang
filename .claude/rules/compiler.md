@@ -4,6 +4,23 @@ paths: **compiler**
 
 # Compiler Development
 
+## Design Principle: Lean Core, Rich Libraries
+
+The compiler implements only constructs that **require special syntax or static analysis**. Everything else belongs in the standard library as methods or functions.
+
+**In the compiler** (special syntax/analysis needed):
+- `run`, `try`, `match` — sequential patterns with bindings
+- `recurse` — self-referential recursion via `self()`
+- `parallel`, `spawn`, `timeout` — concurrency requiring runtime support
+- `cache`, `with` — capability-aware resource management
+- `int`, `float`, `str`, `byte` — type conversion (function_val)
+
+**In stdlib** (no compiler support needed):
+- `[T].map()`, `[T].filter()`, `[T].fold()`, `[T].find()` — collection methods
+- `retry()`, `validate()` — library functions in `std.resilience`, `std.validate`
+
+When adding features, ask: "Does this require special syntax or static analysis?" If no, it belongs in stdlib.
+
 ## Source of Truth
 
 1. **Language Specification** - `docs/sigil_lang/0.1-alpha/spec/` (authoritative)
