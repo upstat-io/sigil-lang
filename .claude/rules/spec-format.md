@@ -1,5 +1,5 @@
 ---
-globs: ["docs/sigil_lang/**/spec/**/*.md"]
+paths: **docs/sigil_lang/**/spec**
 ---
 
 # Sigil Language Specification Format

@@ -1,5 +1,5 @@
 ---
-path: tests/**
+paths: **tests**
 ---
 
 Read the local README.md in this directory for more info.

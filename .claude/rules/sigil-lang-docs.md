@@ -1,3 +1,7 @@
+---
+paths: **sigil_lang**
+---
+
 # Sigil Documentation Rules
 
 When editing files in `docs/sigil_lang/`, follow these guidelines.

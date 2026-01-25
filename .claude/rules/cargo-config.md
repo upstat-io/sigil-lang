@@ -1,5 +1,5 @@
 ---
-globs: ["Cargo.toml", "**/Cargo.toml"]
+paths: **Cargo.toml**
 ---
 
 # Cargo Configuration Protection

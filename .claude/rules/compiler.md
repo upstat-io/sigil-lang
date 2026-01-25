@@ -1,5 +1,5 @@
 ---
-path: compiler/**
+paths: **compiler**
 ---
 
 # Compiler Development
@@ -62,6 +62,37 @@ Before adding a new type to queries:
 - Use `Arc` for shared runtime values
 - Use `Heap<T>` wrapper for consistency
 - Prefer `Copy` types where possible (ExprId, Name, Span)
+
+### Shared Registries (IMPORTANT)
+
+**Never use `Arc<RwLock<T>>` or `Arc<Mutex<T>>` for registries.**
+
+Why this matters:
+- Interior mutability (`RwLock`, `Mutex`, `RefCell`) inside `Arc` creates hidden shared mutable state
+- This leads to hard-to-debug issues where mutations "leak" across boundaries
+- It violates Rust's principle of making shared mutability explicit and controlled
+
+**Correct pattern** - build fully, then share immutably:
+```rust
+// 1. Build up the registry (owned, mutable)
+let mut registry = UserMethodRegistry::new();
+registry.register("str", "shout", method);
+
+// 2. Wrap in Arc AFTER construction is complete
+let shared = SharedRegistry::new(registry);  // Arc<T>, immutable
+
+// 3. Clone the Arc to share (cheap, just increments refcount)
+let child_registry = shared.clone();
+```
+
+**Wrong pattern** - interior mutability:
+```rust
+// DON'T DO THIS - creates hidden shared mutable state
+let shared = Arc::new(RwLock::new(UserMethodRegistry::new()));
+shared.write().unwrap().register(...);  // Mutation through Arc = bad
+```
+
+This pattern applies to all registries: `PatternRegistry`, `MethodRegistry`, `UserMethodRegistry`, etc. Use `SharedRegistry<T>` which enforces immutability after construction.
 
 ## Testing Requirements
 
