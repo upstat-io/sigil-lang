@@ -268,7 +268,7 @@ The reference below is a condensed cheat sheet for writing Sigil code quickly.
 **Compound**: `(T, U)` tuple, `()` unit, `(T) -> U` function, `dyn Trait` trait object
 **Generic**: `Option<T>`, `Result<T, E>`, `Range<T>`, `Channel<T>`, `Ordering`
 **No implicit conversions**: use `int(x)`, `float(x)`, `str(x)` explicitly
-**Integer overflow**: wraps (does not panic)
+**Integer overflow**: panics (use `std.math` for wrapping/saturating alternatives)
 **String indexing**: `str[i]` returns single codepoint as `str`
 
 ### Literals
