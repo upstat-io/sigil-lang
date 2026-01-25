@@ -325,10 +325,9 @@ The reference below is a condensed cheat sheet for writing Sigil code quickly.
 
 **Access**
 - `value.field`, `value.method()`, `value.method(arg: value)`
-- Built-in functions: positional allowed (`print("Hello")`, `len(items)`, `assert(x > 0)`)
-- Type conversions: positional allowed (`int(x)`, `float(x)`, `str(x)`, `byte(x)`)
-- User-defined functions: named arguments required (`fetch_user(id: 1)`)
-- Patterns: named arguments required (`map(over: items, transform: fn)`)
+- Named arguments required for direct calls: `print(msg: "Hello")`, `len(collection: items)`, `fetch_user(id: 1)`
+- Positional allowed for type conversions: `int(x)`, `float(x)`, `str(x)`, `byte(x)`
+- Positional allowed for function variable calls: `let f = x -> x + 1; f(5)` (param names unknowable)
 - Evaluation: left-to-right, arguments in written order (not parameter order)
 - Formatting: width-based (inline if fits, stack if not):
   ```
@@ -566,27 +565,27 @@ Built-in names are reserved **in call position only** (`name(`). The same names 
 **function_val** (type conversions, positional allowed):
 - `int(x)`, `float(x)`, `str(x)`, `byte(x)`
 
-**Built-in functions** (positional):
-- `print(message)` → `void`
-- `len(collection)` → `int`
-- `is_empty(collection)` → `bool`
-- `is_some(option)` → `bool`
-- `is_none(option)` → `bool`
-- `is_ok(result)` → `bool`
-- `is_err(result)` → `bool`
-- `assert(condition)` → `void`
-- `assert_eq(actual, expected)` → `void`
-- `assert_ne(actual, unexpected)` → `void`
-- `assert_some(option)` → `void`
-- `assert_none(option)` → `void`
-- `assert_ok(result)` → `void`
-- `assert_err(result)` → `void`
-- `assert_panics(expr)` → `void`
-- `assert_panics_with(expr, message)` → `void`
-- `panic(message)` → `Never`
-- `compare(left, right)` → `Ordering`
-- `min(a, b)` → smallest value
-- `max(a, b)` → largest value
+**Built-in functions** (named arguments required):
+- `print(msg: str)` → `void`
+- `len(collection: T)` → `int`
+- `is_empty(collection: T)` → `bool`
+- `is_some(option: Option<T>)` → `bool`
+- `is_none(option: Option<T>)` → `bool`
+- `is_ok(result: Result<T, E>)` → `bool`
+- `is_err(result: Result<T, E>)` → `bool`
+- `assert(condition: bool)` → `void`
+- `assert_eq(actual: T, expected: T)` → `void`
+- `assert_ne(actual: T, unexpected: T)` → `void`
+- `assert_some(option: Option<T>)` → `void`
+- `assert_none(option: Option<T>)` → `void`
+- `assert_ok(result: Result<T, E>)` → `void`
+- `assert_err(result: Result<T, E>)` → `void`
+- `assert_panics(expr: T)` → `void`
+- `assert_panics_with(expr: T, msg: str)` → `void`
+- `panic(msg: str)` → `Never`
+- `compare(left: T, right: T)` → `Ordering`
+- `min(left: T, right: T)` → smallest value
+- `max(left: T, right: T)` → largest value
 
 **Option methods**: `.map(transform: fn)`, `.unwrap_or(default: value)`, `.ok_or(error: value)`, `.and_then(transform: fn)`, `.filter(predicate: fn)`
 **Result methods**: `.map(transform: fn)`, `.map_err(transform: fn)`, `.unwrap_or(default: value)`, `.ok()`, `.err()`, `.and_then(transform: fn)`
