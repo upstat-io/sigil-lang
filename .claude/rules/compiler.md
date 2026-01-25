@@ -94,9 +94,70 @@ All types in query signatures must derive: `Clone, Eq, PartialEq, Hash, Debug`
 
 ## Testing
 
-- Unit tests in `#[cfg(test)]` modules, run with `cargo test`
-- Spec tests in `tests/spec/` validate language specification
-- Target ~300 lines/file, max 500 (grammar files may exceed)
+### Test Organization (Hybrid Approach)
+
+Following Rust compiler conventions, tests use a hybrid organization:
+
+**Inline tests** (`#[cfg(test)] mod tests`) for:
+- Small utility functions (< 200 lines of tests)
+- Simple unit tests that are tightly coupled to implementation
+- Tests that benefit from being next to the code
+
+**Separate test files** (`src/<module>/tests/<name>_tests.rs`) for:
+- Comprehensive test suites (> 200 lines)
+- Tests adapted from other languages (Go, Rust stdlib, etc.)
+- Edge cases and stress tests
+- Integration-style tests within a module
+
+Example structure:
+```
+sigilc/src/eval/
+├── function_val.rs           # Implementation
+├── tests/
+│   ├── mod.rs                # Test module declaration
+│   └── function_val_tests.rs # Comprehensive tests
+```
+
+### Test Locations
+
+| Location | Purpose |
+|----------|---------|
+| `#[cfg(test)]` inline | Simple unit tests, close to implementation |
+| `src/<mod>/tests/` | Comprehensive test suites for complex modules |
+| `tests/spec/` | Language specification conformance tests |
+| `tests/run-pass/` | End-to-end execution tests |
+| `tests/compile-fail/` | Expected compilation failure tests |
+
+### Running Tests
+
+```bash
+cargo test --workspace        # All tests
+cargo test -p sigilc          # Single crate
+cargo test -- eval::tests     # Specific module
+```
+
+Target ~300 lines/file, max 500 (grammar files may exceed)
+
+## Coding Guidelines
+
+See `docs/compiler/design/appendices/E-coding-guidelines.md` for comprehensive coding standards including:
+
+- **Testing**: Organization, naming, coverage requirements
+- **Code Style**: Formatting, file length, imports, naming conventions
+- **Error Handling**: Result vs panic, error types, factory functions
+- **Documentation**: Module docs, public API docs, internal comments
+- **Architecture**: Module design, dependency direction, trait design, registry pattern
+- **Type Safety**: Newtypes, builder pattern, exhaustive matching, conversion safety
+- **Performance**: Allocation, cloning, iteration, stack safety
+- **Clippy Compliance**: Required lints, pedantic fixes, never use `#[allow]`
+- **Git Practices**: Commit messages, branch naming, PR requirements
+
+**Key Rules**:
+- Fix clippy warnings properly—never use `#[allow(...)]` attributes
+- All public items must have documentation
+- Use newtypes for type safety (`ExprId`, `Name`)
+- Prefer iterators over indexing
+- Use `#[cold]` on error factory functions
 
 ## Documentation Sync
 
