@@ -14,12 +14,16 @@ paths: **compiler**
 
 | Crate | Path | Purpose |
 |-------|------|---------|
-| `sigil_ir` | `compiler/sigil_ir/` | Core IR types (no dependencies) |
-| `sigil_diagnostic` | `compiler/sigil_diagnostic/` | Error reporting system |
+| `sigil_ir` | `compiler/sigil_ir/` | Core IR types (AST, spans, no dependencies) |
+| `sigil_diagnostic` | `compiler/sigil_diagnostic/` | Error reporting, DiagnosticQueue, emitters |
 | `sigil_lexer` | `compiler/sigil_lexer/` | Tokenization |
 | `sigil_types` | `compiler/sigil_types/` | Type system definitions |
 | `sigil_parse` | `compiler/sigil_parse/` | Recursive descent parser |
-| `sigilc` | `compiler/sigilc/` | CLI, Salsa queries, typeck, eval, patterns |
+| `sigil_typeck` | `compiler/sigil_typeck/` | Type checking infrastructure |
+| `sigil_patterns` | `compiler/sigil_patterns/` | Pattern definitions, Value/Heap system |
+| `sigil_eval` | `compiler/sigil_eval/` | Tree-walking interpreter |
+| `sigil-macros` | `compiler/sigil-macros/` | Proc-macros (#[derive(Diagnostic)]) |
+| `sigilc` | `compiler/sigilc/` | CLI, Salsa queries, orchestration |
 
 ## Salsa Compatibility
 
