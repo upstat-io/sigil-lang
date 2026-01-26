@@ -4,6 +4,22 @@
 
 General-purpose, expression-based language with strict static typing, type inference, and mandatory testing. Sigil enforces code integrity — if it compiles, it has tests; if it has tests, they pass; if you change it, you'll know what broke.
 
+## Development Commands
+
+**Use these cargo aliases** (defined in `.cargo/config.toml`):
+
+| Command | Description |
+|---------|-------------|
+| `cargo t` | Run all Rust unit tests |
+| `cargo st` | Run all Sigil language tests (`tests/spec/`) |
+| `cargo st tests/spec/capabilities/` | Run specific Sigil test directory |
+| `cargo st tests/spec/types/primitives.si` | Run specific Sigil test file |
+| `cargo c` | Check all crates (fast compile check) |
+| `cargo cl` | Run clippy on all crates |
+| `cargo b` | Build all crates |
+
+**Always run `cargo t` after making compiler changes. Run `cargo st` to verify Sigil language behavior.**
+
 ## Design Philosophy
 
 Sigil doesn't trust you. It verifies you.
@@ -458,7 +474,7 @@ Capabilities track effects and async behavior. Functions must declare required c
 - `Http` — HTTP client (`get`, `post`, `put`, `delete`)
 - `FileSystem` — file I/O (`read`, `write`, `exists`, `delete`)
 - `Clock` — time (`now`, `today`)
-- `Random` — random numbers (`int`, `float`)
+- `Random` — random numbers (`rand_int`, `rand_float`)
 - `Cache` — caching (`get`, `set`, `delete`)
 - `Logger` — logging (`debug`, `info`, `warn`, `error`)
 - `Env` — environment variables (`get`)
