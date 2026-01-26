@@ -4,238 +4,147 @@ paths: **/compiler**
 
 # Compiler Development
 
-## Design Principle: Lean Core, Rich Libraries
+## Pragmatic Guidelines
 
-The compiler implements only constructs that **require special syntax or static analysis**. Everything else belongs in the standard library as methods or functions.
+### Dispatch & Extensibility
 
-**In the compiler** (special syntax/analysis needed):
-- `run`, `try`, `match` — sequential patterns with bindings
-- `recurse` — self-referential recursion via `self()`
-- `parallel`, `spawn`, `timeout` — concurrency requiring runtime support
-- `cache`, `with` — capability-aware resource management
-- `int`, `float`, `str`, `byte` — type conversion (function_val)
+- **Enum** for fixed sets (built-in patterns): exhaustiveness, static dispatch, inlining, jump-to-def
+- **`dyn Trait`** only for user-extensible (user methods)
+- Cost hierarchy: `&dyn` < `Box<dyn>` < `Arc<dyn>` (atomic refcount)
+- Registry: when users add entries (user methods)
+- Match: fixed sets (built-in patterns) — compiler catches missing cases
 
-**In stdlib** (no compiler support needed):
-- `[T].map()`, `[T].filter()`, `[T].fold()`, `[T].find()` — collection methods
-- `retry()`, `validate()` — library functions in `std.resilience`, `std.validate`
+### Memory
 
-When adding features, ask: "Does this require special syntax or static analysis?" If no, it belongs in stdlib.
+- Expressions: `ExprArena` + `ExprId`, not `Box<Expr>`
+- Identifiers: `Name` (interned), not `String`
+- Method keys: `MethodKey`, not `(String, String)`
+- Shared values: `Arc<T>` after construction, never `Arc<RwLock<T>>`
 
-## Source of Truth
+### API Design
 
-1. **Language Specification** - `docs/sigil_lang/0.1-alpha/spec/` (authoritative)
-2. **Compiler Design** - `docs/compiler/design/` (implementation details)
-3. **Reference Repos** - `~/lang_repos/` (patterns from Rust, Go, TS, Zig, Gleam, Elm, Roc)
+- >3-4 params → config struct
+- No single-use "doer" objects → just functions
+- Return iterators, not `Vec` — push allocations to caller
+- Imports: std → external → workspace → local
 
-## Crate Structure
+### Builders & RAII
 
-| Crate | Path | Purpose |
-|-------|------|---------|
-| `sigil_ir` | `compiler/sigil_ir/` | Core IR types (AST, spans, no dependencies) |
-| `sigil_diagnostic` | `compiler/sigil_diagnostic/` | Error reporting, DiagnosticQueue, emitters |
-| `sigil_lexer` | `compiler/sigil_lexer/` | Tokenization |
-| `sigil_types` | `compiler/sigil_types/` | Type system definitions |
-| `sigil_parse` | `compiler/sigil_parse/` | Recursive descent parser |
-| `sigil_typeck` | `compiler/sigil_typeck/` | Type checking infrastructure |
-| `sigil_patterns` | `compiler/sigil_patterns/` | Pattern definitions, Value/Heap system |
-| `sigil_eval` | `compiler/sigil_eval/` | Tree-walking interpreter |
-| `sigil-macros` | `compiler/sigil-macros/` | Proc-macros (#[derive(Diagnostic)]) |
-| `sigilc` | `compiler/sigilc/` | CLI, Salsa queries, orchestration |
+- Builders: use when many optional params, validation needed, fluent API helps
+- Builders: skip when few params, `Default` + struct update works
+- RAII: use when scope is clear and lexical
+- Explicit params: when scope unclear or long-lived (but params pollute signatures)
 
-## Salsa Compatibility
+### Complexity & Style
 
-All types in query signatures must derive: `Clone, Eq, PartialEq, Hash, Debug`
-- No function pointers, trait objects, or interior mutability (`Arc<Mutex<T>>`)
-- Use `SharedRegistry<T>` pattern: build fully, then wrap in `Arc` (immutable)
+- Flag O(n²) → O(n), linear scans → hash lookups, repeated lookups → cache
+- Line count is smell, not rule — 600 lines one concept → keep; three concepts → split
+- All public items: documented
+- Newtypes: `ExprId`, `Name`, `MethodKey`
+- Iterators over indexing
+- `#[cold]` on error factories
+- No banner comments — use `//!` module docs or `///` item docs, not decorative `// ====` headers
 
-## Memory Management
+### Errors
 
-- **Expressions**: `ExprArena` + `ExprId`, not `Box<Expr>`
-- **Identifiers**: `Name` (interned), not `String`
-- **Method keys**: `MethodKey` for type/method pairs, not `(String, String)` tuples
-- **Shared values**: `Arc<T>` after construction, never `Arc<RwLock<T>>`
-- **Exception**: `SharedMutableRegistry<T>` uses `Arc<RwLock<T>>` for cached dispatchers that need post-construction updates
+- `Result<T, E>`: recoverable (user input, file I/O)
+- `panic!`: invariant violations (compiler bug)
+- `unreachable!()`: impossible paths
+- `#[allow(clippy)]`: fix issue; if clippy wrong, comment why
 
-## Key Architectural Patterns
+## Salsa
 
-### TypeChecker Components
+- Query types must derive: `Clone, Eq, PartialEq, Hash, Debug`
+- No function pointers, trait objects, or `Arc<Mutex<T>>` in queries
+- `SharedRegistry<T>`: build fully, then wrap in `Arc` (immutable)
 
-TypeChecker is organized into 5 logical components (see `sigilc/src/typeck/checker/components.rs`):
+## Design Principle
 
-| Component | Purpose |
-|-----------|---------|
-| `CheckContext<'a>` | Immutable refs to arena and interner |
-| `InferenceState` | Mutable inference ctx, env, expr_types |
-| `Registries` | Pattern, type_op, types, traits |
-| `DiagnosticState` | Errors, queue, source |
-| `ScopeContext` | Function sigs, impl Self, capabilities |
+Compiler implements only constructs requiring **special syntax or static analysis**. Everything else → stdlib.
 
-Use `TypeCheckerBuilder` for construction:
-```rust
-TypeCheckerBuilder::new(&arena, &interner)
-    .with_source(source)
-    .with_context(&compiler_context)
-    .build()
-```
+- **Compiler**: `run`, `try`, `match`, `recurse`, `parallel`, `spawn`, `timeout`, `cache`, `with`, `int`, `float`, `str`, `byte`
+- **Stdlib**: `map`, `filter`, `fold`, `find`, `retry`, `validate`
 
-### Evaluator Method Dispatch
+---
 
-Method resolution uses Chain of Responsibility (see `sigilc/src/eval/evaluator/resolvers/`):
+## Key Patterns
 
-| Resolver | Priority | Purpose |
-|----------|----------|---------|
-| `UserMethodResolver` | 0 | User-defined methods from impl blocks |
-| `DerivedMethodResolver` | 1 | Methods from `#[derive(...)]` |
-| `CollectionMethodResolver` | 2 | map, filter, fold (need evaluator) |
-| `BuiltinMethodResolver` | 3 | Built-in methods in MethodRegistry |
+**TypeChecker** (5 components in `sigilc/src/typeck/checker/components.rs`):
+- `CheckContext<'a>` — immutable arena/interner refs
+- `InferenceState` — mutable inference ctx, env, expr_types
+- `Registries` — pattern, type_op, types, traits
+- `DiagnosticState` — errors, queue, source
+- `ScopeContext` — function sigs, impl Self, capabilities
 
-Use `EvaluatorBuilder` for construction:
-```rust
-EvaluatorBuilder::new(&interner, &arena)
-    .user_method_registry(registry)
-    .build()
-```
+**Construction**: `TypeCheckerBuilder::new(&arena, &interner).with_source(source).build()`
 
-### RAII Scope Guards
+**Method Dispatch** (Chain of Responsibility, `sigilc/src/eval/evaluator/resolvers/`):
+- Priority 0: `UserRegistryResolver` — user impl blocks + `#[derive]` methods (unified)
+- Priority 1: `CollectionMethodResolver` — map/filter/fold
+- Priority 2: `BuiltinMethodResolver` — built-ins
 
-Use scope guards for safe context management in TypeChecker:
-```rust
-// Capabilities restored automatically, even on early return
-checker.with_capability_scope(caps, |c| { ... });
+**Construction**: `EvaluatorBuilder::new(&interner, &arena).user_method_registry(registry).build()`
 
-// Impl Self type restored automatically
-checker.with_impl_scope(self_type, |c| { ... });
-```
+**RAII Guards**: `checker.with_capability_scope(caps, |c| { ... })`, `checker.with_impl_scope(self_type, |c| { ... })`, `eval.with_env_scope(|e| { ... })`
 
-### Arena Threading
+**Arena Threading**: `self.create_function_evaluator(func_arena, call_env)`
 
-Functions carry their own `SharedArena` for thread safety. Use `create_function_evaluator()`:
-```rust
-let func_evaluator = self.create_function_evaluator(func_arena, call_env);
-```
+---
 
-## Change Categories
+## Change Locations
 
-### New Expression
-- Parser: `sigil_parse/src/grammar/expr.rs`
-- Type inference: `sigilc/src/typeck/infer/expr.rs`
-- Evaluator: `sigilc/src/eval/exec/expr.rs`
-- Spec: `docs/sigil_lang/0.1-alpha/spec/09-expressions.md`
-
-### New Pattern
-- Create: `sigilc/src/patterns/<name>.rs`
-- Register: `sigilc/src/patterns/registry.rs`
-- Add type checking + evaluation logic
-- Spec: `docs/sigil_lang/0.1-alpha/spec/10-patterns.md`
-- See: `docs/compiler/design/06-pattern-system/adding-patterns.md`
-
-### New Type Declaration
-- IR: `sigil_ir/src/ast/items/`
-- Parser: `sigil_parse/src/grammar/item.rs`
-- Type registry: `sigilc/src/typeck/checker/type_registration.rs`
-- Spec: `docs/sigil_lang/0.1-alpha/spec/06-types.md`
-
-### New Trait/Impl
-- IR: `sigil_ir/src/ast/items/`
-- Parser: `sigil_parse/src/grammar/item.rs`
-- Method dispatch: `sigilc/src/eval/evaluator/resolvers/`
-- User methods: `sigil_eval/src/user_methods.rs`
-
-### New Method Resolver
-- Create: `sigilc/src/eval/evaluator/resolvers/<name>.rs`
-- Implement: `MethodResolver` trait with `resolve()`, `priority()`, `name()`
-- Register: Add to `MethodDispatcher::new()` in `builder.rs`
-- Priority: Lower number = higher priority (user=0, derived=1, collection=2, builtin=3)
-
-### New Diagnostic
-- Problem type: `sigil_diagnostic/src/problem.rs`
-- Code fix: `sigil_diagnostic/src/fixes/`
-- Error codes: `docs/compiler/design/appendices/C-error-codes.md`
-
-### Control Flow
-- Lexer: `sigil_lexer/src/lib.rs` (if new keywords)
-- AST: `sigil_ir/src/ast/`
-- Parser: `sigil_parse/src/grammar/control.rs`
-- Type inference: `sigilc/src/typeck/infer/control.rs`
-- Evaluator: `sigilc/src/eval/exec/control.rs`
+| Change | Files |
+|--------|-------|
+| **Expression** | `sigil_parse/src/grammar/expr.rs`, `sigilc/src/typeck/infer/expr.rs`, `sigilc/src/eval/exec/expr.rs` |
+| **Pattern** | `sigilc/src/patterns/<name>.rs`, `sigilc/src/patterns/registry.rs` |
+| **Type Decl** | `sigil_ir/src/ast/items/`, `sigil_parse/src/grammar/item.rs`, `sigilc/src/typeck/checker/type_registration.rs` |
+| **Trait/Impl** | `sigil_ir/src/ast/items/`, `sigil_parse/src/grammar/item.rs`, `sigilc/src/eval/evaluator/resolvers/`, `sigil_eval/src/user_methods.rs` |
+| **Resolver** | `sigilc/src/eval/evaluator/resolvers/<name>.rs`, implement `MethodResolver` trait, register in `builder.rs` |
+| **Diagnostic** | `sigil_diagnostic/src/problem.rs`, `sigil_diagnostic/src/fixes/` |
+| **Control Flow** | `sigil_lexer/src/lib.rs`, `sigil_ir/src/ast/`, `sigil_parse/src/grammar/control.rs`, `sigilc/src/typeck/infer/control.rs`, `sigilc/src/eval/exec/control.rs` |
 
 ## Testing
 
-### Test Organization (Hybrid Approach)
-
-Following Rust compiler conventions, tests use a hybrid organization:
-
-**Inline tests** (`#[cfg(test)] mod tests`) for:
-- Small utility functions (< 200 lines of tests)
-- Simple unit tests that are tightly coupled to implementation
-- Tests that benefit from being next to the code
-
-**Separate test files** (`src/<module>/tests/<name>_tests.rs`) for:
-- Comprehensive test suites (> 200 lines)
-- Tests adapted from other languages (Go, Rust stdlib, etc.)
-- Edge cases and stress tests
-- Integration-style tests within a module
-
-Example structure:
-```
-sigilc/src/eval/
-├── function_val.rs           # Implementation
-├── tests/
-│   ├── mod.rs                # Test module declaration
-│   └── function_val_tests.rs # Comprehensive tests
-```
-
-### Test Locations
-
-| Location | Purpose |
-|----------|---------|
-| `#[cfg(test)]` inline | Simple unit tests, close to implementation |
-| `src/<mod>/tests/` | Comprehensive test suites for complex modules |
-| `tests/spec/` | Language specification conformance tests |
-| `tests/run-pass/` | End-to-end execution tests |
-| `tests/compile-fail/` | Expected compilation failure tests |
-
-### Running Tests
+- **Inline** (`#[cfg(test)]`): <200 lines, tightly coupled to impl
+- **Separate** (`src/<mod>/tests/`): >200 lines, comprehensive suites, edge cases
+- **Spec**: `tests/spec/` — conformance
+- **Run-pass**: `tests/run-pass/` — e2e
+- **Compile-fail**: `tests/compile-fail/` — expected failures
 
 ```bash
-cargo test --workspace        # All tests
-cargo test -p sigilc          # Single crate
-cargo test -- eval::tests     # Specific module
+cargo test --workspace       # all
+cargo test -p sigilc         # single crate
+cargo test -- eval::tests    # specific module
 ```
 
-Target ~300 lines/file, max 500 (grammar files may exceed)
+## Crates
 
-## Coding Guidelines
+| Crate | Purpose |
+|-------|---------|
+| `sigil_ir` | AST, spans (no deps) |
+| `sigil_diagnostic` | Errors, DiagnosticQueue, emitters |
+| `sigil_lexer` | Tokenization |
+| `sigil_types` | Type system |
+| `sigil_parse` | Recursive descent parser |
+| `sigil_typeck` | Type checking |
+| `sigil_patterns` | Pattern definitions |
+| `sigil_eval` | Tree-walking interpreter |
+| `sigil-macros` | Proc-macros |
+| `sigilc` | CLI, Salsa queries, orchestration |
 
-See `docs/compiler/design/appendices/E-coding-guidelines.md` for comprehensive coding standards including:
+## Source of Truth
 
-- **Testing**: Organization, naming, coverage requirements
-- **Code Style**: Formatting, file length, imports, naming conventions
-- **Error Handling**: Result vs panic, error types, factory functions
-- **Documentation**: Module docs, public API docs, internal comments
-- **Architecture**: Module design, dependency direction, trait design, registry pattern
-- **Type Safety**: Newtypes, builder pattern, exhaustive matching, conversion safety
-- **Performance**: Allocation, cloning, iteration, stack safety
-- **Clippy Compliance**: Required lints, pedantic fixes, never use `#[allow]`
-- **Git Practices**: Commit messages, branch naming, PR requirements
+1. `docs/sigil_lang/0.1-alpha/spec/` — Language spec (authoritative)
+2. `docs/compiler/design/` — Implementation details
+3. `~/lang_repos/` — Reference: Rust, Go, TS, Zig, Gleam, Elm, Roc
 
-**Key Rules**:
-- Fix clippy warnings properly—never use `#[allow(...)]` attributes
-- All public items must have documentation
-- Use newtypes for type safety (`ExprId`, `Name`, `MethodKey`)
-- Use builder pattern for complex struct construction (`TypeCheckerBuilder`, `EvaluatorBuilder`)
-- Use RAII scope guards for context management (`with_capability_scope`, `with_impl_scope`)
-- Prefer iterators over indexing
-- Use `#[cold]` on error factory functions
+## Doc Sync
 
-## Documentation Sync
+- Spec changed → update `docs/sigil_lang/0.1-alpha/spec/`
+- Syntax changed → update `CLAUDE.md`
+- Architecture changed → update `docs/compiler/design/`
 
-When modifying behavior:
-- Update spec if language semantics changed
-- Update `CLAUDE.md` if syntax/types/patterns changed
-- Update compiler design docs if architecture changed
-
-## Debugging
+## Debug
 
 ```bash
 SIGIL_DEBUG=tokens,ast,types,eval sigil run file.si
