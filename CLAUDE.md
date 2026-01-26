@@ -22,9 +22,11 @@ General-purpose, expression-based language with strict static typing, type infer
 
 ## Design Philosophy
 
-Sigil doesn't trust you. It verifies you.
+**Code that proves itself.** Every function tested. Every change traced. Every effect explicit.
 
-### The Three Pillars
+Sigil makes verification automatic — the compiler enforces what discipline alone cannot.
+
+### The Four Pillars
 
 1. **Mandatory Verification**
    - Every function requires tests or it doesn't compile
@@ -44,6 +46,13 @@ Sigil doesn't trust you. It verifies you.
    - No hidden side effects
    - Mocking is trivial (`with Http = MockHttp(...) in`)
    - Tests are fast because everything is injectable
+
+4. **ARC-Safe by Design**
+   - Memory managed via ARC (no tracing GC, no borrow checker)
+   - Closures capture by value — no reference cycles through environments
+   - No shared mutable references — single ownership of mutable data
+   - Value semantics by default — reference types are explicit
+   - See `spec/15-memory-model.md` for invariants that new features must maintain
 
 ### The Virtuous Cycle
 
