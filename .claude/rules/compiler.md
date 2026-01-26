@@ -52,7 +52,67 @@ All types in query signatures must derive: `Clone, Eq, PartialEq, Hash, Debug`
 
 - **Expressions**: `ExprArena` + `ExprId`, not `Box<Expr>`
 - **Identifiers**: `Name` (interned), not `String`
+- **Method keys**: `MethodKey` for type/method pairs, not `(String, String)` tuples
 - **Shared values**: `Arc<T>` after construction, never `Arc<RwLock<T>>`
+- **Exception**: `SharedMutableRegistry<T>` uses `Arc<RwLock<T>>` for cached dispatchers that need post-construction updates
+
+## Key Architectural Patterns
+
+### TypeChecker Components
+
+TypeChecker is organized into 5 logical components (see `sigilc/src/typeck/checker/components.rs`):
+
+| Component | Purpose |
+|-----------|---------|
+| `CheckContext<'a>` | Immutable refs to arena and interner |
+| `InferenceState` | Mutable inference ctx, env, expr_types |
+| `Registries` | Pattern, type_op, types, traits |
+| `DiagnosticState` | Errors, queue, source |
+| `ScopeContext` | Function sigs, impl Self, capabilities |
+
+Use `TypeCheckerBuilder` for construction:
+```rust
+TypeCheckerBuilder::new(&arena, &interner)
+    .with_source(source)
+    .with_context(&compiler_context)
+    .build()
+```
+
+### Evaluator Method Dispatch
+
+Method resolution uses Chain of Responsibility (see `sigilc/src/eval/evaluator/resolvers/`):
+
+| Resolver | Priority | Purpose |
+|----------|----------|---------|
+| `UserMethodResolver` | 0 | User-defined methods from impl blocks |
+| `DerivedMethodResolver` | 1 | Methods from `#[derive(...)]` |
+| `CollectionMethodResolver` | 2 | map, filter, fold (need evaluator) |
+| `BuiltinMethodResolver` | 3 | Built-in methods in MethodRegistry |
+
+Use `EvaluatorBuilder` for construction:
+```rust
+EvaluatorBuilder::new(&interner, &arena)
+    .user_method_registry(registry)
+    .build()
+```
+
+### RAII Scope Guards
+
+Use scope guards for safe context management in TypeChecker:
+```rust
+// Capabilities restored automatically, even on early return
+checker.with_capability_scope(caps, |c| { ... });
+
+// Impl Self type restored automatically
+checker.with_impl_scope(self_type, |c| { ... });
+```
+
+### Arena Threading
+
+Functions carry their own `SharedArena` for thread safety. Use `create_function_evaluator()`:
+```rust
+let func_evaluator = self.create_function_evaluator(func_arena, call_env);
+```
 
 ## Change Categories
 
@@ -78,7 +138,14 @@ All types in query signatures must derive: `Clone, Eq, PartialEq, Hash, Debug`
 ### New Trait/Impl
 - IR: `sigil_ir/src/ast/items/`
 - Parser: `sigil_parse/src/grammar/item.rs`
-- Method dispatch: `sigilc/src/eval/methods.rs`
+- Method dispatch: `sigilc/src/eval/evaluator/resolvers/`
+- User methods: `sigil_eval/src/user_methods.rs`
+
+### New Method Resolver
+- Create: `sigilc/src/eval/evaluator/resolvers/<name>.rs`
+- Implement: `MethodResolver` trait with `resolve()`, `priority()`, `name()`
+- Register: Add to `MethodDispatcher::new()` in `builder.rs`
+- Priority: Lower number = higher priority (user=0, derived=1, collection=2, builtin=3)
 
 ### New Diagnostic
 - Problem type: `sigil_diagnostic/src/problem.rs`
@@ -155,7 +222,9 @@ See `docs/compiler/design/appendices/E-coding-guidelines.md` for comprehensive c
 **Key Rules**:
 - Fix clippy warnings properly—never use `#[allow(...)]` attributes
 - All public items must have documentation
-- Use newtypes for type safety (`ExprId`, `Name`)
+- Use newtypes for type safety (`ExprId`, `Name`, `MethodKey`)
+- Use builder pattern for complex struct construction (`TypeCheckerBuilder`, `EvaluatorBuilder`)
+- Use RAII scope guards for context management (`with_capability_scope`, `with_impl_scope`)
 - Prefer iterators over indexing
 - Use `#[cold]` on error factory functions
 
