@@ -97,11 +97,33 @@ This separation keeps the compiler focused and maintainable while allowing the s
 
 | Path | Purpose |
 |------|---------|
-| `compiler/oric/` | Rust compiler (lexer, parser, types, interpreter, codegen) |
+| `compiler/oric/` | Rust compiler (lexer, parser, types, interpreter, LLVM backend) |
 | `docs/ori_lang/0.1-alpha/spec/` | **Formal specification** (authoritative) |
 | `docs/ori_lang/proposals/` | Proposals and decision rationale |
 | `library/std/` | Standard library |
 | `tests/spec/` | Specification conformance tests |
+| `plans/roadmap/` | **Compiler roadmap** (phases, tracking, priorities) |
+
+## Roadmap
+
+The compiler development roadmap is in `plans/roadmap/`. Key files:
+
+| File | Purpose |
+|------|---------|
+| `00-overview.md` | Phase overview, tiers, dependency graph, milestones |
+| `plan.md` | Execution plan, phase order, how to use |
+| `priority-and-tracking.md` | **Current status**, test results, immediate priorities |
+| `phase-XX-*.md` | Individual phase details and checklists |
+
+**22 phases across 8 tiers:**
+- Tier 1 (1-5): Foundation — types, inference, traits, modules, type declarations
+- Tier 2 (6-7): Capabilities & stdlib
+- Tier 3 (8-10): Core patterns — run/try/match, control flow
+- Tier 4 (11-12): FFI & interop
+- Tier 5 (13-15): Language completion — conditional compilation, testing, syntax
+- Tier 6 (16-17): Async & concurrency
+- Tier 7 (18-19): Advanced types — const generics, existential types
+- Tier 8 (20-22): Advanced features — reflection, **LLVM backend**, tooling
 
 ## Reference Repos
 
