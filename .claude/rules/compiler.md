@@ -110,12 +110,19 @@ Compiler implements only constructs requiring **special syntax or static analysi
 - **Spec**: `tests/spec/` — conformance
 - **Run-pass**: `tests/run-pass/` — e2e
 - **Compile-fail**: `tests/compile-fail/` — expected failures
+- Ori spec tests can use `assert_panics` and `assert_panics_with` from the prelude to verify panic behavior
 
 ```bash
 cargo test --workspace       # all
 cargo test -p oric         # single crate
 cargo test -- eval::tests    # specific module
 ```
+
+## Key Files
+
+| Path | Purpose |
+|------|---------|
+| `library/std/prelude.ori` | Standard prelude — auto-imported assertions, traits, capabilities |
 
 ## Crates
 

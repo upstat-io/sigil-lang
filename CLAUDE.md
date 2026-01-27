@@ -398,7 +398,6 @@ Patterns are compiler constructs with special syntax. Three categories:
 - `run(let x = a, let y = b, result)`
 - `try(let x = fallible()?, Ok(x))`
 - `match(value, Pattern -> expr, _ -> default)`
-- `catch(expr)` — catch panics, returns `Result<T, PanicInfo>`
 
 **function_exp** — Named expressions (`name: expr`)
 - `recurse(condition: base_case, base: value, step: self(...), memo: true, parallel: threshold)`
@@ -408,6 +407,7 @@ Patterns are compiler constructs with special syntax. Three categories:
 - `cache(key: k, op: expr, ttl: 5m)`
 - `with(acquire: expr, use: r -> expr, release: r -> expr)`
 - `for(over: items, match: pattern, default: fallback)`
+- `catch(expr: expression)` — catch panics, returns `Result<T, str>`
 
 **function_val** — Type conversion functions (positional allowed)
 - `int(x)`, `float(x)`, `str(x)`, `byte(x)`
@@ -485,7 +485,8 @@ Capabilities track effects and async behavior. Functions must declare required c
 - `Clock` — time (`now`, `today`)
 - `Random` — random numbers (`rand_int`, `rand_float`)
 - `Cache` — caching (`get`, `set`, `delete`)
-- `Logger` — logging (`debug`, `info`, `warn`, `error`)
+- `Print` — standard output (`print`, `println`, `output`, `clear`) — has default
+- `Logger` — structured logging (`debug`, `info`, `warn`, `error`)
 - `Env` — environment variables (`get`)
 - `Async` — marker for functions that may suspend
 
@@ -605,8 +606,8 @@ Built-in names are reserved **in call position only** (`name(`). The same names 
 - `assert_none(option: Option<T>)` → `void`
 - `assert_ok(result: Result<T, E>)` → `void`
 - `assert_err(result: Result<T, E>)` → `void`
-- `assert_panics(expr: T)` → `void`
-- `assert_panics_with(expr: T, msg: str)` → `void`
+- `assert_panics(f: () -> void)` → `void` — asserts the thunk panics
+- `assert_panics_with(f: () -> void, msg: str)` → `void` — asserts the thunk panics with a specific message
 - `panic(msg: str)` → `Never`
 - `compare(left: T, right: T)` → `Ordering`
 - `min(left: T, right: T)` → smallest value
