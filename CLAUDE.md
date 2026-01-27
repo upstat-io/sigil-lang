@@ -331,6 +331,7 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 **Conditionals**
 - `if cond then expr else expr`
 - `if cond then expr else if cond then expr else expr`
+- `if cond then expr` — no else, result type is `void`
 
 **Bindings**
 - `let x = value` — immutable
