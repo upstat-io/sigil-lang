@@ -78,16 +78,16 @@ Compiler implements only constructs requiring **special syntax or static analysi
 
 **Construction**: `TypeCheckerBuilder::new(&arena, &interner).with_source(source).build()`
 
-**Method Dispatch** (Chain of Responsibility, `oric/src/eval/evaluator/resolvers/`):
+**Method Dispatch** (Chain of Responsibility, `ori_eval/src/interpreter/resolvers/`):
 - Priority 0: `UserRegistryResolver` — user impl blocks + `#[derive]` methods (unified)
 - Priority 1: `CollectionMethodResolver` — map/filter/fold
 - Priority 2: `BuiltinMethodResolver` — built-ins
 
-**Construction**: `EvaluatorBuilder::new(&interner, &arena).user_method_registry(registry).build()`
+**Construction**: `InterpreterBuilder::new(&interner, &arena).user_method_registry(registry).build()`
 
-**RAII Guards**: `checker.with_capability_scope(caps, |c| { ... })`, `checker.with_impl_scope(self_type, |c| { ... })`, `eval.with_env_scope(|e| { ... })`
+**RAII Guards**: `checker.with_capability_scope(caps, |c| { ... })`, `checker.with_impl_scope(self_type, |c| { ... })`, `interp.with_env_scope(|i| { ... })`
 
-**Arena Threading**: `self.create_function_evaluator(func_arena, call_env)`
+**Arena Threading**: `self.create_function_interpreter(func_arena, call_env)`
 
 ---
 
@@ -95,13 +95,13 @@ Compiler implements only constructs requiring **special syntax or static analysi
 
 | Change | Files |
 |--------|-------|
-| **Expression** | `ori_parse/src/grammar/expr.rs`, `oric/src/typeck/infer/expr.rs`, `oric/src/eval/exec/expr.rs` |
-| **Pattern** | `oric/src/patterns/<name>.rs`, `oric/src/patterns/registry.rs` |
+| **Expression** | `ori_parse/src/grammar/expr.rs`, `oric/src/typeck/infer/expr.rs`, `ori_eval/src/exec/expr.rs` |
+| **Pattern** | `ori_patterns/src/<name>.rs`, `ori_patterns/src/registry.rs` |
 | **Type Decl** | `ori_ir/src/ast/items/`, `ori_parse/src/grammar/item.rs`, `oric/src/typeck/checker/type_registration.rs` |
-| **Trait/Impl** | `ori_ir/src/ast/items/`, `ori_parse/src/grammar/item.rs`, `oric/src/eval/evaluator/resolvers/`, `ori_eval/src/user_methods.rs` |
-| **Resolver** | `oric/src/eval/evaluator/resolvers/<name>.rs`, implement `MethodResolver` trait, register in `builder.rs` |
+| **Trait/Impl** | `ori_ir/src/ast/items/`, `ori_parse/src/grammar/item.rs`, `ori_eval/src/interpreter/resolvers/`, `ori_eval/src/user_methods.rs` |
+| **Resolver** | `ori_eval/src/interpreter/resolvers/<name>.rs`, implement `MethodResolver` trait, register in `builder.rs` |
 | **Diagnostic** | `ori_diagnostic/src/problem.rs`, `ori_diagnostic/src/fixes/` |
-| **Control Flow** | `ori_lexer/src/lib.rs`, `ori_ir/src/ast/`, `ori_parse/src/grammar/control.rs`, `oric/src/typeck/infer/control.rs`, `oric/src/eval/exec/control.rs` |
+| **Control Flow** | `ori_lexer/src/lib.rs`, `ori_ir/src/ast/`, `ori_parse/src/grammar/control.rs`, `oric/src/typeck/infer/control.rs`, `ori_eval/src/exec/control.rs` |
 
 ## Testing
 
@@ -134,10 +134,10 @@ cargo test -- eval::tests    # specific module
 | `ori_types` | Type system |
 | `ori_parse` | Recursive descent parser |
 | `ori_typeck` | Type checking |
-| `ori_patterns` | Pattern definitions |
-| `ori_eval` | Tree-walking interpreter |
+| `ori_patterns` | Pattern definitions, Value types, EvalError |
+| `ori_eval` | Core interpreter: Interpreter, Environment, exec, method dispatch |
 | `ori-macros` | Proc-macros |
-| `oric` | CLI, Salsa queries, orchestration |
+| `oric` | CLI, Salsa queries, high-level Evaluator, orchestration |
 
 ## Source of Truth
 
