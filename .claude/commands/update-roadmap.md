@@ -6,9 +6,9 @@ Update the website roadmap page (`website/src/pages/roadmap.astro`) with the lat
 
 Read these files to get the current roadmap status:
 
-1. `plans/sigil-compiler-roadmap/00-overview.md` - Phase overview, tiers, milestones, dependency graph
-2. `plans/sigil-compiler-roadmap/priority-and-tracking.md` - Current status of each phase, test results, immediate priorities
-3. `plans/sigil-compiler-roadmap/phase-XX-*.md` - Individual phase files with detailed task checklists (read as needed for task bullet point updates)
+1. `plans/roadmap/00-overview.md` - Phase overview, tiers, milestones, dependency graph
+2. `plans/roadmap/priority-and-tracking.md` - Current status of each phase, test results, immediate priorities
+3. `plans/roadmap/phase-XX-*.md` - Individual phase files with detailed task checklists (read as needed for task bullet point updates)
 
 ## Data to Extract
 
@@ -21,7 +21,6 @@ Read these files to get the current roadmap status:
 ### From `priority-and-tracking.md`:
 - Current status of each phase (✅ Complete, 🔶 Partial, ⏳ Not started)
 - Notes for each phase (what's done, what's pending)
-- Current focus area
 - Test results (Rust unit tests count, Ori spec tests count, skipped count)
 - Milestone status
 
@@ -30,13 +29,29 @@ Read these files to get the current roadmap status:
 - Task names and groupings by section
 - Any new tasks added since last sync
 
+## Website Structure
+
+The roadmap page has these main sections:
+
+1. **Hero stats** - Count of phases by status (complete, in progress, planned)
+2. **Completed section** - Collapsible section showing all phases with `status: "complete"`
+3. **Tier sections** - Each tier shows only non-complete phases (partial or not-started)
+4. **Dependency graph** - Visual representation of phase dependencies
+5. **Test results** - Current test counts
+
+### Completed Section Logic
+
+Phases with `status: "complete"` are:
+- Automatically extracted and shown in the collapsed "Completed" section at the top
+- Filtered OUT of their original tier sections
+- This keeps completed work visible while tiers show remaining work
+
 ## Update Process
 
-1. Read both source files
+1. Read the source files
 2. Parse the status tables to extract:
    - Phase number, name, status, and notes
    - Test counts
-   - Current focus phases
 3. Update the `tiers` array in `website/src/pages/roadmap.astro` with:
    - Correct status for each phase (`complete`, `partial`, `not-started`)
    - Current notes from tracking
@@ -49,8 +64,7 @@ Read these files to get the current roadmap status:
    - Remove tasks that are no longer relevant
 5. Update the stats in the hero section:
    - Count phases by status
-6. Update the "Current Focus" section based on "Immediate Priority" in tracking
-7. Update the "Test Results" section with latest counts
+6. Update the "Test Results" section with latest counts
 
 ## Status Mapping
 
@@ -77,4 +91,5 @@ cd website && bun run build
 Report what changed:
 - Which phases changed status
 - Updated test counts
-- Any new notes added
+- Any new tasks added
+- Which phases moved to/from the Completed section
