@@ -1,8 +1,8 @@
 ---
-paths: **docs/sigil_lang/**/spec**
+paths: **docs/ori_lang/**/spec**
 ---
 
-# Sigil Language Specification Format
+# Ori Language Specification Format
 
 Style: [Go Language Specification](https://go.dev/ref/spec)
 
@@ -76,7 +76,7 @@ production_name = expression .
 
 ## Examples
 
-```sigil
+```ori
 // Valid
 example()
 
@@ -86,4 +86,4 @@ bad()  // error: explanation
 
 ## Template Location
 
-See `docs/sigil_lang/0.1-alpha/spec/_template.md` for new files.
+See `docs/ori_lang/0.1-alpha/spec/_template.md` for new files.

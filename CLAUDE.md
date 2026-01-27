@@ -1,8 +1,8 @@
-# Sigil
+# Ori
 
 **Code That Proves Itself**
 
-General-purpose, expression-based language with strict static typing, type inference, and mandatory testing. Sigil enforces code integrity — if it compiles, it has tests; if it has tests, they pass; if you change it, you'll know what broke.
+General-purpose, expression-based language with strict static typing, type inference, and mandatory testing. Ori enforces code integrity — if it compiles, it has tests; if it has tests, they pass; if you change it, you'll know what broke.
 
 ## Development Commands
 
@@ -11,20 +11,20 @@ General-purpose, expression-based language with strict static typing, type infer
 | Command | Description |
 |---------|-------------|
 | `cargo t` | Run all Rust unit tests |
-| `cargo st` | Run all Sigil language tests (`tests/spec/`) |
-| `cargo st tests/spec/capabilities/` | Run specific Sigil test directory |
-| `cargo st tests/spec/types/primitives.si` | Run specific Sigil test file |
+| `cargo st` | Run all Ori language tests (`tests/spec/`) |
+| `cargo st tests/spec/capabilities/` | Run specific Ori test directory |
+| `cargo st tests/spec/types/primitives.ori` | Run specific Ori test file |
 | `cargo c` | Check all crates (fast compile check) |
 | `cargo cl` | Run clippy on all crates |
 | `cargo b` | Build all crates |
 
-**Always run `cargo t` after making compiler changes. Run `cargo st` to verify Sigil language behavior.**
+**Always run `cargo t` after making compiler changes. Run `cargo st` to verify Ori language behavior.**
 
 ## Design Philosophy
 
 **Code that proves itself.** Every function tested. Every change traced. Every effect explicit.
 
-Sigil makes verification automatic — the compiler enforces what discipline alone cannot.
+Ori makes verification automatic — the compiler enforces what discipline alone cannot.
 
 ### The Four Pillars
 
@@ -86,9 +86,9 @@ This separation keeps the compiler focused and maintainable while allowing the s
 - **Patterns over loops**: `recurse`, `parallel`, `for` patterns; `map`, `filter`, `fold` as stdlib methods
 - **Mandatory testing**: every function requires tests or compilation fails
 - **Dependency-aware tests**: tests bound to functions, run on change propagation
-- **Causality tracking**: `sigil impact` shows blast radius, `sigil why` traces failures to source
+- **Causality tracking**: `ori impact` shows blast radius, `ori why` traces failures to source
 - **Contracts**: `pre_check:`/`post_check:` for function invariants
-- **Explicit sigils**: `@` functions, `$` config
+- **Explicit oris**: `@` functions, `$` config
 - **No null/exceptions**: `Option<T>` for optional, `Result<T, E>` for fallible
 - **Capabilities for effects**: `uses Http`, `uses Async` — explicit, injectable, testable
 - **Zero-config formatting**: one canonical style, enforced
@@ -97,9 +97,9 @@ This separation keeps the compiler focused and maintainable while allowing the s
 
 | Path | Purpose |
 |------|---------|
-| `compiler/sigilc/` | Rust compiler (lexer, parser, types, interpreter, codegen) |
-| `docs/sigil_lang/0.1-alpha/spec/` | **Formal specification** (authoritative) |
-| `docs/sigil_lang/proposals/` | Proposals and decision rationale |
+| `compiler/oric/` | Rust compiler (lexer, parser, types, interpreter, codegen) |
+| `docs/ori_lang/0.1-alpha/spec/` | **Formal specification** (authoritative) |
+| `docs/ori_lang/proposals/` | Proposals and decision rationale |
 | `library/std/` | Standard library |
 | `tests/spec/` | Specification conformance tests |
 
@@ -188,14 +188,14 @@ These are shallow clones. To update: `cd ~/lang_repos/<name> && git pull --depth
 
 | Command | Action |
 |---------|--------|
-| `sigil run file.si` | Run program |
-| `sigil test` | Run all tests (parallel) |
-| `sigil check file.si` | Check test coverage |
-| `sigil fmt src/` | Format files |
+| `ori run file.ori` | Run program |
+| `ori test` | Run all tests (parallel) |
+| `ori check file.ori` | Check test coverage |
+| `ori fmt src/` | Format files |
 
 ## Files & Tests
 
-- `.si` source, `.test.si` tests in `_test/` subdirectory
+- `.ori` source, `.test.ori` tests in `_test/` subdirectory
 - Targeted test: `@test_name tests @target () -> void = run(...)`
 - Free-floating test: `@test_name () -> void = run(...)`
 - Private access via `::` prefix; every function (except `@main`) requires tests
@@ -216,8 +216,8 @@ These are shallow clones. To update: `cd ~/lang_repos/<name> && git pull --depth
 
 | What you want | Where to look |
 |---------------|---------------|
-| **Authoritative language spec** | `docs/sigil_lang/0.1-alpha/spec/` |
-| **Decision rationale** | `docs/sigil_lang/proposals/` |
+| **Authoritative language spec** | `docs/ori_lang/0.1-alpha/spec/` |
+| **Decision rationale** | `docs/ori_lang/proposals/` |
 | **Quick syntax reminder** | The reference below |
 
 **If this quick reference contradicts the spec, the spec is correct.** Always consult the spec for:
@@ -226,11 +226,11 @@ These are shallow clones. To update: `cd ~/lang_repos/<name> && git pull --depth
 - Grammar productions and formal definitions
 - Any ambiguity in behavior
 
-The reference below is a condensed cheat sheet for writing Sigil code quickly.
+The reference below is a condensed cheat sheet for writing Ori code quickly.
 
 ---
 
-## Sigil Quick Reference
+## Ori Quick Reference
 
 ### Declarations
 
@@ -498,7 +498,7 @@ Capabilities track effects and async behavior. Functions must declare required c
 
 **Important:** Inline comments are not allowed. Comments must appear on their own line:
 
-```sigil
+```ori
 // This is valid
 let x = 42
 
@@ -534,7 +534,7 @@ Inline when ALL conditions met:
 - No single value exceeds ~30 chars
 - No complex values (list literals, nested calls with args)
 
-```sigil
+```ori
 // Inline - short, simple values
 assert_eq(actual: result, expected: 10)
 items.map(transform: x -> x * 2)
@@ -542,7 +542,7 @@ items.map(transform: x -> x * 2)
 
 Stack when ANY value is long or complex:
 
-```sigil
+```ori
 // Stacked - long list literal
 assert_eq(
     actual: open_doors(),

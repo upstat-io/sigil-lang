@@ -9,7 +9,7 @@ Read the local README.md in this directory for more info.
 **CRITICAL: Tests are the source of truth.**
 
 These tests validate that the compiler conforms to the language specification
-defined in `docs/sigil_lang/0.1-alpha/spec/`.
+defined in `docs/ori_lang/0.1-alpha/spec/`.
 
 ## Philosophy
 
@@ -25,10 +25,10 @@ defined in `docs/sigil_lang/0.1-alpha/spec/`.
 
 ```bash
 # Run all spec tests
-sigil test tests/spec/
+ori test tests/spec/
 
 # Run specific category
-sigil test tests/spec/lexical/
+ori test tests/spec/lexical/
 ```
 
 ## Adding New Tests

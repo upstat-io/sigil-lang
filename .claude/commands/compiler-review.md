@@ -1,23 +1,23 @@
 ---
-description: Analyze the Sigil compiler for DRY/SOLID violations and industry best practices
+description: Analyze the Ori compiler for DRY/SOLID violations and industry best practices
 ---
 
 # Code Review: DRY and SOLID Analysis
 
-Analyze the Sigil compiler codebase for violations of documented patterns and industry best practices from major compiler projects (Rust, Go, TypeScript, Zig, Gleam, Elm, Roc).
+Analyze the Ori compiler codebase for violations of documented patterns and industry best practices from major compiler projects (Rust, Go, TypeScript, Zig, Gleam, Elm, Roc).
 
 ## Scope
 
 Focus on the compiler crates in `compiler/`:
-- `sigilc/` - Main compiler driver, Salsa queries, orchestration
-- `sigil_diagnostic/` - Error reporting and diagnostics
-- `sigil_eval/` - Tree-walking interpreter
-- `sigil_ir/` - Core IR types (AST, spans, no dependencies)
-- `sigil_lexer/` - Tokenization
-- `sigil_parse/` - Recursive descent parser
-- `sigil_patterns/` - Pattern definitions
-- `sigil_typeck/` - Type checking
-- `sigil_types/` - Type system definitions
+- `oric/` - Main compiler driver, Salsa queries, orchestration
+- `ori_diagnostic/` - Error reporting and diagnostics
+- `ori_eval/` - Tree-walking interpreter
+- `ori_ir/` - Core IR types (AST, spans, no dependencies)
+- `ori_lexer/` - Tokenization
+- `ori_parse/` - Recursive descent parser
+- `ori_patterns/` - Pattern definitions
+- `ori_typeck/` - Type checking
+- `ori_types/` - Type system definitions
 
 ## What to Look For
 
@@ -50,7 +50,7 @@ Focus on the compiler crates in `compiler/`:
 
 **D - Dependency Inversion**
 - Upward dependencies (lower crates depending on higher)
-- Expected direction: sigilc → sigil_typeck/eval/patterns → sigil_parse → sigil_lexer → sigil_ir/diagnostic
+- Expected direction: oric → ori_typeck/eval/patterns → ori_parse → ori_lexer → ori_ir/diagnostic
 
 ---
 
@@ -81,7 +81,7 @@ use std::collections::HashMap;
 // 2. External crates
 use salsa::Database;
 // 3. Workspace crates
-use sigil_ir::Span;
+use ori_ir::Span;
 // 4. Local modules
 use crate::utils;
 ```
@@ -99,8 +99,8 @@ use crate::utils;
 **Pure Core Separation**
 - Core compilation logic should have no IO
 - IO (file reads, network, env vars) belongs in driver/CLI layer
-- `sigil_ir`, `sigil_types`, `sigil_typeck` should be pure
-- Only `sigilc` CLI should perform IO
+- `ori_ir`, `ori_types`, `ori_typeck` should be pure
+- Only `oric` CLI should perform IO
 
 **Snapshot Testing**
 - Complex output (error messages, IR dumps) should use snapshot tests
@@ -137,7 +137,7 @@ use crate::utils;
 
 ---
 
-## Sigil-Specific Patterns
+## Ori-Specific Patterns
 
 ### Salsa Compatibility
 
@@ -383,7 +383,7 @@ For each finding, provide:
 Prioritize findings by severity and impact on maintainability.
 
 **References:**
-- Sigil guidelines: `docs/compiler/design/appendices/E-coding-guidelines.md`
+- Ori guidelines: `docs/compiler/design/appendices/E-coding-guidelines.md`
 - rust-analyzer style: `~/lang_repos/rust/src/tools/rust-analyzer/docs/book/src/contributing/style.md`
 - Go compiler: `~/lang_repos/golang/src/cmd/compile/README.md`
 - Gleam contributing: `~/lang_repos/gleam/CONTRIBUTING.md`

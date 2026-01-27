@@ -69,7 +69,7 @@ Compiler implements only constructs requiring **special syntax or static analysi
 
 ## Key Patterns
 
-**TypeChecker** (5 components in `sigilc/src/typeck/checker/components.rs`):
+**TypeChecker** (5 components in `oric/src/typeck/checker/components.rs`):
 - `CheckContext<'a>` — immutable arena/interner refs
 - `InferenceState` — mutable inference ctx, env, expr_types
 - `Registries` — pattern, type_op, types, traits
@@ -78,7 +78,7 @@ Compiler implements only constructs requiring **special syntax or static analysi
 
 **Construction**: `TypeCheckerBuilder::new(&arena, &interner).with_source(source).build()`
 
-**Method Dispatch** (Chain of Responsibility, `sigilc/src/eval/evaluator/resolvers/`):
+**Method Dispatch** (Chain of Responsibility, `oric/src/eval/evaluator/resolvers/`):
 - Priority 0: `UserRegistryResolver` — user impl blocks + `#[derive]` methods (unified)
 - Priority 1: `CollectionMethodResolver` — map/filter/fold
 - Priority 2: `BuiltinMethodResolver` — built-ins
@@ -95,13 +95,13 @@ Compiler implements only constructs requiring **special syntax or static analysi
 
 | Change | Files |
 |--------|-------|
-| **Expression** | `sigil_parse/src/grammar/expr.rs`, `sigilc/src/typeck/infer/expr.rs`, `sigilc/src/eval/exec/expr.rs` |
-| **Pattern** | `sigilc/src/patterns/<name>.rs`, `sigilc/src/patterns/registry.rs` |
-| **Type Decl** | `sigil_ir/src/ast/items/`, `sigil_parse/src/grammar/item.rs`, `sigilc/src/typeck/checker/type_registration.rs` |
-| **Trait/Impl** | `sigil_ir/src/ast/items/`, `sigil_parse/src/grammar/item.rs`, `sigilc/src/eval/evaluator/resolvers/`, `sigil_eval/src/user_methods.rs` |
-| **Resolver** | `sigilc/src/eval/evaluator/resolvers/<name>.rs`, implement `MethodResolver` trait, register in `builder.rs` |
-| **Diagnostic** | `sigil_diagnostic/src/problem.rs`, `sigil_diagnostic/src/fixes/` |
-| **Control Flow** | `sigil_lexer/src/lib.rs`, `sigil_ir/src/ast/`, `sigil_parse/src/grammar/control.rs`, `sigilc/src/typeck/infer/control.rs`, `sigilc/src/eval/exec/control.rs` |
+| **Expression** | `ori_parse/src/grammar/expr.rs`, `oric/src/typeck/infer/expr.rs`, `oric/src/eval/exec/expr.rs` |
+| **Pattern** | `oric/src/patterns/<name>.rs`, `oric/src/patterns/registry.rs` |
+| **Type Decl** | `ori_ir/src/ast/items/`, `ori_parse/src/grammar/item.rs`, `oric/src/typeck/checker/type_registration.rs` |
+| **Trait/Impl** | `ori_ir/src/ast/items/`, `ori_parse/src/grammar/item.rs`, `oric/src/eval/evaluator/resolvers/`, `ori_eval/src/user_methods.rs` |
+| **Resolver** | `oric/src/eval/evaluator/resolvers/<name>.rs`, implement `MethodResolver` trait, register in `builder.rs` |
+| **Diagnostic** | `ori_diagnostic/src/problem.rs`, `ori_diagnostic/src/fixes/` |
+| **Control Flow** | `ori_lexer/src/lib.rs`, `ori_ir/src/ast/`, `ori_parse/src/grammar/control.rs`, `oric/src/typeck/infer/control.rs`, `oric/src/eval/exec/control.rs` |
 
 ## Testing
 
@@ -113,7 +113,7 @@ Compiler implements only constructs requiring **special syntax or static analysi
 
 ```bash
 cargo test --workspace       # all
-cargo test -p sigilc         # single crate
+cargo test -p oric         # single crate
 cargo test -- eval::tests    # specific module
 ```
 
@@ -121,33 +121,33 @@ cargo test -- eval::tests    # specific module
 
 | Crate | Purpose |
 |-------|---------|
-| `sigil_ir` | AST, spans (no deps) |
-| `sigil_diagnostic` | Errors, DiagnosticQueue, emitters |
-| `sigil_lexer` | Tokenization |
-| `sigil_types` | Type system |
-| `sigil_parse` | Recursive descent parser |
-| `sigil_typeck` | Type checking |
-| `sigil_patterns` | Pattern definitions |
-| `sigil_eval` | Tree-walking interpreter |
-| `sigil-macros` | Proc-macros |
-| `sigilc` | CLI, Salsa queries, orchestration |
+| `ori_ir` | AST, spans (no deps) |
+| `ori_diagnostic` | Errors, DiagnosticQueue, emitters |
+| `ori_lexer` | Tokenization |
+| `ori_types` | Type system |
+| `ori_parse` | Recursive descent parser |
+| `ori_typeck` | Type checking |
+| `ori_patterns` | Pattern definitions |
+| `ori_eval` | Tree-walking interpreter |
+| `ori-macros` | Proc-macros |
+| `oric` | CLI, Salsa queries, orchestration |
 
 ## Source of Truth
 
-1. `docs/sigil_lang/0.1-alpha/spec/` — Language spec (authoritative)
+1. `docs/ori_lang/0.1-alpha/spec/` — Language spec (authoritative)
 2. `docs/compiler/design/` — Implementation details
 3. `~/lang_repos/` — Reference: Rust, Go, TS, Zig, Gleam, Elm, Roc
 
 ## Doc Sync
 
-- Spec changed → update `docs/sigil_lang/0.1-alpha/spec/`
+- Spec changed → update `docs/ori_lang/0.1-alpha/spec/`
 - Syntax changed → update `CLAUDE.md`
 - Architecture changed → update `docs/compiler/design/`
 
 ## Debug
 
 ```bash
-SIGIL_DEBUG=tokens,ast,types,eval sigil run file.si
+ORI_DEBUG=tokens,ast,types,eval ori run file.ori
 ```
 
 See `docs/compiler/design/appendices/D-debugging.md`
