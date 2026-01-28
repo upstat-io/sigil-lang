@@ -6,7 +6,7 @@ General-purpose, expression-based language with strict static typing, type infer
 
 ## Development Commands
 
-**Primary commands** (run everything, including LLVM in Docker):
+**Primary commands** (run everything, including LLVM):
 
 | Command | Description |
 |---------|-------------|
@@ -33,8 +33,8 @@ General-purpose, expression-based language with strict static typing, type infer
 | `cargo cl` | Run clippy on all crates |
 | `cargo b` | Build all crates |
 | `cargo fmt` | Format all crates |
-| `./llvm-build` | Build LLVM crate (Docker) |
-| `./llvm-clippy` | Run clippy on LLVM crate (Docker) |
+| `./llvm-build` | Build LLVM crate |
+| `./llvm-clippy` | Run clippy on LLVM crate |
 
 **Always run `./test-all` after making compiler changes to verify everything works.**
 
