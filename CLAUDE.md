@@ -642,8 +642,8 @@ Built-in names are reserved **in call position only** (`name(`). The same names 
 
 ### Prelude (auto-imported)
 
-**Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `Ordering` (`Less`/`Equal`/`Greater`), `PanicInfo` (`message`, `location`)
-**Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Clone`, `Default`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`
+**Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `TraceEntry`, `Ordering` (`Less`/`Equal`/`Greater`), `PanicInfo` (`message`, `location`)
+**Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Clone`, `Default`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`
 
 **function_val** (type conversions, positional allowed):
 - `int(x)`, `float(x)`, `str(x)`, `byte(x)`
@@ -672,7 +672,8 @@ Built-in names are reserved **in call position only** (`name(`). The same names 
 - `repeat(value: T)` → infinite iterator of `value`
 
 **Option methods**: `.map(transform: fn)`, `.unwrap_or(default: value)`, `.ok_or(error: value)`, `.and_then(transform: fn)`, `.filter(predicate: fn)`
-**Result methods**: `.map(transform: fn)`, `.map_err(transform: fn)`, `.unwrap_or(default: value)`, `.ok()`, `.err()`, `.and_then(transform: fn)`
+**Result methods**: `.map(transform: fn)`, `.map_err(transform: fn)`, `.unwrap_or(default: value)`, `.ok()`, `.err()`, `.and_then(transform: fn)`, `.context(msg: str)` (preserves trace)
+**Error methods**: `.trace()` → `str`, `.trace_entries()` → `[TraceEntry]`, `.has_trace()` → `bool`
 
 **Clone trait** (explicit value duplication):
 ```ori
@@ -723,3 +724,24 @@ trait Collect<T> { @from_iter (iter: impl Iterator) -> Self }
 - `Range<float>` is NOT iterable (precision issues)
 - `for` loop desugars to `.iter()` and `.next()`
 - `for...yield` desugars to `.iter().map().collect()`
+
+**Into trait** (type conversions):
+```ori
+trait Into<T> { @into (self) -> T }
+```
+Standard impl: `str` implements `Into<Error>` for `.context()` method.
+
+**Traceable trait** (optional for custom errors):
+```ori
+trait Traceable {
+    @with_trace (self, trace: [TraceEntry]) -> Self
+    @trace (self) -> [TraceEntry]
+}
+```
+For non-Traceable error types, traces attach to the `Result` wrapper during propagation.
+
+**TraceEntry type** (error return trace entries):
+```ori
+type TraceEntry = { function: str, file: str, line: int, column: int }
+```
+Traces are collected automatically at `?` propagation points. Use `.context()` to preserve traces when converting error types.
