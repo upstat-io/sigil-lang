@@ -23,8 +23,9 @@ Example: `/approve-proposal as-conversion` (reviews and potentially approves `as
    - The proposed solution and alternatives considered
    - Which compiler phases it affects
    - Any dependencies on other proposals or phases
+3. Read related spec files to understand how the proposal fits with existing language features
 
-### Step 2: Analyze and Review with User
+### Step 2: Present Initial Review
 
 Present a structured review to the user covering:
 
@@ -48,49 +49,94 @@ Raise any issues found, including but not limited to:
 - **Spec completeness**: Are grammar, semantics, and examples complete?
 
 #### Questions
-- List any clarifying questions for the user
+- List any clarifying questions that need answers before approval
 
 #### Recommendation
-Provide a clear recommendation:
+Provide a clear initial recommendation:
 - **APPROVE**: Ready for implementation as-is
-- **APPROVE WITH CHANGES**: Good proposal but needs minor adjustments (list them)
+- **APPROVE WITH CHANGES**: Good proposal but needs adjustments (list them)
 - **DEFER**: Needs more work before approval (explain what)
 - **REJECT**: Fundamentally flawed or conflicts with language goals (explain why)
 
-### Step 3: Get User Decision
+### Step 3: Interactive Recommendation Review
 
-Ask the user to confirm one of:
-1. **Approve** - Proceed with approval workflow
-2. **Approve with changes** - Make specified changes, then approve
-3. **Defer** - Leave in drafts for revision
-4. **Reject** - Move to rejected with rationale
+**If recommending changes**, walk through each recommendation one by one:
 
-If the user chooses to defer or reject, stop here. Only proceed to Step 4+ if approving.
+For each recommendation:
+
+1. **Show the current syntax** from the proposal
+2. **Show the recommended change** with concrete examples
+3. **Explain the rationale** — why this change improves the proposal
+4. **Present alternatives** if applicable
+5. **Ask for user decision** using AskUserQuestion with clear options
+
+Example format for each recommendation:
+
+```
+### Recommendation N: [Topic]
+
+**Current proposal:**
+```ori
+[code from proposal]
+```
+
+**Recommended:**
+```ori
+[suggested change]
+```
+
+**Rationale:** [Why this is better — consistency with existing features, readability, etc.]
+
+**Alternatives considered:**
+- Option A: [description]
+- Option B: [description]
+
+[Use AskUserQuestion to get user's choice]
+```
+
+Continue until all recommendations have been addressed.
+
+### Step 4: Summarize Decisions
+
+After all recommendations are reviewed, present a summary table:
+
+```markdown
+## Summary of Decisions
+
+| Aspect | Decision |
+|--------|----------|
+| [Topic 1] | [User's choice] |
+| [Topic 2] | [User's choice] |
+| ... | ... |
+```
+
+### Step 5: Confirm Approval
+
+Ask the user if they want to:
+1. **Approve** — Proceed with approval workflow using the decided changes
+2. **Show updated proposal** — Display the full proposal with changes before approving
+3. **Defer** — Leave in drafts for further consideration
+4. **Reject** — Move to rejected with rationale
+
+If the user chooses to defer or reject, stop here. Only proceed to Step 6+ if approving.
 
 ---
 
-## Approval Workflow (Steps 4-10)
+## Approval Workflow (Steps 6-12)
 
 Only proceed with these steps after user confirms approval.
 
-### Step 4: Move to Approved
+### Step 6: Update and Move Proposal
 
-1. Move the file from `drafts/` to `approved/`:
+1. Update the proposal file with all approved changes
+2. Update the **Status** field from `Draft` to `Approved`
+3. Add an **Approved** date field: `**Approved:** YYYY-MM-DD`
+4. Move the file from `drafts/` to `approved/`:
    ```bash
    git mv docs/ori_lang/proposals/drafts/<name>-proposal.md docs/ori_lang/proposals/approved/
    ```
 
-2. Update the proposal's **Status** field from `Draft` to `Approved`:
-   ```markdown
-   **Status:** Approved
-   ```
-
-3. Add an **Approved** date field:
-   ```markdown
-   **Approved:** YYYY-MM-DD
-   ```
-
-### Step 5: Determine Target Phase
+### Step 7: Determine Target Phase
 
 Map the proposal to the appropriate roadmap phase based on what it affects:
 
@@ -107,7 +153,7 @@ Map the proposal to the appropriate roadmap phase based on what it affects:
 
 Some proposals affect multiple phases. Add entries to each affected phase.
 
-### Step 6: Add to Phase File
+### Step 8: Add to Phase File
 
 Add a new section to the appropriate `plans/roadmap/phase-XX-*.md` file:
 
@@ -137,51 +183,35 @@ Brief description of what this implements.
 
 Follow the existing format in the phase file. Break down the proposal's implementation section into discrete, checkable tasks.
 
-### Step 7: Update plan.md
+### Step 9: Update plan.md
 
 If the proposal is referenced in `plans/roadmap/plan.md` (under "Draft Proposals Pending Review" or similar sections):
 
 1. Remove it from the drafts section
 2. Add a note that it's been approved and which phase it's in
 
-Example change:
-```markdown
-// Before (in drafts section)
-- [ ] **`as` Conversion Syntax** — Replace `int()`, `float()`, `str()`, `byte()` with `as`/`as?`
-  - Proposal: `proposals/drafts/as-conversion-proposal.md`
-  - **Affects**: Phase 7 (Stdlib), Phase 15 (Syntax)
+### Step 10: Update priority-and-tracking.md
 
-// After (remove from drafts, or mark as approved)
-- [x] **`as` Conversion Syntax** — APPROVED → See Phase 15.7
+Add the approved proposal to the "Approved Proposals" section in `plans/roadmap/priority-and-tracking.md`:
+
+```markdown
+**Proposal Name** — ✅ APPROVED YYYY-MM-DD
+- Proposal: `proposals/approved/<name>-proposal.md`
+- Implementation: Phase X.Y
+- [Brief description of key features]
+- Blocked on: [dependencies, or "None"]
 ```
 
-### Step 8: Update priority-and-tracking.md
-
-Add the approved proposal to the appropriate section in `plans/roadmap/priority-and-tracking.md`:
-
-1. If it's immediately actionable, add to "What's Next (Priority Order)"
-2. If it's blocked on other phases, note the dependency
-3. Update the phase status if this adds new work
-
-Example addition:
-```markdown
-### Recently Approved Proposals
-
-**`as` Conversion Syntax** — Approved YYYY-MM-DD
-- Proposal: `proposals/approved/as-conversion-proposal.md`
-- Implementation: Phase 15.7
-- Blocked on: Phase 3 (needs As<T> trait)
-```
-
-### Step 9: Update Spec (If Required)
+### Step 11: Update Spec and CLAUDE.md
 
 If the proposal introduces new syntax, types, or semantics:
 
 1. Update the relevant spec file in `docs/ori_lang/0.1-alpha/spec/`
-2. Update `CLAUDE.md` if syntax/types/patterns are affected
-3. Follow the rules in `.claude/rules/ori-lang.md`
+2. Update `grammar.ebnf` if syntax changes
+3. Update `CLAUDE.md` if syntax/types/patterns are affected
+4. Follow the rules in `.claude/rules/ori-lang.md`
 
-### Step 10: Commit
+### Step 12: Commit
 
 Create a commit with:
 ```
@@ -190,8 +220,17 @@ docs(proposal): approve <proposal-name>
 - Move from drafts/ to approved/
 - Add implementation plan to Phase X
 - Update roadmap tracking
+- Update spec ([list affected spec files])
+- Update CLAUDE.md with [feature] syntax
+
+Key design decisions:
+- [Decision 1]
+- [Decision 2]
+- [etc.]
 
 Proposal: docs/ori_lang/proposals/approved/<name>-proposal.md
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 ```
 
 ---
@@ -201,8 +240,10 @@ Proposal: docs/ori_lang/proposals/approved/<name>-proposal.md
 Before completing, verify:
 
 - [ ] Proposal reviewed with user (strengths, concerns, questions)
-- [ ] Recommendation provided (approve/defer/reject)
-- [ ] User confirmed approval decision
+- [ ] Each recommendation reviewed one-by-one with user
+- [ ] User decisions summarized
+- [ ] User confirmed approval
+- [ ] Proposal updated with approved changes
 - [ ] Proposal moved from `drafts/` to `approved/`
 - [ ] Status field updated to `Approved`
 - [ ] Approved date added
@@ -210,8 +251,55 @@ Before completing, verify:
 - [ ] `plan.md` updated (if proposal was listed there)
 - [ ] `priority-and-tracking.md` updated
 - [ ] Spec updated (if proposal affects language semantics)
+- [ ] `grammar.ebnf` updated (if proposal affects syntax)
 - [ ] `CLAUDE.md` updated (if proposal affects syntax/types/patterns)
-- [ ] Changes committed
+- [ ] Changes committed with design decisions in commit message
+
+---
+
+## Example: Recommendation Walkthrough
+
+Here's how a typical recommendation review might look:
+
+---
+
+### Recommendation 1: Guard Syntax
+
+**Current proposal:**
+```ori
+@classify (n: int).match(n < 0) -> str = "negative"
+```
+
+**Recommended:**
+```ori
+@classify (n: int) -> str if n < 0 = "negative"
+```
+
+**Rationale:** The `if` syntax mirrors existing `for x in items if cond` syntax in Ori. It reads more naturally: "classify n returning str if n < 0". The `.match()` on the parameter list is unusual and inconsistent with how guards work in match arms.
+
+[AskUserQuestion: "Use `if` guard syntax instead of `.match()` on params?"]
+
+---
+
+### Recommendation 2: Type Annotation Rules
+
+**Question:** When can type annotations be omitted from clause parameters?
+
+**Option A — Required on first clause only:**
+```ori
+@factorial (0: int) -> int = 1      // type required
+@factorial (n) -> int = ...         // type optional
+```
+
+**Option B — Always required:**
+```ori
+@factorial (0: int) -> int = 1
+@factorial (n: int) -> int = ...
+```
+
+**Rationale for Option A:** Reduces repetition while maintaining clarity. The first clause establishes the contract; subsequent clauses focus on patterns.
+
+[AskUserQuestion: "When are type annotations required?"]
 
 ---
 
