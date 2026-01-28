@@ -18,40 +18,31 @@ The ori_llvm crate is excluded from the main workspace to avoid LLVM linking ove
 ./docker/llvm/build.sh
 ```
 
-## Standard Cargo Commands (No Docker)
-
-All other LLVM development uses normal cargo commands with the manifest path:
-
-```bash
-# Build ori_llvm crate
-cargo build --manifest-path compiler/ori_llvm/Cargo.toml
-
-# Run clippy on ori_llvm
-cargo clippy --manifest-path compiler/ori_llvm/Cargo.toml
-
-# Format ori_llvm code
-cargo fmt --manifest-path compiler/ori_llvm/Cargo.toml
-
-# Check ori_llvm (fast compile check)
-cargo check --manifest-path compiler/ori_llvm/Cargo.toml
-```
-
-Or use the convenience scripts:
-
-```bash
-./llvm-build     # cargo build
-./llvm-clippy    # cargo clippy
-./fmt-all        # formats workspace + LLVM crate
-```
-
-## Why Docker for Tests Only
+## Docker Commands
 
 Docker provides a controlled environment with LLVM 17 properly installed and linked. This is needed for:
 - Running tests that actually execute LLVM codegen
-- Test runs with `--backend=llvm` flag
+- Running clippy (requires LLVM headers for `llvm-sys` crate)
 - Building the compiler with the `llvm` feature enabled
+- Test runs with `--backend=llvm` flag
 
-Building and static analysis (clippy, check) work on the host because they don't require linking against LLVM libraries at runtime.
+Use the convenience scripts:
+
+```bash
+./llvm-test      # Run LLVM unit tests (Docker)
+./llvm-clippy    # Run clippy on ori_llvm (Docker)
+./llvm-build     # Build ori_llvm crate (Docker)
+./fmt-all        # formats workspace + LLVM crate (no Docker needed)
+```
+
+## Standard Cargo Commands (No Docker)
+
+Formatting doesn't require LLVM libraries:
+
+```bash
+# Format ori_llvm code
+cargo fmt --manifest-path compiler/ori_llvm/Cargo.toml
+```
 
 ## Container Resource Limits
 
@@ -69,9 +60,8 @@ LLVM_CPUS=4 ./llvm-test
 
 | Command | Docker? | How |
 |---------|---------|-----|
-| Build | No | `cargo build --manifest-path compiler/ori_llvm/Cargo.toml` |
-| Clippy | No | `cargo clippy --manifest-path compiler/ori_llvm/Cargo.toml` |
+| Build | Yes | `./llvm-build` |
+| Clippy | Yes | `./llvm-clippy` |
 | Format | No | `cargo fmt --manifest-path compiler/ori_llvm/Cargo.toml` |
-| Check | No | `cargo check --manifest-path compiler/ori_llvm/Cargo.toml` |
-| **Tests** | **Yes** | `./llvm-test` |
+| Tests | Yes | `./llvm-test` |
 | Edit source | No | Direct file editing |
