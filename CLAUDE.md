@@ -286,6 +286,13 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 - `@name (a: int, b: int = 0, c: int = 0) -> int` — multiple defaults (any position)
 - Default expressions evaluated at call time, cannot reference other parameters
 
+**Function Clauses** (pattern matching in parameters)
+- `@f (0: int) -> int = 1` then `@f (n) -> int = n * f(n - 1)` — multiple clauses
+- First clause establishes signature (visibility, generics, types)
+- Subsequent clauses: types optional, matched top-to-bottom
+- `@f (n: int) -> int if n < 0 = -n` — guard with `if`
+- All clauses must be exhaustive; compiler warns about unreachable clauses
+
 **Config Variables** (compile-time constants)
 - `$name = value`
 - `pub $name = value` — public
