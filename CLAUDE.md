@@ -674,6 +674,18 @@ Built-in names are reserved **in call position only** (`name(`). The same names 
 **Option methods**: `.map(transform: fn)`, `.unwrap_or(default: value)`, `.ok_or(error: value)`, `.and_then(transform: fn)`, `.filter(predicate: fn)`
 **Result methods**: `.map(transform: fn)`, `.map_err(transform: fn)`, `.unwrap_or(default: value)`, `.ok()`, `.err()`, `.and_then(transform: fn)`
 
+**Clone trait** (explicit value duplication):
+```ori
+trait Clone { @clone (self) -> Self }
+```
+
+- All primitives implement Clone (`int`, `float`, `bool`, `str`, `char`, `byte`, `Duration`, `Size`)
+- Collections implement Clone when element types implement Clone (`[T]`, `{K: V}`, `Set<T>`)
+- `Option<T>` and `Result<T, E>` implement Clone when inner types do
+- Tuples implement Clone when all elements do
+- Derivable for user types: `#[derive(Clone)] type Point = { x: int, y: int }`
+- Element-wise recursive: cloning a container clones each element via `.clone()`
+
 **Iterator traits** (functional iteration with `(Option<Item>, Self)` return):
 ```ori
 trait Iterator { type Item; @next (self) -> (Option<Self.Item>, Self) }
