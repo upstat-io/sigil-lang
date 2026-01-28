@@ -20,10 +20,10 @@ General-purpose, expression-based language with strict static typing, type infer
 | Command | Description |
 |---------|-------------|
 | `cargo t` | Run Rust unit tests only |
-| `cargo st` | Run Ori language tests (`tests/spec/`) |
+| `cargo st` | Run Ori language tests (`tests/`) |
 | `cargo st tests/spec/capabilities/` | Run specific Ori test directory |
 | `cargo st tests/spec/types/primitives.ori` | Run specific Ori test file |
-| `./llvm-test` | Run LLVM crate tests (Docker) |
+| `./llvm-test` | Run LLVM Rust unit tests (Docker) |
 
 **Build and check commands** (workspace only, excludes LLVM):
 

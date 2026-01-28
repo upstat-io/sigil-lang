@@ -1,5 +1,5 @@
 ---
-paths: **/llvm**
+paths: **llvm**
 ---
 
 # LLVM Development
