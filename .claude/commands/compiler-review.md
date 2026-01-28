@@ -1,389 +1,427 @@
 ---
+name: compiler-review
 description: Analyze the Ori compiler for DRY/SOLID violations and industry best practices
+allowed-tools: Read, Grep, Glob, Task
 ---
 
-# Code Review: DRY and SOLID Analysis
+# Compiler Code Review
 
-Analyze the Ori compiler codebase for violations of documented patterns and industry best practices from major compiler projects (Rust, Go, TypeScript, Zig, Gleam, Elm, Roc).
+Analyze the Ori compiler for violations of documented patterns and industry best practices.
 
-## Scope
+## Execution Strategy
 
-Focus on the compiler crates in `compiler/`:
-- `oric/` - Main compiler driver, Salsa queries, orchestration
-- `ori_diagnostic/` - Error reporting and diagnostics
-- `ori_eval/` - Tree-walking interpreter
-- `ori_ir/` - Core IR types (AST, spans, no dependencies)
-- `ori_lexer/` - Tokenization
-- `ori_parse/` - Recursive descent parser
-- `ori_patterns/` - Pattern definitions
-- `ori_typeck/` - Type checking
-- `ori_types/` - Type system definitions
+Use the **Task tool** to launch **9 parallel Explore agents** (one per category below). Send a **single message with 9 Task tool calls** to maximize parallelism.
 
-## What to Look For
+Each agent prompt should:
+1. Specify the category name and detection patterns from that section
+2. Search `compiler/` for violations matching those patterns
+3. Return findings with: severity, location (`file:line`), issue, fix suggestion
 
-### DRY Violations
-- Duplicated code blocks across modules
-- Type definitions duplicated instead of re-exported
-- Similar patterns that could use shared registries
-- Repeated error handling logic
-- Copy-pasted struct definitions or enum variants
-
-### SOLID Violations
-
-**S - Single Responsibility**
-- Files exceeding 500 lines (target ~300)
-- Functions exceeding 100 lines (target <50)
-- Modules doing multiple unrelated things
-
-**O - Open/Closed**
-- Hard-coded dispatch that should use registry pattern
-- Match statements that grow with every new feature
-- Missing trait abstractions for extensible systems
-
-**L - Liskov Substitution**
-- Trait implementations that behave inconsistently
-- Subtypes that violate parent contract expectations
-
-**I - Interface Segregation**
-- Large traits that force implementors to define unused methods
-- Overly broad APIs
-
-**D - Dependency Inversion**
-- Upward dependencies (lower crates depending on higher)
-- Expected direction: oric → ori_typeck/eval/patterns → ori_parse → ori_lexer → ori_ir/diagnostic
-
----
-
-## Cross-Project Patterns
-
-### Function & API Design (from rust-analyzer)
-
-**Config Structs Over Many Parameters**
-- Functions with >3-4 parameters should use a config/options struct
-- Especially for boolean or optional parameters
-- Bad: `fn check(x, verbose: bool, strict: bool, limit: Option<usize>)`
-- Good: `fn check(x, opts: CheckOptions)`
-
-**Functions Over Single-Use Objects**
-- Avoid "doer" objects that exist only to perform one action
-- Bad: `Builder::new().set_x(x).set_y(y).execute()`
-- Good: `do_thing(x, y)` or `do_thing(Config { x, y })`
-
-**Push Allocations to Caller**
-- If a function needs a collection, let the caller provide it
-- Return iterators instead of `Vec` where possible
-- Avoid intermediate collections in recursive functions
-
-**Import Ordering**
-```rust
-// 1. Standard library
-use std::collections::HashMap;
-// 2. External crates
-use salsa::Database;
-// 3. Workspace crates
-use ori_ir::Span;
-// 4. Local modules
-use crate::utils;
+**Example Task call:**
+```
+Task(
+  subagent_type: "Explore",
+  description: "Review: Architecture",
+  prompt: "Search compiler/ for Architecture & Boundaries violations: [paste detection patterns]. Return findings as: SEVERITY | file:line | issue | fix"
+)
 ```
 
-### Algorithm Complexity (from Zig)
+**After all 9 agents complete**, aggregate and synthesize:
+1. Group findings by severity (CRITICAL → HIGH → MEDIUM)
+2. Identify patterns (same issue in multiple places)
+3. Prioritize by impact on maintainability
+4. Present actionable summary to user
 
-**O(N) vs O(log N) Awareness**
-- Flag O(n²) patterns that could be O(n) or O(n log n)
-- Linear scans through collections that could use hash lookups
-- Repeated lookups that could be cached
-- Nested loops over the same data
+## Severity Guide
 
-### Architecture Purity (from Gleam)
-
-**Pure Core Separation**
-- Core compilation logic should have no IO
-- IO (file reads, network, env vars) belongs in driver/CLI layer
-- `ori_ir`, `ori_types`, `ori_typeck` should be pure
-- Only `oric` CLI should perform IO
-
-**Snapshot Testing**
-- Complex output (error messages, IR dumps) should use snapshot tests
-- Allows bulk updates when output format changes
-- Makes expected output review easier
-
-### Error Severity (from Go)
-
-**Three-Level Error Handling**
-- `Result<T, E>` - Recoverable errors (user input, file not found)
-- `panic` macro - Programming errors, invariant violations (bug in compiler)
-- Unrecoverable with context - Fatal errors that should never happen
-
-**Error Message Conventions**
-- Prefix convention for error sources (e.g., "parse:", "typecheck:")
-- Consistent capitalization and punctuation
-- Include context: what was being done when error occurred
-
-### Variable Hygiene (from Elm)
-
-**Shadowing Awareness**
-- Variable shadowing can hide bugs during refactoring
-- Each shadow has ~5% chance of causing confusion per edit
-- Consider unique names over shadowing, especially for important bindings
-- Shadowing is sometimes appropriate (e.g., `let x = transform(x)`)
-
-### Incremental Complexity (from Roc)
-
-**N+1 Feature Development**
-- New features should be incremental additions, not giant leaps
-- Each change should be reviewable in isolation
-- Avoid PRs that touch >10 files for a single feature
-- Break large features into smaller, mergeable chunks
+- **CRITICAL**: Must fix before merge
+- **HIGH**: Should fix, blocks new code
+- **MEDIUM**: Fix when touching code
 
 ---
 
-## Ori-Specific Patterns
+## 1. Architecture & Boundaries
 
-### Salsa Compatibility
+> Phase organization, layer dependencies, invariants, IO isolation
 
-**Query Type Requirements**
-- Types in query signatures missing required derives: `Clone, Eq, PartialEq, Hash, Debug`
+### Detection Patterns
+
+**CRITICAL**
+- Upward dependency: lower crate imports higher (`ori_ir` → `oric`, `ori_parse` → `ori_typeck`)
+- IO in core: file/network/env ops in `ori_typeck`, `ori_types`, `ori_ir`, `ori_parse`
+- Circular dependency between crates
+- Phase bleeding: parser doing type checking, lexer doing parsing
+
+**HIGH**
+- Missing phase boundary documentation
+- Implicit coupling: module A assumes internal state of module B
+- Framework types in core: Salsa types leaking into pure logic
+- Mixed abstraction levels in single function
+
+**MEDIUM**
+- Unclear module responsibility (does multiple unrelated things)
+- Missing module-level doc comment explaining purpose
+- Cross-cutting concern not isolated (e.g., span tracking scattered)
+
+### Principles
+
+- **Dependency direction**: `oric` → `ori_typeck/eval/patterns` → `ori_parse` → `ori_lexer` → `ori_ir/diagnostic`
+- **IO isolation**: Only `oric` CLI performs IO; core crates are pure
+- **Phase contracts**: Each phase has documented input/output types
+- **Invariants**: Document what must always hold (parser never fails, always produces AST)
+
+### Checklist
+
+- [ ] No upward dependencies between crates
+- [ ] IO isolated to CLI layer (`oric`)
+- [ ] Each crate has clear single responsibility
+- [ ] Phase boundaries documented in module docs
+- [ ] No Salsa types in non-query code
+
+---
+
+## 2. Salsa & Incremental
+
+> Query design, derives, determinism, caching granularity
+
+### Detection Patterns
+
+**CRITICAL**
+- Missing derives on query types: needs `Clone, Eq, PartialEq, Hash, Debug`
 - `Arc<Mutex<T>>` or `Arc<RwLock<T>>` in Salsa-tracked types
-- Function pointers or trait objects in query signatures
-- Side effects in Salsa queries (should use event logging)
-- Non-deterministic query implementations
+- Function pointers or `dyn Trait` in query signatures
+- Non-deterministic query: random, time, or IO in query body
+- Side effects in queries (mutation, IO, global state)
 
-### Memory Management
+**HIGH**
+- Query returns `Result` where `(T, Vec<Error>)` better (partial results)
+- Coarse query granularity: recomputes too much on small changes
+- Missing `#[salsa::tracked]` on type that should be tracked
+- Query depends on unstable iteration order (HashMap without sort)
 
-**Arena Allocation**
-- `Box<Expr>` instead of `ExprArena` + `ExprId`
-- Scattered heap allocations for AST nodes
+**MEDIUM**
+- Query could be split for better incrementality
+- Expensive computation not memoized
+- Debug impl on query type is expensive
+
+### Principles
+
+- **Determinism**: Same inputs → same outputs, always
+- **Partial results**: Return best-effort result + errors, not `Result<T, E>`
+- **Granularity**: Finer queries = better incrementality, but more overhead
+- **Immutable after construction**: Build fully, then wrap in `Arc`
+
+### Checklist
+
+- [ ] All query types derive required traits
+- [ ] No interior mutability in tracked types
+- [ ] No side effects in query bodies
+- [ ] Queries are deterministic
+- [ ] Error accumulation, not early bailout
+
+---
+
+## 3. Memory & Allocation
+
+> Arenas, interning, newtypes, reference counting
+
+### Detection Patterns
+
+**CRITICAL**
+- `Box<Expr>` instead of arena allocation (`ExprArena` + `ExprId`)
+- `String` for identifiers instead of interned `Name`
+- Raw integer IDs without newtype (`u32` instead of `ExprId`)
+- `Arc<T>` cloned in hot loop
+- Unbounded collection growth (Vec/HashMap never cleared)
+
+**HIGH**
+- Type alias instead of newtype: `type ExprId = u32;`
+- `(String, String)` tuples instead of `MethodKey` newtype
+- String comparisons where interned ID comparison works
 - Excessive cloning of IR structures
+- `Arc<dyn Trait>` where `&dyn` or `Box<dyn>` suffices
 
-**Interning**
-- `String` for identifiers instead of `Name` (interned)
-- String comparisons where interned ID comparison would work
-- `(String, String)` tuples instead of `MethodKey`
-
-**ID-Based References**
-- Raw integers where newtypes should be used (`ExprId`, `Name`)
-- Type aliases instead of newtypes: `type ExprId = u32;`
-
-### Builder & RAII Patterns
-
-**Builder Pattern**
-- Complex struct construction without builders
-- Should use: `TypeCheckerBuilder`, `EvaluatorBuilder`
-
-**RAII Scope Guards**
-- Manual save/restore of context (capabilities, impl Self type)
-- Should use: `with_capability_scope()`, `with_impl_scope()`
-
-### Registry Pattern
-
-**Missing Registry Usage**
-- Hard-coded pattern dispatch instead of `PatternRegistry`
-- Hard-coded method dispatch instead of `MethodDispatcher`
-- Hard-coded operator handling instead of operator registry
-- New cases requiring core code modification
-
----
-
-## Code Quality
-
-### Clippy Compliance
-- `#[allow(clippy::...)]` attributes (NEVER allowed - fix the issue)
-- `#[expect(...)]` attributes (same rule)
-- Unchecked conversions: `n as i32` instead of `i32::try_from(n)`
-- `unwrap()` on user input (should use Result)
-
-### Iteration Patterns
-- Indexing in loops instead of iterators
-- Bounds checks on every iteration
-- Consider `rustc_hash::FxHashMap` for hot paths
-
-### Documentation
-- Public items without documentation
-- Modules without module-level doc comments
-- Comments explaining "what" instead of "why"
-- Banner comments (e.g., `// ====`, `// ----`) — remove and use module docs or item docs instead
-
-### Testing Organization
-
-**Hybrid Approach**
-- Inline tests exceeding ~200 lines (should be in `tests/` subdirectory)
-- Comprehensive test suites not in separate files
-- Missing test coverage: happy path, edge cases, error conditions
-
-### Error Handling
-
-**Result vs Panic**
-- `panic` macro on recoverable errors (user input, file I/O)
-- `unwrap()` where `?` or proper error handling needed
+**MEDIUM**
+- Scattered heap allocations for related nodes
 - Missing `#[cold]` on error factory functions
+- Intermediate collections in recursive functions
+- `to_string()` / `clone()` in hot path
 
-### Diagnostic Quality
+### Principles
 
-**Error Messages**
-- Terse or cryptic error messages
-- Missing "did you mean?" suggestions
-- Inconsistent error message style across similar errors
-- Missing error codes
+- **Arena allocation**: AST/IR nodes in arenas, reference by ID
+- **Interning**: Identifiers, strings, method keys → O(1) comparison
+- **Newtypes**: Type-safe IDs prevent mixing `ExprId` with `TypeId`
+- **Push allocations to caller**: Return iterators, not `Vec`
 
-**Error Recovery**
-- Early bailout on first error instead of accumulating
-- Missing synchronization points for parser recovery
+### Checklist
 
----
-
-## Review Scale (from rust-analyzer)
-
-Apply different scrutiny levels based on change scope:
-
-**Category 1: Internal Changes** (single module, no API changes)
-- Works for happy case
-- Has tests
-- Doesn't panic on unhappy case
-
-**Category 2: API Changes** (new public functions, changed signatures)
-- API design matters more than implementation
-- Consider future extensibility
-- Minimize changed lines
-
-**Category 3: New Dependencies** (between crates or external)
-- Rare, requires careful consideration
-- Impact on compile times
-- Maintenance burden
+- [ ] AST nodes use arena + ID pattern
+- [ ] Identifiers are interned `Name` type
+- [ ] IDs are newtypes, not raw integers
+- [ ] No `Arc` cloning in hot paths
+- [ ] Error paths marked `#[cold]`
 
 ---
 
-## Over-Engineering Watch
+## 4. API Design
 
-Patterns that are good in moderation but can be taken too far:
+> Config structs, builders, RAII guards, function signatures
 
-### Static vs Dynamic Dispatch
+### Detection Patterns
 
-**When to prefer enums over `dyn Trait`:**
-- Small, fixed set of variants (e.g., built-in patterns like `run`/`try`/`match`)
-- Not extended at runtime
-- Language-defined constructs that users cannot add to
+**CRITICAL**
+- Function with 5+ parameters (should use config struct)
+- Manual save/restore of context without RAII guard
+- `unwrap()` on user input or file IO
+- Public API without documentation
 
-Enum benefits: exhaustiveness checking, static dispatch, better inlining, clearer code navigation (jump-to-definition works).
+**HIGH**
+- Boolean parameter that changes behavior (flag argument)
+- "Doer" object: `Builder::new().set_x(x).execute()` for simple operation
+- Missing builder for complex struct with many optional fields
+- Context threaded through 5+ functions (consider RAII or context object)
 
-**When `dyn Trait` is appropriate:**
-- User-extensible systems (user-defined methods)
-- Plugin architectures
-- When users can add entries
+**MEDIUM**
+- Return `Vec` where iterator would work
+- `Option<Option<T>>` or `Result<Result<T, E1>, E2>` (flatten)
+- Inconsistent parameter ordering across similar functions
+- Missing `Default` impl for config struct
 
-**If dynamic dispatch is needed, prefer cheaper options:**
-- `&dyn Trait` - borrowed, no refcount
-- `Box<dyn Trait>` - owned, no atomic ops
-- `Arc<dyn Trait>` - atomic refcount on every clone/drop, only when shared ownership required
+### Principles
 
-**Flag:** `Arc<dyn T>` for fixed, compile-time-known sets. Also flag `Arc<dyn T>` where `&dyn T` or `Box<dyn T>` would suffice.
+- **Config structs**: >3-4 params → single config/options struct
+- **Functions over doer objects**: Prefer `do_thing(Config { x, y })` over builder ceremony
+- **RAII guards**: Use for lexically-scoped context changes (capabilities, impl scope)
+- **Push allocations to caller**: Return iterators, accept slices
 
-### Registry Granularity
+### Checklist
 
-**Registries make sense for:**
-- User-defined methods (users create them)
-- Plugin systems
-- Things that genuinely vary per-project
+- [ ] No functions with 5+ parameters
+- [ ] No boolean flag parameters
+- [ ] RAII guards for context save/restore
+- [ ] Public items documented
+- [ ] Config structs implement `Default`
 
-**Simple match may be better for:**
-- Built-in patterns (`run`, `try`, `parallel`) - these won't change at runtime
-- Built-in operators - fixed set, compiler can optimize match
-- Core language constructs
+---
 
-**Flag:** Registry lookup for things that could be a simple, exhaustiveness-checked match.
+## 5. Dispatch & Extensibility
 
-### Line Count as Smell, Not Rule
+> Enum vs dyn Trait, registries, static vs dynamic dispatch
 
-**Line count depends on "why" the file is long:**
-- 600 lines handling one cohesive concept → keep it together
-- 600 lines handling three concepts that evolved together → split it
-- Rustc has many 1000+ line files that are perfectly maintainable
+### Detection Patterns
 
-**The real question:** "Does this file have one clear purpose?" not "Is it under 300 lines?"
+**CRITICAL**
+- `Arc<dyn Trait>` for fixed, compile-time-known set (should be enum)
+- Registry lookup for built-in patterns (`run`, `try`, `match`)
+- `dyn Trait` where enum gives exhaustiveness checking
 
-**Flag as smell (investigate, don't auto-split):**
-- Files over 500 lines → check if multiple concepts are entangled
-- Files split purely to meet line targets → check if related code is now scattered
-- Many small files with heavy cross-imports → may indicate over-splitting
+**HIGH**
+- Missing registry for user-extensible system (user methods need dynamic dispatch)
+- Hard-coded dispatch growing with every feature (match with 20+ arms on type)
+- `Box<dyn Trait>` where `&dyn Trait` suffices (unnecessary allocation)
+- Trait object where generic would allow inlining
 
-### Builder Pattern Overhead
+**MEDIUM**
+- Enum variant added but match not updated (missing exhaustiveness benefit)
+- Over-abstracted: trait with single implementation
+- Registry for things that won't change at runtime
 
-**Builders are valuable when:**
-- Many optional parameters with complex defaults
-- Construction requires validation
-- Fluent API improves readability
+### Principles
 
-**Simple construction may be better when:**
-- Few parameters, most required
-- `Default` + struct update syntax works: `Foo { field: val, ..Default::default() }`
-- The "builder" just sets fields then calls `build()`
+- **Enum for fixed sets**: Built-in patterns, operators, keywords → exhaustiveness, static dispatch, inlining
+- **`dyn Trait` for user-extensible**: User methods, plugins → runtime dispatch necessary
+- **Cost hierarchy**: `&dyn` < `Box<dyn>` < `Arc<dyn>` (prefer cheapest that works)
+- **Registries**: Only when users add entries at runtime
 
-**Flag:** Builders that add ceremony without enabling anything a plain struct couldn't do.
+### Checklist
 
-### RAII Guard Tradeoffs
+- [ ] Built-in patterns use enum, not registry
+- [ ] User methods use registry/trait objects
+- [ ] No `Arc<dyn>` for fixed sets
+- [ ] Trait objects only where necessary
+- [ ] Match statements on enums (not type strings)
 
-**RAII guards are idiomatic Rust when:**
-- Context change is short-lived and lexically scoped
-- Early returns need automatic cleanup
-- The pattern is well-established (e.g., `with_capability_scope`)
+---
 
-**Explicit parameters have their own cost:**
-- Every function signature gets polluted with context
-- Threading context through many layers adds noise
-- Changes to context shape require updating many signatures
+## 6. Diagnostics
 
-**The real question:** Is the scope clear and lexical?
-- Yes → RAII is idiomatic, use it
-- Unclear or long-lived → explicit parameters are safer
+> Error messages, suggestions, recovery, error codes
 
-**Flag:** RAII guards where the scope boundary is unclear or spans multiple call sites.
+### Detection Patterns
 
-### Suggesting Simplification
+**CRITICAL**
+- Terse/cryptic error message (user can't understand what's wrong)
+- Missing source location (span) on error
+- `panic!` on recoverable error (user input, file not found)
+- Early bailout: stops at first error instead of accumulating
 
-**The review can recommend undoing abstractions.** If code was over-refactored, suggest consolidating back:
+**HIGH**
+- Missing "did you mean?" suggestion for typos
+- Inconsistent error message style (capitalization, punctuation)
+- Error without context (what was being done when error occurred)
+- No error code for programmatic handling
 
-- Inline single-use helper functions that obscure rather than clarify
-- Collapse over-split modules back together when they have heavy cross-dependencies
-- Replace registry/trait indirection with simple match for fixed sets
-- Remove builders that just set fields and call `build()`
-- Merge scattered small files back into cohesive units
-- Replace `Arc<dyn Trait>` with enum when the set is fixed and compile-time known
+**MEDIUM**
+- Missing fix suggestion where one is obvious
+- Error message uses internal jargon instead of user terms
+- Duplicate error for same underlying issue
+- Warning that should be error (or vice versa)
 
-**Be careful:**
-- Don't suggest simplification if the abstraction enables testing, mocking, or future extension
-- Consider churn cost — small gains may not justify touching many files
-- Check if the pattern is used consistently elsewhere (don't create inconsistency)
-- Ask "why was this abstracted?" before suggesting removal — there may be history
+### Principles
 
-**Phrasing:** "Consider simplifying by..." or "This abstraction may not be paying for itself—suggest inlining..."
+- **User-first messages**: Write for the person seeing the error, not the compiler author
+- **Context + cause + fix**: What happened, why, how to fix
+- **Accumulate errors**: Don't stop at first error; show all problems
+- **Suggestions**: "Did you mean X?" when edit distance is small
 
-**The bar:** Does the abstraction make the code easier to understand and change, or harder? If harder AND the simplification is low-risk, suggest removing it.
+### Checklist
 
-### Absolute Rules
+- [ ] All errors have source spans
+- [ ] Error messages are actionable
+- [ ] Errors accumulate, not early bailout
+- [ ] Typo suggestions implemented
+- [ ] No `panic!` on user errors
 
-**Rules that should have escape hatches:**
-- "Never use `#[allow]`" - Sometimes clippy is wrong, or you're mid-refactor. Require a comment explaining why.
-- "Always use Result" - Sometimes `unwrap()` on internal invariants is correct (with a comment).
-- "No files over X lines" - Cohesion matters more than line count.
+---
 
-**Flag:** Contortions to satisfy absolute rules when a pragmatic exception would be cleaner.
+## 7. Testing
+
+> Snapshot testing, test organization, coverage layers
+
+### Detection Patterns
+
+**CRITICAL**
+- No test for public function
+- Test verifies implementation, not behavior
+- Flaky test (timing, shared state, order-dependent)
+- `#[ignore]` without tracking issue
+
+**HIGH**
+- Inline tests exceeding 200 lines (should be in `tests/` subdirectory)
+- Missing edge case tests (empty, boundary, error conditions)
+- Snapshot test without clear expected output
+- Test mocks 5+ dependencies (suggests SRP violation)
+
+**MEDIUM**
+- Poor test naming (`test_1`, `test_parser`)
+- No AAA structure (Arrange-Act-Assert unclear)
+- Missing compile-fail tests for error paths
+- Test duplicates logic instead of using fixtures
+
+### Principles
+
+- **Three layers**: Unit (isolated), integration (components), spec (language conformance)
+- **Snapshot testing**: Complex output (errors, IR dumps) use snapshots
+- **Behavior, not implementation**: Test what it does, not how
+- **Data-driven**: Fixture + expected output, not API-direct
+
+### Checklist
+
+- [ ] Public functions have tests
+- [ ] Edge cases covered (empty, boundary, error)
+- [ ] Inline tests < 200 lines
+- [ ] Snapshot tests for complex output
+- [ ] No flaky tests
+
+---
+
+## 8. Performance
+
+> Algorithm complexity, hot paths, allocation patterns
+
+### Detection Patterns
+
+**CRITICAL**
+- O(n²) where O(n) or O(n log n) possible
+- Linear scan in hot loop (should use hash lookup)
+- Allocation in hot loop (`String::new()`, `Vec::new()`, `clone()`)
+- Unbounded recursion without tail-call or iteration
+
+**HIGH**
+- Repeated lookup that could be cached
+- Nested loops over same data
+- `collect()` followed by `iter()` (intermediate allocation)
+- HashMap with bad hash function in hot path
+
+**MEDIUM**
+- Missing `#[inline]` on small hot function
+- `FxHashMap` would outperform `HashMap` in hot path
+- Bounds check on every iteration (use iterators)
+- Debug-only code in hot path
+
+### Principles
+
+- **Measure first**: Profile before optimizing
+- **Algorithmic complexity**: O(n²) → O(n log n) beats micro-optimization
+- **Allocation hierarchy**: Stack < arena < heap; reuse > allocate
+- **Iterators over indexing**: Bounds checks eliminated, better optimization
+
+### Checklist
+
+- [ ] No O(n²) in hot paths
+- [ ] Hash lookups instead of linear scans
+- [ ] No allocation in hot loops
+- [ ] Iterators preferred over indexing
+- [ ] Hot functions profiled
+
+---
+
+## 9. Code Style
+
+> DRY/SOLID adapted for compilers, file organization, documentation
+
+### Detection Patterns
+
+**CRITICAL**
+- `#[allow(clippy::...)]` without comment explaining why
+- Duplicated logic across modules (DRY violation)
+- God module: 1000+ lines doing multiple unrelated things
+- Hidden side effect: function does more than name suggests
+
+**HIGH**
+- Function > 50 lines (target < 30)
+- File > 500 lines without clear single purpose
+- Match statement growing with every feature (OCP violation)
+- Import from sibling's internals (coupling)
+
+**MEDIUM**
+- Banner comments (`// ====`) instead of doc comments
+- Comment explains "what" instead of "why"
+- Inconsistent naming conventions
+- Dead code / commented-out code
+
+### Principles
+
+- **Single responsibility**: One reason to change per module/function
+- **Open/closed**: New features = new code, not modified code
+- **Line count as smell**: Investigate 500+ line files, don't auto-split
+- **Documentation**: Public items documented, modules have doc comments
+
+### Checklist
+
+- [ ] No `#[allow(clippy)]` without justification
+- [ ] Functions < 50 lines
+- [ ] Files have single clear purpose
+- [ ] No dead code or commented-out code
+- [ ] Public items documented
 
 ---
 
 ## Output Format
 
-For each finding, provide:
-1. **Location**: File path and line numbers
-2. **Category**: DRY / SOLID / API-Design / Algorithm / Purity / Errors / Salsa / Memory / Registry / Style / Testing / Diagnostics / Over-Engineering
-3. **Description**: What the issue is
-4. **Severity**: Low / Medium / High
-5. **Suggestion**: How to refactor (reference existing patterns in codebase or industry examples)
+For each finding:
+1. **Severity**: CRITICAL / HIGH / MEDIUM
+2. **Category**: Which section above
+3. **Location**: `file:line` or file path
+4. **Issue**: What's wrong (one line)
+5. **Fix**: How to resolve (one line)
 
-**Note on Over-Engineering:** When flagging potential over-engineering, explain the tradeoff. The goal is pragmatic code, not pattern purity. Sometimes the "wrong" pattern is the right choice for the specific situation.
+Group by severity, then by category. Identify patterns (same issue in multiple places).
 
-Prioritize findings by severity and impact on maintainability.
+## References
 
-**References:**
-- Ori guidelines: `docs/compiler/design/appendices/E-coding-guidelines.md`
-- rust-analyzer style: `~/lang_repos/rust/src/tools/rust-analyzer/docs/book/src/contributing/style.md`
-- Go compiler: `~/lang_repos/golang/src/cmd/compile/README.md`
-- Gleam contributing: `~/lang_repos/gleam/CONTRIBUTING.md`
+- Ori guidelines: `.claude/rules/compiler.md`
+- rust-analyzer style: `~/lang_repos/rust/src/tools/rust-analyzer/docs/`
+- Gleam compiler: `~/lang_repos/gleam/compiler-core/`
+- Roc compiler: `~/lang_repos/roc/crates/`
