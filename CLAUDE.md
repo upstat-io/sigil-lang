@@ -124,24 +124,7 @@ This separation keeps the compiler focused and maintainable while allowing the s
 
 ## Roadmap
 
-The compiler development roadmap is in `plans/roadmap/`. Key files:
-
-| File | Purpose |
-|------|---------|
-| `00-overview.md` | Phase overview, tiers, dependency graph, milestones |
-| `plan.md` | Execution plan, phase order, how to use |
-| `priority-and-tracking.md` | **Current status**, test results, immediate priorities |
-| `phase-XX-*.md` | Individual phase details and checklists |
-
-**22 phases across 8 tiers:**
-- Tier 1 (1-5): Foundation — types, inference, traits, modules, type declarations
-- Tier 2 (6-7): Capabilities & stdlib
-- Tier 3 (8-10): Core patterns — run/try/match, control flow
-- Tier 4 (11-12): FFI & interop
-- Tier 5 (13-15): Language completion — conditional compilation, testing, syntax
-- Tier 6 (16-17): Async & concurrency
-- Tier 7 (18-19): Advanced types — const generics, existential types
-- Tier 8 (20-22): Advanced features — reflection, **LLVM backend**, tooling
+The compiler development roadmap is in `plans/roadmap/`.
 
 ## Reference Repos
 
@@ -658,7 +641,7 @@ Built-in names are reserved **in call position only** (`name(`). The same names 
 ### Prelude (auto-imported)
 
 **Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `Ordering` (`Less`/`Equal`/`Greater`), `PanicInfo` (`message`, `location`)
-**Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Clone`, `Default`
+**Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Clone`, `Default`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`
 
 **function_val** (type conversions, positional allowed):
 - `int(x)`, `float(x)`, `str(x)`, `byte(x)`
@@ -684,6 +667,45 @@ Built-in names are reserved **in call position only** (`name(`). The same names 
 - `compare(left: T, right: T)` → `Ordering`
 - `min(left: T, right: T)` → smallest value
 - `max(left: T, right: T)` → largest value
+- `repeat(value: T)` → infinite iterator of `value`
 
 **Option methods**: `.map(transform: fn)`, `.unwrap_or(default: value)`, `.ok_or(error: value)`, `.and_then(transform: fn)`, `.filter(predicate: fn)`
 **Result methods**: `.map(transform: fn)`, `.map_err(transform: fn)`, `.unwrap_or(default: value)`, `.ok()`, `.err()`, `.and_then(transform: fn)`
+
+**Iterator traits** (functional iteration with `(Option<Item>, Self)` return):
+```ori
+trait Iterator { type Item; @next (self) -> (Option<Self.Item>, Self) }
+trait DoubleEndedIterator: Iterator { @next_back (self) -> (Option<Self.Item>, Self) }
+trait Iterable { type Item; @iter (self) -> impl Iterator }
+trait Collect<T> { @from_iter (iter: impl Iterator) -> Self }
+```
+
+**Iterator methods** (default implementations):
+- `.map(transform: fn)` → `MapIterator`
+- `.filter(predicate: fn)` → `FilterIterator`
+- `.fold(initial: val, op: fn)` → `U`
+- `.find(predicate: fn)` → `Option<T>`
+- `.collect()` → target collection (type inferred)
+- `.count()` → `int`
+- `.any(predicate: fn)` → `bool`
+- `.all(predicate: fn)` → `bool`
+- `.take(count: n)` → `TakeIterator`
+- `.skip(count: n)` → `SkipIterator`
+- `.enumerate()` → `EnumerateIterator` (yields `(int, Item)`)
+- `.zip(other: Iterator)` → `ZipIterator`
+- `.chain(other: Iterator)` → `ChainIterator`
+- `.flatten()` → `FlattenIterator`
+- `.flat_map(transform: fn)` → flattened map
+- `.cycle()` → infinite repeating iterator (requires `Clone`)
+
+**DoubleEndedIterator methods** (traverse from both ends):
+- `.rev()` → `RevIterator` (reversed)
+- `.last()` → `Option<T>` (efficient O(1))
+- `.rfind(predicate: fn)` → `Option<T>` (find from back)
+- `.rfold(initial: val, op: fn)` → `U` (fold from back)
+
+**Iteration notes**:
+- Fused guarantee: once `next()` returns `None`, always returns `None`
+- `Range<float>` is NOT iterable (precision issues)
+- `for` loop desugars to `.iter()` and `.next()`
+- `for...yield` desugars to `.iter().map().collect()`
