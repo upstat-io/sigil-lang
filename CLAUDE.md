@@ -368,7 +368,7 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 3. `*` `/` `%` `div` — multiply, divide, modulo, floor div
 4. `+` `-` — add/concat, subtract
 5. `<<` `>>` — left shift, right shift
-6. `..` `..=` — exclusive range, inclusive range
+6. `..` `..=` `by` — exclusive range, inclusive range, range step
 7. `<` `>` `<=` `>=` — comparison
 8. `==` `!=` — equality
 9. `&` — bitwise and
@@ -427,6 +427,16 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 - `() -> 42` — no params
 - `(x: int) -> int = x * 2` — typed lambda with explicit signature
 - Capture by value: lambdas snapshot outer variables, cannot mutate outer scope
+
+**Ranges**
+- `0..10` — exclusive range (0, 1, 2, ..., 9)
+- `0..=10` — inclusive range (0, 1, 2, ..., 10)
+- `0..10 by 2` — stepped range (0, 2, 4, 6, 8)
+- `10..0 by -1` — descending range (10, 9, 8, ..., 1)
+- `by` is context-sensitive keyword (only after `..` or `..=`)
+- Step must be non-zero (panics at runtime)
+- Mismatched direction produces empty range (no panic)
+- Range with step supported only for `int` (compile error for `float`)
 
 **Loops**
 - `for item in items do expr` — imperative
@@ -635,7 +645,7 @@ assert_eq(
 
 **Reserved**: `async`, `break`, `continue`, `do`, `else`, `false`, `for`, `if`, `impl`, `in`, `let`, `loop`, `match`, `pub`, `self`, `Self`, `then`, `trait`, `true`, `type`, `use`, `uses`, `void`, `where`, `with`, `yield`
 
-**Context-sensitive** (compiler patterns only): `cache`, `catch`, `for`, `parallel`, `recurse`, `run`, `spawn`, `timeout`, `try`, `with`
+**Context-sensitive** (compiler patterns only): `by`, `cache`, `catch`, `for`, `parallel`, `recurse`, `run`, `spawn`, `timeout`, `try`, `with`
 
 **Reserved built-in function names** (cannot be used for user-defined functions, but CAN be used as variable names):
 `int`, `float`, `str`, `byte`, `len`, `is_empty`, `is_some`, `is_none`, `is_ok`, `is_err`, `assert`, `assert_eq`, `assert_ne`, `assert_some`, `assert_none`, `assert_ok`, `assert_err`, `assert_panics`, `assert_panics_with`, `compare`, `min`, `max`, `print`, `panic`
