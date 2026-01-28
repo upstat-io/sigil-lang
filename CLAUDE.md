@@ -342,7 +342,7 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 **Primitives**: `int` (64-bit signed), `float` (64-bit IEEE 754), `bool`, `str` (UTF-8), `char`, `byte`, `void`, `Never`
 **Special**: `Duration` (`30s`, `100ms`), `Size` (`4kb`, `10mb`)
 **Collections**: `[T]` list, `{K: V}` map, `Set<T>` set
-**Compound**: `(T, U)` tuple, `()` unit, `(T) -> U` function, `dyn Trait` trait object
+**Compound**: `(T, U)` tuple, `()` unit, `(T) -> U` function, `Trait` trait object
 **Generic**: `Option<T>`, `Result<T, E>`, `Range<T>`, `Channel<T>`, `Ordering`
 **No implicit conversions**: use `int(x)`, `float(x)`, `str(x)` explicitly
 **Integer overflow**: panics (use `std.math` for wrapping/saturating alternatives)
