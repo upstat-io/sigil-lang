@@ -1,10 +1,14 @@
-# AI Guidance for Ori Specification
+---
+paths: **spec**
+---
+
+# Ori Language Specification Format
+
+Style: [Go Language Specification](https://go.dev/ref/spec)
 
 **IMPORTANT: Synchronization rules are defined in `.claude/rules/ori-lang-docs.md`.**
 
 Any spec change MUST be synchronized with design docs, guide, and module docs.
-
----
 
 ## This is a SPECIFICATION
 
@@ -16,6 +20,12 @@ Any spec change MUST be synchronized with design docs, guide, and module docs.
 | "An identifier is..." | "You can use identifiers to..." |
 
 **Never use tutorial language. Never say "you" or "best practice".**
+
+## Core Principles
+
+1. **Concise** - No fluff, no tutorials, just facts
+2. **Declarative** - State what IS, not how to use it
+3. **Technical** - Precise terminology, formal grammar
 
 ## Writing Style
 
@@ -41,23 +51,21 @@ Don't use incompatible types or you'll get an error.
 Functions let you organize your code into reusable pieces.
 ```
 
-## Grammar Productions
+## Prose Rules
 
-Always use EBNF notation:
+**DO:**
+- Short declarative sentences
+- _Italics_ for technical terms (first use)
+- `Backticks` for syntax
+- Direct constraints: "X must be Y"
 
-```ebnf
-production_name = expression .
-```
+**DO NOT:**
+- "you can...", "let's...", "we..."
+- Rhetorical questions
+- Motivation ("useful for...")
+- Verbose explanations
 
-Conventions:
-- Production names in `snake_case`
-- Terminals in double quotes: `"keyword"`
-- Alternatives with `|`
-- Optional with `[ ]`
-- Repetition with `{ }`
-- Grouping with `( )`
-
-## Terminology
+## Normative Keywords
 
 | Term | Meaning |
 |------|---------|
@@ -66,8 +74,32 @@ Conventions:
 | shall | Same as must |
 | should | Recommendation |
 | may | Optional |
+| may not | Prohibited |
 | error | Compile-time failure |
 | undefined | Implementation-defined |
+
+## Grammar
+
+The complete formal grammar is in [grammar.ebnf](grammar.ebnf). This is the **single source of truth** for all syntax.
+
+**Do not inline EBNF in spec files.** Instead, reference the grammar file:
+
+```markdown
+> **Grammar:** See [grammar.ebnf](grammar.ebnf) § SECTION_NAME
+```
+
+Where `SECTION_NAME` matches the comment headers in grammar.ebnf (e.g., LEXICAL GRAMMAR, TYPES, DECLARATIONS, EXPRESSIONS, PATTERNS).
+
+### EBNF Conventions
+
+```
+production_name = expression .
+```
+
+- `snake_case` production names
+- `"keyword"` literal tokens
+- `|` alternation, `[ ]` optional, `{ }` repetition, `( )` grouping
+- `.` terminates productions
 
 ## Section Structure
 
@@ -76,13 +108,9 @@ Conventions:
 
 Brief normative introduction.
 
+> **Grammar:** See [grammar.ebnf](grammar.ebnf) § SECTION_NAME
+
 ## Subsection
-
-### Grammar
-
-\`\`\`ebnf
-production = ... .
-\`\`\`
 
 ### Semantics
 
@@ -102,6 +130,16 @@ Normative definitions here.
 \`\`\`
 ```
 
+## Examples
+
+```ori
+// Valid
+example()
+
+// Invalid - reason
+bad()  // error: explanation
+```
+
 ## Cross-References
 
 ```markdown
@@ -112,7 +150,7 @@ See [Design: Error Handling](../design/05-error-handling/index.md).
 
 ## Checklist for Spec Changes
 
-- [ ] Update grammar productions if syntax changed
+- [ ] Update [grammar.ebnf](grammar.ebnf) if syntax changed
 - [ ] Use formal language throughout
 - [ ] Mark informative sections with `> **Note:**`
 - [ ] Update cross-references within spec
@@ -123,6 +161,10 @@ See [Design: Error Handling](../design/05-error-handling/index.md).
 ## Common Mistakes
 
 1. **Tutorial language**: "You can..." → "A program may..."
-2. **Missing grammar**: Syntax without EBNF production
+2. **Inline EBNF**: Use grammar.ebnf reference instead
 3. **Unmarked informative content**: Always use `> **Note:**`
 4. **Forgetting sync**: Spec change without design doc update
+
+## Template Location
+
+See `docs/ori_lang/0.1-alpha/spec/_template.md` for new files.

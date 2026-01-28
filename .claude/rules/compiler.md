@@ -1,5 +1,5 @@
 ---
-paths: **/compiler**
+paths: **compiler**
 ---
 
 # Compiler Development

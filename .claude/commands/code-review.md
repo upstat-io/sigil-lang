@@ -1,5 +1,5 @@
 ---
-name: compiler-review
+name: code-review
 description: Analyze the Ori compiler for DRY/SOLID violations and industry best practices
 allowed-tools: Read, Grep, Glob, Task
 ---
