@@ -643,7 +643,7 @@ Built-in names are reserved **in call position only** (`name(`). The same names 
 ### Prelude (auto-imported)
 
 **Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `TraceEntry`, `Ordering` (`Less`/`Equal`/`Greater`), `PanicInfo` (`message`, `location`)
-**Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Clone`, `Default`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`
+**Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Debug`, `Clone`, `Default`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`
 
 **function_val** (type conversions, positional allowed):
 - `int(x)`, `float(x)`, `str(x)`, `byte(x)`
@@ -674,6 +674,17 @@ Built-in names are reserved **in call position only** (`name(`). The same names 
 **Option methods**: `.map(transform: fn)`, `.unwrap_or(default: value)`, `.ok_or(error: value)`, `.and_then(transform: fn)`, `.filter(predicate: fn)`
 **Result methods**: `.map(transform: fn)`, `.map_err(transform: fn)`, `.unwrap_or(default: value)`, `.ok()`, `.err()`, `.and_then(transform: fn)`, `.context(msg: str)` (preserves trace)
 **Error methods**: `.trace()` → `str`, `.trace_entries()` → `[TraceEntry]`, `.has_trace()` → `bool`
+
+**Debug trait** (developer-facing representation):
+```ori
+trait Debug { @debug (self) -> str }
+```
+
+- All primitives implement Debug (strings/chars show escaped: `"\"hello\""`, `"'\\n'"`)
+- Collections implement Debug when element types do (`[T]`, `{K: V}`, `Set<T>`)
+- `Option<T>` and `Result<T, E>` implement Debug when inner types do
+- Derivable for user types: `#[derive(Debug)] type Point = { x: int, y: int }`
+- Shows complete internal structure (vs `Printable` for user-facing display)
 
 **Clone trait** (explicit value duplication):
 ```ori
