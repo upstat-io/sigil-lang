@@ -1,6 +1,6 @@
 # Approve Proposal Command
 
-Approve a draft proposal and integrate it into the roadmap.
+Review a draft proposal, analyze its implications, and (if approved) integrate it into the roadmap.
 
 ## Usage
 
@@ -8,21 +8,72 @@ Approve a draft proposal and integrate it into the roadmap.
 /approve-proposal <proposal-name>
 ```
 
-Example: `/approve-proposal as-conversion` (approves `as-conversion-proposal.md`)
+Example: `/approve-proposal as-conversion` (reviews and potentially approves `as-conversion-proposal.md`)
 
 ---
 
 ## Workflow
 
-### Step 1: Locate and Validate the Draft
+### Step 1: Locate and Read the Draft
 
 1. Find the proposal in `docs/ori_lang/proposals/drafts/`
-2. Read the proposal to understand:
+2. Read the entire proposal carefully to understand:
    - What it changes (syntax, types, patterns, stdlib, etc.)
+   - The motivation and problem being solved
+   - The proposed solution and alternatives considered
    - Which compiler phases it affects
    - Any dependencies on other proposals or phases
 
-### Step 2: Move to Approved
+### Step 2: Analyze and Review with User
+
+Present a structured review to the user covering:
+
+#### Summary
+- Brief (2-3 sentence) summary of what the proposal does
+
+#### Strengths
+- What the proposal does well
+- How it aligns with Ori's design philosophy
+- Benefits to language users
+
+#### Concerns
+Raise any issues found, including but not limited to:
+- **Consistency**: Does it fit with existing language patterns?
+- **Complexity**: Does it add unnecessary complexity?
+- **Edge cases**: Are there unhandled edge cases?
+- **Ambiguity**: Is the specification clear and complete?
+- **Implementation burden**: Is the implementation realistic?
+- **Alternatives**: Were better alternatives overlooked?
+- **Breaking changes**: Does it break existing code?
+- **Spec completeness**: Are grammar, semantics, and examples complete?
+
+#### Questions
+- List any clarifying questions for the user
+
+#### Recommendation
+Provide a clear recommendation:
+- **APPROVE**: Ready for implementation as-is
+- **APPROVE WITH CHANGES**: Good proposal but needs minor adjustments (list them)
+- **DEFER**: Needs more work before approval (explain what)
+- **REJECT**: Fundamentally flawed or conflicts with language goals (explain why)
+
+### Step 3: Get User Decision
+
+Ask the user to confirm one of:
+1. **Approve** - Proceed with approval workflow
+2. **Approve with changes** - Make specified changes, then approve
+3. **Defer** - Leave in drafts for revision
+4. **Reject** - Move to rejected with rationale
+
+If the user chooses to defer or reject, stop here. Only proceed to Step 4+ if approving.
+
+---
+
+## Approval Workflow (Steps 4-10)
+
+Only proceed with these steps after user confirms approval.
+
+### Step 4: Move to Approved
 
 1. Move the file from `drafts/` to `approved/`:
    ```bash
@@ -39,7 +90,7 @@ Example: `/approve-proposal as-conversion` (approves `as-conversion-proposal.md`
    **Approved:** YYYY-MM-DD
    ```
 
-### Step 3: Determine Target Phase
+### Step 5: Determine Target Phase
 
 Map the proposal to the appropriate roadmap phase based on what it affects:
 
@@ -56,7 +107,7 @@ Map the proposal to the appropriate roadmap phase based on what it affects:
 
 Some proposals affect multiple phases. Add entries to each affected phase.
 
-### Step 4: Add to Phase File
+### Step 6: Add to Phase File
 
 Add a new section to the appropriate `plans/roadmap/phase-XX-*.md` file:
 
@@ -86,7 +137,7 @@ Brief description of what this implements.
 
 Follow the existing format in the phase file. Break down the proposal's implementation section into discrete, checkable tasks.
 
-### Step 5: Update plan.md
+### Step 7: Update plan.md
 
 If the proposal is referenced in `plans/roadmap/plan.md` (under "Draft Proposals Pending Review" or similar sections):
 
@@ -104,7 +155,7 @@ Example change:
 - [x] **`as` Conversion Syntax** — APPROVED → See Phase 15.7
 ```
 
-### Step 6: Update priority-and-tracking.md
+### Step 8: Update priority-and-tracking.md
 
 Add the approved proposal to the appropriate section in `plans/roadmap/priority-and-tracking.md`:
 
@@ -122,7 +173,7 @@ Example addition:
 - Blocked on: Phase 3 (needs As<T> trait)
 ```
 
-### Step 7: Update Spec (If Required)
+### Step 9: Update Spec (If Required)
 
 If the proposal introduces new syntax, types, or semantics:
 
@@ -130,7 +181,7 @@ If the proposal introduces new syntax, types, or semantics:
 2. Update `CLAUDE.md` if syntax/types/patterns are affected
 3. Follow the rules in `.claude/rules/ori-lang.md`
 
-### Step 8: Commit
+### Step 10: Commit
 
 Create a commit with:
 ```
@@ -149,6 +200,9 @@ Proposal: docs/ori_lang/proposals/approved/<name>-proposal.md
 
 Before completing, verify:
 
+- [ ] Proposal reviewed with user (strengths, concerns, questions)
+- [ ] Recommendation provided (approve/defer/reject)
+- [ ] User confirmed approval decision
 - [ ] Proposal moved from `drafts/` to `approved/`
 - [ ] Status field updated to `Approved`
 - [ ] Approved date added
