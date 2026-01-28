@@ -282,6 +282,9 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 - `@name<T: A + B> (x: T) -> T` — multiple bounds
 - `@name<T> (...) -> T where T: Clone, U: Default = ...` — where clause
 - `@name (...) -> Type uses Capability = ...` — capability
+- `@name (x: int = 10) -> int` — default parameter value
+- `@name (a: int, b: int = 0, c: int = 0) -> int` — multiple defaults (any position)
+- Default expressions evaluated at call time, cannot reference other parameters
 
 **Config Variables** (compile-time constants)
 - `$name = value`
