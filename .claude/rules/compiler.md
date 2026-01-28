@@ -69,7 +69,7 @@ Compiler implements only constructs requiring **special syntax or static analysi
 
 ## Key Patterns
 
-**TypeChecker** (5 components in `oric/src/typeck/checker/components.rs`):
+**TypeChecker** (5 components in `ori_typeck/src/checker/components.rs`):
 - `CheckContext<'a>` — immutable arena/interner refs
 - `InferenceState` — mutable inference ctx, env, expr_types
 - `Registries` — pattern, type_op, types, traits
@@ -95,13 +95,13 @@ Compiler implements only constructs requiring **special syntax or static analysi
 
 | Change | Files |
 |--------|-------|
-| **Expression** | `ori_parse/src/grammar/expr.rs`, `oric/src/typeck/infer/expr.rs`, `ori_eval/src/exec/expr.rs` |
+| **Expression** | `ori_parse/src/grammar/expr.rs`, `ori_typeck/src/infer/expressions/`, `ori_eval/src/exec/expr.rs` |
 | **Pattern** | `ori_patterns/src/<name>.rs`, `ori_patterns/src/registry.rs` |
-| **Type Decl** | `ori_ir/src/ast/items/`, `ori_parse/src/grammar/item.rs`, `oric/src/typeck/checker/type_registration.rs` |
+| **Type Decl** | `ori_ir/src/ast/items/`, `ori_parse/src/grammar/item.rs`, `ori_typeck/src/checker/type_registration.rs` |
 | **Trait/Impl** | `ori_ir/src/ast/items/`, `ori_parse/src/grammar/item.rs`, `ori_eval/src/interpreter/resolvers/`, `ori_eval/src/user_methods.rs` |
 | **Resolver** | `ori_eval/src/interpreter/resolvers/<name>.rs`, implement `MethodResolver` trait, register in `builder.rs` |
 | **Diagnostic** | `ori_diagnostic/src/problem.rs`, `ori_diagnostic/src/fixes/` |
-| **Control Flow** | `ori_lexer/src/lib.rs`, `ori_ir/src/ast/`, `ori_parse/src/grammar/control.rs`, `oric/src/typeck/infer/control.rs`, `ori_eval/src/exec/control.rs` |
+| **Control Flow** | `ori_lexer/src/lib.rs`, `ori_ir/src/ast/`, `ori_parse/src/grammar/control.rs`, `ori_typeck/src/infer/control.rs`, `ori_eval/src/exec/control.rs` |
 
 ## Testing
 
