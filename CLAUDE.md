@@ -106,7 +106,7 @@ This separation keeps the compiler focused and maintainable while allowing the s
 - **Dependency-aware tests**: tests bound to functions, run on change propagation
 - **Causality tracking**: `ori impact` shows blast radius, `ori why` traces failures to source
 - **Contracts**: `pre_check:`/`post_check:` for function invariants
-- **Explicit oris**: `@` functions, `$` config
+- **Explicit sigils**: `@` functions, `$` immutable bindings
 - **No null/exceptions**: `Option<T>` for optional, `Result<T, E>` for fallible
 - **Capabilities for effects**: `uses Http`, `uses Async` — explicit, injectable, testable
 - **Zero-config formatting**: one canonical style, enforced
@@ -293,17 +293,19 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 - `@f (n: int) -> int if n < 0 = -n` — guard with `if`
 - All clauses must be exhaustive; compiler warns about unreachable clauses
 
-**Config Variables** (compile-time constants)
-- `$name = value`
-- `pub $name = value` — public
-- `$name = $other * 2` — can reference other config
-- `use './config' { $timeout }` — import config
+**Constants** (immutable bindings with `$` prefix)
+- `let $name = value` — immutable binding
+- `pub let $name = value` — public immutable binding
+- `let $name = $other * 2` — can reference other constants
+- `use './config' { $timeout }` — import constants (must include `$`)
+- Module-level bindings must be immutable (`$` prefix required)
+- `$` is a modifier, not part of the name — `x` and `$x` cannot coexist in same scope
 
 **Const Functions** (compile-time evaluation)
-- `$name (param: Type) -> ReturnType = expression`
-- `$square (x: int) -> int = x * x`
-- `$factorial (n: int) -> int = if n <= 1 then 1 else n * $factorial(n: n - 1)`
-- Must be pure: no capabilities, no I/O, no mutable bindings
+- `let $name = (param: Type) -> ReturnType = expression`
+- `let $square = (x: int) -> int = x * x`
+- `let $factorial = (n: int) -> int = if n <= 1 then 1 else n * $factorial(n: n - 1)`
+- Must be pure: no capabilities, no I/O, no mutable state access
 - Called with constant args → evaluated at compile time
 - Called with runtime args → evaluated at runtime
 
@@ -384,15 +386,16 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 - `if cond then expr` — no else, result type is `void`
 
 **Bindings**
-- `let x = value` — immutable
-- `let mut x = value` — mutable
+- `let x = value` — mutable (can reassign)
+- `let $x = value` — immutable (cannot reassign)
 - `let x: Type = value` — annotated
-- `let x = value` then `let x = x + 1` — shadowing allowed
-- `let { x, y } = point` — struct destructure
+- `let x = value` then `let x = x + 1` — shadowing allowed (can change mutability)
+- `let { x, y } = point` — struct destructure (both mutable)
+- `let { $x, y } = point` — struct destructure (x immutable, y mutable)
 - `let { x: px, y: py } = point` — destructure with rename
 - `let { position: { x, y } } = entity` — nested destructure
 - `let (a, b) = tuple` — tuple destructure
-- `let [head, ..tail] = list` — list destructure
+- `let [$head, ..tail] = list` — list destructure (head immutable)
 
 **Indexing**
 - `list[0]`, `list[# - 1]` — `#` is length inside brackets (panics on out-of-bounds)
@@ -630,7 +633,7 @@ assert_eq(
 
 ### Keywords
 
-**Reserved**: `async`, `break`, `continue`, `do`, `else`, `false`, `for`, `if`, `impl`, `in`, `let`, `loop`, `match`, `mut`, `pub`, `self`, `Self`, `then`, `trait`, `true`, `type`, `use`, `uses`, `void`, `where`, `with`, `yield`
+**Reserved**: `async`, `break`, `continue`, `do`, `else`, `false`, `for`, `if`, `impl`, `in`, `let`, `loop`, `match`, `pub`, `self`, `Self`, `then`, `trait`, `true`, `type`, `use`, `uses`, `void`, `where`, `with`, `yield`
 
 **Context-sensitive** (compiler patterns only): `cache`, `catch`, `for`, `parallel`, `recurse`, `run`, `spawn`, `timeout`, `try`, `with`
 
