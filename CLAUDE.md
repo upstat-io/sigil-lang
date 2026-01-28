@@ -6,19 +6,37 @@ General-purpose, expression-based language with strict static typing, type infer
 
 ## Development Commands
 
-**Use these cargo aliases** (defined in `.cargo/config.toml`):
+**Primary commands** (run everything, including LLVM in Docker):
 
 | Command | Description |
 |---------|-------------|
-| `cargo t` | Run all Rust unit tests |
-| `cargo st` | Run all Ori language tests (`tests/spec/`) |
+| `./test-all` | Run ALL tests: Rust + Ori spec + LLVM |
+| `./clippy-all` | Run clippy on ALL crates: workspace + LLVM |
+| `./fmt-all` | Format ALL Rust code: workspace + LLVM |
+| `./build-all` | Build ALL crates: workspace + LLVM |
+
+**Individual test commands:**
+
+| Command | Description |
+|---------|-------------|
+| `cargo t` | Run Rust unit tests only |
+| `cargo st` | Run Ori language tests (`tests/spec/`) |
 | `cargo st tests/spec/capabilities/` | Run specific Ori test directory |
 | `cargo st tests/spec/types/primitives.ori` | Run specific Ori test file |
+| `./llvm-test` | Run LLVM crate tests (Docker) |
+
+**Build and check commands** (workspace only, excludes LLVM):
+
+| Command | Description |
+|---------|-------------|
 | `cargo c` | Check all crates (fast compile check) |
 | `cargo cl` | Run clippy on all crates |
 | `cargo b` | Build all crates |
+| `cargo fmt` | Format all crates |
+| `./llvm-build` | Build LLVM crate (Docker) |
+| `./llvm-clippy` | Run clippy on LLVM crate (Docker) |
 
-**Always run `cargo t` after making compiler changes. Run `cargo st` to verify Ori language behavior.**
+**Always run `./test-all` after making compiler changes to verify everything works.**
 
 ## Design Philosophy
 
