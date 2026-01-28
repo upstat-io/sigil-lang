@@ -451,6 +451,8 @@ Patterns are compiler constructs with special syntax. Three categories:
 
 **function_seq** — Sequential expressions (order matters)
 - `run(let x = a, let y = b, result)`
+- `run(pre_check: cond, body, post_check: r -> cond)` — with contract checks
+- `run(pre_check: x > 0 | "msg", body)` — check with custom message
 - `try(let x = fallible()?, Ok(x))`
 - `match(value, Pattern -> expr, _ -> default)`
 
