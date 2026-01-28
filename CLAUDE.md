@@ -355,9 +355,9 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 - **Bool**: `true`, `false`
 - **Duration**: `100ms`, `30s`, `5m`, `2h`
 - **Size**: `1024b`, `4kb`, `10mb`, `2gb`
-- **List**: `[]`, `[1, 2, 3]`
-- **Map**: `{}`, `{"key": value}`
-- **Struct**: `Point { x: 0, y: 0 }`, `Point { x, y }` (shorthand)
+- **List**: `[]`, `[1, 2, 3]`, `[...a, ...b]` (spread)
+- **Map**: `{}`, `{"key": value}`, `{...defaults, ...overrides}` (spread)
+- **Struct**: `Point { x: 0, y: 0 }`, `Point { x, y }` (shorthand), `Point { ...original, x: 10 }` (spread)
 
 ### Operators (by precedence, highest first)
 
@@ -440,6 +440,14 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 - `break:name` — break outer loop
 - `break:name value` — break outer loop with value
 - `continue:name` — continue outer loop
+
+**Spread Operator**
+- `[...a, ...b]` — concatenate lists
+- `{...defaults, ...overrides}` — merge maps (later wins on conflicts)
+- `Point { ...original, x: 10 }` — copy struct with field overrides
+- Order determines precedence: later entries override earlier ones
+- Spread only in literal contexts, not function calls
+- Type constraints: list spread requires same element type, map spread requires compatible K/V, struct spread requires exact same type
 
 ### Patterns
 
