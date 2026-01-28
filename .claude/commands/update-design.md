@@ -1,0 +1,127 @@
+# Update Compiler Design Docs
+
+Update the compiler design documentation at `docs/compiler/design/` to reflect recent implementation changes.
+
+## Path
+
+**IMPORTANT:** The compiler design docs are located at:
+```
+docs/compiler/design/
+```
+
+NOT at `docs/ori_lang/` (that's the language spec, not compiler design).
+
+## Directory Structure
+
+```
+docs/compiler/design/
+├── index.md                    # Overview and navigation
+├── 01-architecture/            # Compiler architecture
+│   ├── index.md
+│   ├── pipeline.md
+│   ├── data-flow.md
+│   └── salsa-integration.md
+├── 03-lexer/                   # Lexer design
+│   ├── index.md
+│   └── token-design.md
+├── 04-parser/                  # Parser design
+│   ├── index.md
+│   ├── recursive-descent.md
+│   ├── grammar-modules.md
+│   └── error-recovery.md
+├── 05-type-system/             # Type system design
+│   ├── index.md
+│   └── ...
+├── 06-pattern-system/          # Pattern matching design
+│   ├── index.md
+│   ├── pattern-trait.md
+│   └── ...
+├── 07-evaluator/               # Interpreter/evaluator design
+│   ├── index.md
+│   ├── tree-walking.md
+│   ├── environment.md
+│   ├── value-system.md
+│   └── module-loading.md
+├── 08-diagnostics/             # Error reporting design
+│   ├── index.md
+│   ├── problem-types.md
+│   ├── emitters.md
+│   └── code-fixes.md
+├── 09-testing/                 # Test infrastructure design
+│   ├── index.md
+│   ├── test-discovery.md
+│   └── test-runner.md
+└── appendices/
+    ├── A-salsa-patterns.md
+    ├── B-memory-management.md
+    ├── C-error-codes.md
+    ├── D-debugging.md
+    └── E-coding-guidelines.md
+```
+
+## When to Update
+
+Update design docs when:
+- Adding new compiler features (new AST nodes, new patterns, new type constructs)
+- Changing compiler architecture (new crates, reorganized modules)
+- Modifying key data structures (Value, Type, MatchPattern, etc.)
+- Adding new resolution/dispatch mechanisms
+- Changing the compilation pipeline
+
+## Update Process
+
+1. **Identify affected docs** based on what changed:
+   - AST changes → `04-parser/`, `06-pattern-system/`
+   - Type system changes → `05-type-system/`
+   - Evaluator changes → `07-evaluator/`
+   - New patterns → `06-pattern-system/`
+   - Error handling → `08-diagnostics/`
+
+2. **Read the relevant source files** to understand current implementation:
+   - `compiler/ori_ir/src/ast/` - AST definitions
+   - `compiler/ori_parse/src/grammar/` - Parser
+   - `compiler/ori_typeck/src/` - Type checker
+   - `compiler/ori_eval/src/` - Evaluator
+   - `compiler/ori_patterns/src/` - Pattern definitions
+
+3. **Update the design docs** to reflect:
+   - New data structures and their purpose
+   - New algorithms or approaches
+   - Changed interfaces or APIs
+   - Updated examples showing new syntax/behavior
+
+4. **Cross-reference with roadmap** (`plans/roadmap/priority-and-tracking.md`):
+   - Note which phase the change relates to
+   - Update completion status if design doc completion was tracked
+
+## Writing Style
+
+Design docs explain **WHY** and **HOW**, not just what:
+- Explain design decisions and trade-offs
+- Document the reasoning behind choices
+- Include diagrams or ASCII art where helpful
+- Reference the spec (`docs/ori_lang/0.1-alpha/spec/`) for normative definitions
+
+## Example Update
+
+If you added multi-field variant pattern support:
+
+1. Update `docs/compiler/design/06-pattern-system/index.md`:
+   - Document `MatchPattern::Variant { inner: Vec<MatchPattern> }` change
+   - Explain why Vec instead of Option<Box>
+
+2. Update `docs/compiler/design/04-parser/grammar-modules.md`:
+   - Document `parse_variant_inner_patterns()` helper
+   - Show grammar for comma-separated patterns
+
+3. Update `docs/compiler/design/07-evaluator/tree-walking.md`:
+   - Document how `try_match()` handles multi-field variants
+   - Explain binding extraction for each field
+
+## Output
+
+Report what was updated:
+- Which design doc files were modified
+- Summary of changes made
+- Any new sections added
+- Cross-references updated
