@@ -1,6 +1,6 @@
 # Update Compiler Design Docs
 
-Update the compiler design documentation at `docs/compiler/design/` to reflect recent implementation changes.
+Update the compiler design documentation at `docs/compiler/design/` to accurately describe the current implementation.
 
 ## Path
 
@@ -84,17 +84,38 @@ Update design docs when:
    - `compiler/ori_eval/src/` - Evaluator
    - `compiler/ori_patterns/src/` - Pattern definitions
 
-3. **Update the design docs** to reflect:
-   - New data structures and their purpose
-   - New algorithms or approaches
-   - Changed interfaces or APIs
-   - Updated examples showing new syntax/behavior
+3. **Update the design docs** to accurately describe:
+   - Data structures and their purpose
+   - Algorithms and approaches
+   - Interfaces and APIs
+   - Examples showing current syntax/behavior
 
 4. **Cross-reference with roadmap** (`plans/roadmap/priority-and-tracking.md`):
-   - Note which phase the change relates to
+   - Note which phase the feature relates to
    - Update completion status if design doc completion was tracked
 
 ## Writing Style
+
+### Document the Current Design, Not Changes
+
+**CRITICAL:** Design docs describe **what IS**, not what changed or was fixed.
+
+**DO NOT write:**
+- "This was changed to..."
+- "Previously X, now Y..."
+- "The problem was... the solution is..."
+- "This fix enables..."
+- Progress updates or completion notes
+
+**DO write:**
+- "The lexer produces X tokens"
+- "The parser synthesizes Y from Z"
+- "This design enables..."
+- Present tense, factual descriptions
+
+Write as if documenting a fresh codebase for someone who has never seen previous versions. The reader doesn't care what it used to be — they need to understand what it is now.
+
+### Content Guidelines
 
 Design docs explain **WHY** and **HOW**, not just what:
 - Explain design decisions and trade-offs
@@ -104,11 +125,11 @@ Design docs explain **WHY** and **HOW**, not just what:
 
 ## Example Update
 
-If you added multi-field variant pattern support:
+If the codebase now supports multi-field variant patterns:
 
 1. Update `docs/compiler/design/06-pattern-system/index.md`:
-   - Document `MatchPattern::Variant { inner: Vec<MatchPattern> }` change
-   - Explain why Vec instead of Option<Box>
+   - Document `MatchPattern::Variant { inner: Vec<MatchPattern> }` structure
+   - Explain why Vec is used (supports 0, 1, or N fields)
 
 2. Update `docs/compiler/design/04-parser/grammar-modules.md`:
    - Document `parse_variant_inner_patterns()` helper
@@ -117,6 +138,12 @@ If you added multi-field variant pattern support:
 3. Update `docs/compiler/design/07-evaluator/tree-walking.md`:
    - Document how `try_match()` handles multi-field variants
    - Explain binding extraction for each field
+
+**Good example text:**
+> "Variant patterns use `Vec<MatchPattern>` for inner patterns, supporting unit variants (`None`), single-field variants (`Some(x)`), and multi-field variants (`Point(x, y)`)."
+
+**Bad example text:**
+> "The variant pattern was changed from `Option<Box<MatchPattern>>` to `Vec<MatchPattern>` to support multi-field variants."
 
 ## Output
 
