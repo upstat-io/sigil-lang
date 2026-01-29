@@ -80,12 +80,12 @@ Functions let you organize your code into reusable pieces.
 
 ## Grammar
 
-The complete formal grammar is in [grammar.ebnf](grammar.ebnf). This is the **single source of truth** for all syntax.
+The complete formal grammar is in [grammar.ebnf](https://ori-lang.com/docs/compiler-design/04-parser#grammar). This is the **single source of truth** for all syntax.
 
 **Do not inline EBNF in spec files.** Instead, reference the grammar file:
 
 ```markdown
-> **Grammar:** See [grammar.ebnf](grammar.ebnf) § SECTION_NAME
+> **Grammar:** See [grammar.ebnf](https://ori-lang.com/docs/compiler-design/04-parser#grammar) § SECTION_NAME
 ```
 
 Where `SECTION_NAME` matches the comment headers in grammar.ebnf (e.g., LEXICAL GRAMMAR, TYPES, DECLARATIONS, EXPRESSIONS, PATTERNS).
@@ -108,7 +108,7 @@ production_name = expression .
 
 Brief normative introduction.
 
-> **Grammar:** See [grammar.ebnf](grammar.ebnf) § SECTION_NAME
+> **Grammar:** See [grammar.ebnf](https://ori-lang.com/docs/compiler-design/04-parser#grammar) § SECTION_NAME
 
 ## Subsection
 
@@ -150,7 +150,7 @@ See [Design: Error Handling](../design/05-error-handling/index.md).
 
 ## Checklist for Spec Changes
 
-- [ ] Update [grammar.ebnf](grammar.ebnf) if syntax changed
+- [ ] Update [grammar.ebnf](https://ori-lang.com/docs/compiler-design/04-parser#grammar) if syntax changed
 - [ ] Use formal language throughout
 - [ ] Mark informative sections with `> **Note:**`
 - [ ] Update cross-references within spec
