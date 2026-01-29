@@ -212,16 +212,21 @@ These are shallow clones. To update: `cd ~/lang_repos/<name> && git pull --depth
 | Command | Action |
 |---------|--------|
 | `ori run file.ori` | Run program |
-| `ori test` | Run all tests (parallel) |
-| `ori check file.ori` | Check test coverage |
+| `ori check file.ori` | Compile + run affected targeted tests |
+| `ori check --no-test` | Compile only, skip tests |
+| `ori check --strict` | Fail build on test failure (for CI) |
+| `ori test` | Run all tests (targeted + free-floating) |
+| `ori test --only-targeted` | Run only targeted tests |
 | `ori fmt src/` | Format files |
 
 ## Files & Tests
 
 - `.ori` source, `.test.ori` tests in `_test/` subdirectory
 - Targeted test: `@test_name tests @target () -> void = run(...)`
-- Free-floating test: `@test_name () -> void = run(...)`
+- Free-floating test: `@test_name tests _ () -> void = run(...)` — targets nothing, runs only via `ori test`
+- `tests` keyword required for all tests; `_` indicates free-floating
 - Private access via `::` prefix; every function (except `@main`) requires tests
+- Targeted tests auto-run during `ori check` when their target functions change
 
 ## Program Entry
 
@@ -314,11 +319,12 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 
 **Tests**
 - `@test_name tests @target () -> void = run(...)` — targeted test
-- `@test_name () -> void = run(...)` — free-floating test
+- `@test_name tests _ () -> void = run(...)` — free-floating test (targets nothing)
 - `@test_name tests @a tests @b () -> void = ...` — multiple targets
 - `#[skip("reason")] @test_name ...` — skipped test
 - `#[compile_fail("error")] @test_name ...` — compile-fail test
 - `#[fail("error")] @test_name ...` — expected failure test
+- All tests require `tests` keyword; `_` for free-floating, `@fn` for targeted
 
 ### Types
 
