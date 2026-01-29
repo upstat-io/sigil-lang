@@ -10,7 +10,7 @@ Analyze the Ori compiler for violations of documented patterns and industry best
 
 ## Execution Strategy
 
-Use the **Task tool** to launch **9 parallel Explore agents** (one per category below). Send a **single message with 9 Task tool calls** to maximize parallelism.
+Use the **Task tool** to launch **10 parallel Explore agents** (one per category below). Send a **single message with 10 Task tool calls** to maximize parallelism.
 
 Each agent prompt should:
 1. Specify the category name and detection patterns from that section
@@ -26,7 +26,7 @@ Task(
 )
 ```
 
-**After all 9 agents complete**, aggregate and synthesize:
+**After all 10 agents complete**, aggregate and synthesize:
 1. Group findings by severity (CRITICAL → HIGH → MEDIUM)
 2. Identify patterns (same issue in multiple places)
 3. Prioritize by impact on maintainability
@@ -405,6 +405,111 @@ Task(
 - [ ] Files have single clear purpose
 - [ ] No dead code or commented-out code
 - [ ] Public items documented
+
+---
+
+## 10. Extractable Patterns
+
+> Match arm clustering, repetitive structures, module extraction opportunities
+
+This category specifically targets **large functions with clustered similar code** that should be extracted into separate modules. These are often missed by line-count heuristics because each individual arm is small, but groups of arms share structure.
+
+### Detection Patterns
+
+**CRITICAL**
+- **Match arm clustering**: Match with 15+ arms where 3+ consecutive arms follow identical structure:
+  - Same sequence of operations (get child value → check sentinel → compute formula)
+  - Same error handling pattern (check for error, early return)
+  - Same delegation pattern (call helper, combine results)
+  - *Example*: `ExprKind::Ok`, `ExprKind::Err`, `ExprKind::Some` all doing `calc.width(inner)` + check + return prefix_len + inner_w + 1
+
+- **Repetitive iteration methods**: 3+ methods with near-identical bodies differing only in:
+  - Field name accessed (`entry.key` vs `entry.value` vs `arg.name`)
+  - Type being iterated (`&[ExprId]` vs `&[MapEntry]` vs `&[FieldInit]`)
+  - *Example*: `width_of_expr_list`, `width_of_map_entries`, `width_of_field_inits` all doing accumulate-with-separator
+
+**HIGH**
+- **God match**: Single match statement with 20+ arms in one function (even if function is <100 lines)
+- **Structural similarity**: Code blocks that:
+  1. Get multiple child values/widths
+  2. Check each for error/sentinel condition
+  3. Combine with formula
+  - When 4+ blocks follow this pattern, extract to helper or module
+
+- **Implicit grouping**: Match arms that are conceptually related but scattered:
+  - All call-related: `Call`, `CallNamed`, `MethodCall`, `MethodCallNamed`
+  - All collections: `List`, `Map`, `Struct`, `Tuple`, `Range`
+  - All wrappers: `Ok`, `Err`, `Some`, `None`, `Try`, `Await`
+  - All control flow: `If`, `For`, `Loop`, `Block`, `Return`, `Break`
+
+**MEDIUM**
+- **Missing abstraction**: Same 3-line pattern appears 5+ times (even with different variable names)
+- **Inline helpers**: Private functions that only serve one match arm but are defined at module level
+- **Scattered related code**: Functions operating on same concept spread across file instead of grouped
+
+### How to Detect
+
+1. **Count match arms**: Any `match` with 15+ arms is a candidate
+2. **Group by structure**: Identify arms with same operation sequence (ignoring specific fields/types)
+3. **Name the groups**: If you can name a group ("wrapper expressions", "binary operations"), it should be a module
+4. **Check delegation**: Arms that immediately delegate to a helper suggest the helper should be in its own file
+
+### Extraction Indicators
+
+Extract when a group of arms:
+- Has 3+ members with identical structure
+- Has a clear conceptual name (calls, collections, wrappers, control)
+- Would benefit from shared helper functions
+- Could have its own tests
+
+### Example Violation
+
+```rust
+// BAD: 30-arm match in one function, related arms scattered
+fn calculate_width(&mut self, expr_id: ExprId) -> usize {
+    match &expr.kind {
+        ExprKind::Int(n) => int_width(*n),
+        ExprKind::Call { func, args } => { ... },  // 4 similar call arms scattered
+        ExprKind::Float(f) => float_width(*f),
+        ExprKind::MethodCall { .. } => { ... },
+        ExprKind::List(items) => { ... },          // 5 similar collection arms scattered
+        ExprKind::Ok(inner) => { ... },            // 6 similar wrapper arms scattered
+        ExprKind::Map(entries) => { ... },
+        // ... 20 more arms
+    }
+}
+```
+
+```rust
+// GOOD: Main match delegates to focused modules
+fn calculate_width(&mut self, expr_id: ExprId) -> usize {
+    match &expr.kind {
+        // Literals - delegated to literals module
+        ExprKind::Int(n) => int_width(*n),
+        ExprKind::Float(f) => float_width(*f),
+
+        // Calls - delegated to calls module
+        ExprKind::Call { func, args } => call_width(self, *func, *args),
+        ExprKind::MethodCall { .. } => method_call_width(self, ...),
+
+        // Collections - delegated to collections module
+        ExprKind::List(items) => list_width(self, *items),
+        ExprKind::Map(entries) => map_width(self, *entries),
+
+        // Wrappers - delegated to wrappers module
+        ExprKind::Ok(inner) => ok_width(self, *inner),
+        // ...
+    }
+}
+```
+
+### Checklist
+
+- [ ] No match statements with 20+ arms in single file
+- [ ] Related match arms grouped together (not scattered)
+- [ ] Conceptually related arms extracted to modules (calls.rs, wrappers.rs, etc.)
+- [ ] Repetitive iteration patterns use shared helper (`accumulate_widths`)
+- [ ] Each extracted module has focused, testable responsibility
 
 ---
 
