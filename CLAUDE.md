@@ -285,7 +285,7 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 - `let $name = value` — immutable binding
 - `pub let $name = value` — public immutable binding
 - `let $name = $other * 2` — can reference other constants
-- `use './config' { $timeout }` — import constants (must include `$`)
+- `use "./config" { $timeout }` — import constants (must include `$`)
 - Module-level bindings must be immutable (`$` prefix required)
 - `$` is a modifier, not part of the name — `x` and `$x` cannot coexist in same scope
 
@@ -515,26 +515,26 @@ Patterns are compiler constructs with special syntax. Three categories:
 ### Imports
 
 **Relative (local files)** — path in quotes, relative to current file:
-- `use './math' { add, subtract }` — same directory
-- `use '../utils' { helper }` — parent directory
-- `use './http/client' { get }` — subdirectory
+- `use "./math" { add, subtract }` — same directory
+- `use "../utils" { helper }` — parent directory
+- `use "./http/client" { get }` — subdirectory
 
 **Module (stdlib/packages)** — dot-separated, no quotes:
 - `use std.math { sqrt, abs }` — standard library
 - `use std.time { Duration }` — standard library
 
 **Private imports** — `::` prefix for non-public items:
-- `use './math' { ::internal_helper }` — explicit private access
-- `use '../utils' { pub_fn, ::priv_fn }` — mixed
+- `use "./math" { ::internal_helper }` — explicit private access
+- `use "../utils" { pub_fn, ::priv_fn }` — mixed
 
 **Aliases and re-exports**:
-- `use './math' { add as plus }` — with alias
+- `use "./math" { add as plus }` — with alias
 - `use std.net.http as http` — module alias
-- `pub use './internal' { Widget }` — re-export
+- `pub use "./internal" { Widget }` — re-export
 
 **Extension imports** — bring trait extension methods into scope:
 - `extension std.iter.extensions { Iterator.count, Iterator.last }`
-- `extension './my_extensions' { Iterator.sum }` — local extensions
+- `extension "./my_extensions" { Iterator.sum }` — local extensions
 
 **Extension definitions** — add methods to existing traits:
 - `extend Iterator { @count (self) -> int = ... }` — define extension
