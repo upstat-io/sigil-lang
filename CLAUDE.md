@@ -1,3 +1,7 @@
+**There is no such thing as an "unrelated" or "pre-existing" issue. If you encounter a problem while working, fix it. Every issue found is an issue that needs resolution.**
+
+---
+
 # Ori
 
 **Code That Proves Itself**
