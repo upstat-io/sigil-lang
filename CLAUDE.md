@@ -332,7 +332,10 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 **Special**: `Duration` (`30s`, `100ms`), `Size` (`4kb`, `10mb`)
 **Collections**: `[T]` list, `{K: V}` map, `Set<T>` set
 **Compound**: `(T, U)` tuple, `()` unit, `(T) -> U` function, `Trait` trait object
-**Generic**: `Option<T>`, `Result<T, E>`, `Range<T>`, `Channel<T>`, `Ordering`
+**Generic**: `Option<T>`, `Result<T, E>`, `Range<T>`, `Ordering`
+**Channels**: `Producer<T>`, `Consumer<T>`, `CloneableProducer<T>`, `CloneableConsumer<T>` (role-based, `T: Sendable`)
+**Concurrency**: `Nursery`, `NurseryErrorMode` (`CancelRemaining | CollectAll | FailFast`)
+**Marker traits**: `Sendable` (auto-implemented for types safe to send across tasks)
 **No implicit conversions**: use `int(x)`, `float(x)`, `str(x)` explicitly
 **Integer overflow**: panics (use `std.math` for wrapping/saturating alternatives)
 **String indexing**: `str[i]` returns single codepoint as `str`
@@ -471,6 +474,13 @@ Patterns are compiler constructs with special syntax. Three categories:
 - `with(acquire: expr, use: r -> expr, release: r -> expr)`
 - `for(over: items, match: pattern, default: fallback)`
 - `catch(expr: expression)` — catch panics, returns `Result<T, str>`
+- `nursery(body: n -> expr, on_error: mode, timeout: dur)` → `[Result<T, E>]` (structured concurrency)
+
+**Channel constructors** (return tuples)
+- `channel<T>(buffer: n)` → `(Producer<T>, Consumer<T>)` — one-to-one
+- `channel_in<T>(buffer: n)` → `(CloneableProducer<T>, Consumer<T>)` — fan-in (many-to-one)
+- `channel_out<T>(buffer: n)` → `(Producer<T>, CloneableConsumer<T>)` — fan-out (one-to-many)
+- `channel_all<T>(buffer: n)` → `(CloneableProducer<T>, CloneableConsumer<T>)` — many-to-many
 
 **function_val** — Type conversion functions (positional allowed)
 - `int(x)`, `float(x)`, `str(x)`, `byte(x)`
