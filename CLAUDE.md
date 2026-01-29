@@ -398,7 +398,10 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 **Access**
 - `value.field`, `value.method()`, `value.method(arg: value)`
 - Named arguments required for all function calls: `print(msg: "Hello")`, `len(collection: items)`, `fetch_user(id: 1)`
-- Positional allowed only for function variable calls: `let f = x -> x + 1; f(5)` (param names unknowable)
+- Positional allowed for function variable calls: `let f = x -> x + 1; f(5)` (param names unknowable)
+- Positional allowed for single-param functions with lambda literals: `items.map(x -> x * 2)`, `items.filter(x -> x > 0)`
+  - Only for inline lambdas, not function references: `items.map(double)` requires named arg
+  - `self` excluded from param count for methods
 - Type conversions use `as` keyword, not functions (see Expressions below)
 - Evaluation: left-to-right, arguments in written order (not parameter order)
 - Formatting: width-based (inline if fits, stack if not):
