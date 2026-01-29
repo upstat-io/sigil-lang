@@ -344,7 +344,8 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 
 - **Integer**: `42`, `1_000_000`, `0xFF` (hex)
 - **Float**: `3.14`, `2.5e-8`
-- **String**: `"hello"`, `"line1\nline2"` (escapes: `\\`, `\"`, `\n`, `\t`, `\r`)
+- **String**: `"hello"`, `"line1\nline2"` (escapes: `\\`, `\"`, `\n`, `\t`, `\r`, `\0`)
+- **Template String**: `` `Hello, {name}!` ``, `` `Value: {x:.2}` `` (escapes: `{{`, `}}`, `` \` ``, `\\`, `\n`, `\t`, `\r`, `\0`)
 - **Char**: `'a'`, `'\n'`, `'λ'` (escapes: `\\`, `\'`, `\n`, `\t`, `\r`, `\0`)
 - **Bool**: `true`, `false`
 - **Duration**: `100ms`, `30s`, `5m`, `2h`
@@ -659,7 +660,7 @@ Built-in names are reserved **in call position only** (`name(`). The same names 
 ### Prelude (auto-imported)
 
 **Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `TraceEntry`, `Ordering` (`Less`/`Equal`/`Greater`), `PanicInfo` (`message`, `location`)
-**Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Debug`, `Clone`, `Default`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`
+**Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Formattable`, `Debug`, `Clone`, `Default`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`
 
 **function_val** (type conversions, positional allowed):
 - `int(x)`, `float(x)`, `str(x)`, `byte(x)`
@@ -690,6 +691,24 @@ Built-in names are reserved **in call position only** (`name(`). The same names 
 **Option methods**: `.map(transform: fn)`, `.unwrap_or(default: value)`, `.ok_or(error: value)`, `.and_then(transform: fn)`, `.filter(predicate: fn)`
 **Result methods**: `.map(transform: fn)`, `.map_err(transform: fn)`, `.unwrap_or(default: value)`, `.ok()`, `.err()`, `.and_then(transform: fn)`, `.context(msg: str)` (preserves trace)
 **Error methods**: `.trace()` → `str`, `.trace_entries()` → `[TraceEntry]`, `.has_trace()` → `bool`
+
+**Printable trait** (user-facing string representation):
+```ori
+trait Printable { @to_str (self) -> str }
+```
+- Required for template string interpolation: `` `Hello, {name}!` ``
+- All primitives implement Printable
+- Custom types need explicit impl or derive
+
+**Formattable trait** (formatted output with specifiers):
+```ori
+trait Formattable { @format (self, spec: FormatSpec) -> str }
+```
+- Blanket impl: all `Printable` types automatically implement `Formattable`
+- Used for format specifiers in template strings: `` `{price:.2}` ``, `` `{count:05}` ``
+- Format spec: `[[fill]align][width][.precision][type]`
+- Align: `<` (left), `>` (right), `^` (center)
+- Types: `b` (binary), `x`/`X` (hex), `o` (octal), `e`/`E` (scientific)
 
 **Debug trait** (developer-facing representation):
 ```ori
