@@ -302,7 +302,7 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 - `type Name = A | B | C(field: Type)` — sum type
 - `type Name = ExistingType` — newtype
 - `type Name<T> = ...` — generic
-- `#[derive(Eq, Clone)] type Name = ...` — derive
+- `#derive(Eq, Clone) type Name = ...` — derive
 - `pub type Name = ...` — public
 
 **Traits**
@@ -321,9 +321,9 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 - `@test_name tests @target () -> void = run(...)` — targeted test
 - `@test_name tests _ () -> void = run(...)` — free-floating test (targets nothing)
 - `@test_name tests @a tests @b () -> void = ...` — multiple targets
-- `#[skip("reason")] @test_name ...` — skipped test
-- `#[compile_fail("error")] @test_name ...` — compile-fail test
-- `#[fail("error")] @test_name ...` — expected failure test
+- `#skip("reason") @test_name ...` — skipped test
+- `#compile_fail("error") @test_name ...` — compile-fail test
+- `#fail("error") @test_name ...` — expected failure test
 - All tests require `tests` keyword; `_` for free-floating, `@fn` for targeted
 
 ### Types
@@ -720,7 +720,7 @@ trait Debug { @debug (self) -> str }
 - All primitives implement Debug (strings/chars show escaped: `"\"hello\""`, `"'\\n'"`)
 - Collections implement Debug when element types do (`[T]`, `{K: V}`, `Set<T>`)
 - `Option<T>` and `Result<T, E>` implement Debug when inner types do
-- Derivable for user types: `#[derive(Debug)] type Point = { x: int, y: int }`
+- Derivable for user types: `#derive(Debug) type Point = { x: int, y: int }`
 - Shows complete internal structure (vs `Printable` for user-facing display)
 
 **Clone trait** (explicit value duplication):
@@ -732,7 +732,7 @@ trait Clone { @clone (self) -> Self }
 - Collections implement Clone when element types implement Clone (`[T]`, `{K: V}`, `Set<T>`)
 - `Option<T>` and `Result<T, E>` implement Clone when inner types do
 - Tuples implement Clone when all elements do
-- Derivable for user types: `#[derive(Clone)] type Point = { x: int, y: int }`
+- Derivable for user types: `#derive(Clone) type Point = { x: int, y: int }`
 - Element-wise recursive: cloning a container clones each element via `.clone()`
 
 **Iterator traits** (functional iteration with `(Option<Item>, Self)` return):
