@@ -397,9 +397,9 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 
 **Access**
 - `value.field`, `value.method()`, `value.method(arg: value)`
-- Named arguments required for direct calls: `print(msg: "Hello")`, `len(collection: items)`, `fetch_user(id: 1)`
-- Positional allowed for type conversions: `int(x)`, `float(x)`, `str(x)`, `byte(x)`
-- Positional allowed for function variable calls: `let f = x -> x + 1; f(5)` (param names unknowable)
+- Named arguments required for all function calls: `print(msg: "Hello")`, `len(collection: items)`, `fetch_user(id: 1)`
+- Positional allowed only for function variable calls: `let f = x -> x + 1; f(5)` (param names unknowable)
+- Type conversions use `as` keyword, not functions (see Expressions below)
 - Evaluation: left-to-right, arguments in written order (not parameter order)
 - Formatting: width-based (inline if fits, stack if not):
   ```
@@ -483,8 +483,10 @@ Patterns are compiler constructs with special syntax. Three categories:
 - `channel_out<T>(buffer: n)` → `(Producer<T>, CloneableConsumer<T>)` — fan-out (one-to-many)
 - `channel_all<T>(buffer: n)` → `(CloneableProducer<T>, CloneableConsumer<T>)` — many-to-many
 
-**function_val** — Type conversion functions (positional allowed)
-- `int(x)`, `float(x)`, `str(x)`, `byte(x)`
+**Type Conversions** — Use `as`/`as?` keyword syntax
+- `42 as float` — infallible conversion (42.0)
+- `"42" as? int` — fallible conversion (Some(42) or None)
+- Backed by `As<T>` and `TryAs<T>` traits (see Prelude)
 
 **Stdlib methods** (not compiler patterns — use method call syntax):
 - `items.map(transform: fn)` → `[U]`
@@ -662,8 +664,8 @@ Built-in names are reserved **in call position only** (`name(`). The same names 
 **Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `TraceEntry`, `Ordering` (`Less`/`Equal`/`Greater`), `PanicInfo` (`message`, `location`)
 **Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Formattable`, `Debug`, `Clone`, `Default`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`
 
-**function_val** (type conversions, positional allowed):
-- `int(x)`, `float(x)`, `str(x)`, `byte(x)`
+**Type conversions** (use `as`/`as?` syntax, not functions):
+- `42 as float`, `"42" as? int`, `value as str`
 
 **Built-in functions** (named arguments required):
 - `print(msg: str)` → `void`
