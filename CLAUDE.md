@@ -597,7 +597,7 @@ let y = 42  // This is a syntax error
 
 **Indentation**: 4 spaces, no tabs
 **Line length**: 100 characters hard limit
-**Trailing commas**: always on multi-line
+**Trailing commas**: always on multi-line, forbidden on single-line
 
 **Spacing**
 - Space around binary operators: `a + b`, `x == y`
@@ -605,48 +605,57 @@ let y = 42  // This is a syntax error
 - Space after colons: `x: int`, `key: value`
 - Space after commas: `f(a, b, c)`
 - No space inside parens/brackets: `f(x)`, `[1, 2]`
+- Space inside struct braces: `Point { x, y }`
+- No space in empty delimiters: `[]`, `{}`, `()`
+- No space around `.`, `..`, `..=`, `?`: `point.x`, `0..10`, `fetch()?`
+- Space around `as`/`as?`, `by`, `|`: `42 as float`, `0..10 by 2`, `Red | Green`
 - Space after `//`: `// comment`
+- Space after `pub`: `pub @name`
 
-**Named Arguments - Inline vs Stacked**
+**Width-Based Breaking**
 
-Inline when ALL conditions met:
-- Total call fits in 100 chars
-- No single value exceeds ~30 chars
-- No complex values (list literals, nested calls with args)
+Core principle: **inline if ≤100 characters, break otherwise**.
 
 ```ori
-// Inline - short, simple values
+// Inline - fits in 100 chars
 assert_eq(actual: result, expected: 10)
-items.map(transform: x -> x * 2)
-```
 
-Stack when ANY value is long or complex:
-
-```ori
-// Stacked - long list literal
-assert_eq(
-    actual: open_doors(),
-    expected: [1, 4, 9, 16, 25, 36, 49, 64, 81, 100],
-)
-
-// Stacked - list literal in args
-[1, 2, 3, 4, 5].map(
-    transform: x -> x * 2,
+// Broken - exceeds 100 chars
+send_notification(
+    user_id: current_user,
+    message: notification_text,
+    priority: Priority.High,
 )
 ```
 
-**Other Breaking Rules**
-- `run`/`try`: always stack contents (block-like)
-- List literals: inline if short, stack if long
-- Long signatures: break after `->` or break params
-- Long binary expressions: break before operator
+Nested constructs break independently based on their own width.
+
+**Always-Stacked Constructs**
+- `run`/`try`: always stacked (never inline)
+- `match` arms: always one per line
+- `recurse`, `parallel`, `spawn`, `nursery`: always stacked
+
+**Breaking Behavior by Construct**
+
+| Construct | Broken Format |
+|-----------|---------------|
+| Function params/args | One per line |
+| Generics, where clauses | One per line |
+| Struct fields, map entries | One per line |
+| Sum type variants | One per line with leading `\|` |
+| Lists (simple items) | Wrap multiple per line |
+| Lists (complex items) | One per line |
+| Chains | Every `.method()` on own line |
+| Binary expressions | Break before operator |
+| Conditionals | `if cond then expr` together, `else` on new line |
+| Lambdas | Break after `->` only for always-stacked patterns |
 
 **Blank lines**
 - One after import block
-- One after config block
+- One after constants block
 - One between functions
+- One between trait/impl methods (except single-method blocks)
 - No consecutive blank lines
-- No trailing/leading blank lines
 
 ### Keywords
 
