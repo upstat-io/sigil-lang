@@ -1,5 +1,7 @@
 **Fix every issue encountered. No "unrelated" or "pre-existing" exceptions.**
 
+**TDD for bugs**: Issue found + tests pass → write test for correct behavior (must fail) → fix code → test passes unchanged
+
 ---
 
 # Ori — Code That Proves Itself
@@ -42,14 +44,15 @@ Expression-based language with strict static typing, type inference, mandatory t
 
 ## CLI
 
-`ori run file.ori` | `ori check file.ori` | `ori check --no-test` | `ori check --strict` | `ori test` | `ori test --only-targeted` | `ori fmt src/`
+`ori run file.ori` | `ori check file.ori` | `ori check --no-test` | `ori check --strict` | `ori test` | `ori test --only-attached` | `ori fmt src/`
 
 ## Files & Tests
 
 - `.ori` source, `.test.ori` in `_test/` subdirectory
-- Targeted: `@test tests @target () -> void = run(...)` — runs on target/caller changes
-- Free-floating: `@test tests _ () -> void = run(...)` — runs only via `ori test`
+- Attached: `@test tests @target () -> void = run(...)` — runs on target/caller changes
+- Floating: `@test tests _ () -> void = run(...)` — runs only via `ori test`
 - Private access via `::` prefix; every function (except `@main`) requires tests
+- Bug fix = failing test first (TDD): write test for correct behavior, verify failure, fix code, test passes unchanged
 
 ## Entry Points
 
@@ -74,7 +77,7 @@ Expression-based language with strict static typing, type inference, mandatory t
 **Default Impls**: `pub def impl Trait { @m }` — stateless, one per trait/module, auto-bound on import, override with `with`
 **Resolution**: Diamond=single impl; Inherent>Trait>Extension; qualified: `Trait.method(v)`; `Type::Trait::Assoc`
 **Object Safety**: No `Self` return/param (except receiver), no generic methods; safe: `Printable`, `Debug`, `Hashable`; unsafe: `Clone`, `Eq`, `Iterator`
-**Tests**: `@t tests @fn () -> void` | `tests _` free-floating | `tests @a tests @b` multi | `#skip("r")` | `#compile_fail("e")` | `#fail("e")`
+**Tests**: `@t tests @fn () -> void` | `tests _` floating | `tests @a tests @b` multi | `#skip("r")` | `#compile_fail("e")` | `#fail("e")`
 
 ## Conditional Compilation
 
