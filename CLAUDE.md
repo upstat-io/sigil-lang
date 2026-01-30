@@ -1,892 +1,182 @@
-**There is no such thing as an "unrelated" or "pre-existing" issue. If you encounter a problem while working, fix it. Every issue found is an issue that needs resolution.**
+**Fix every issue encountered. No "unrelated" or "pre-existing" exceptions.**
 
 ---
 
-# Ori
+# Ori — Code That Proves Itself
 
-**Code That Proves Itself**
+Expression-based language with strict static typing, type inference, mandatory testing. If it compiles, it has tests; if it has tests, they pass.
 
-General-purpose, expression-based language with strict static typing, type inference, and mandatory testing. Ori enforces code integrity — if it compiles, it has tests; if it has tests, they pass; if you change it, you'll know what broke.
+## Commands
 
-## Development Commands
+**Primary** (includes LLVM): `./test-all`, `./clippy-all`, `./fmt-all`, `./build-all`
+**Tests**: `cargo t` (Rust), `cargo st` (Ori), `cargo st tests/spec/path/` (specific), `./llvm-test`
+**Build**: `cargo c` (check), `cargo cl` (clippy), `cargo b`, `cargo fmt`, `./llvm-build`, `./llvm-clippy`
 
-**Primary commands** (run everything, including LLVM):
-
-| Command | Description |
-|---------|-------------|
-| `./test-all` | Run ALL tests: Rust + Ori spec + LLVM |
-| `./clippy-all` | Run clippy on ALL crates: workspace + LLVM |
-| `./fmt-all` | Format ALL Rust code: workspace + LLVM |
-| `./build-all` | Build ALL crates: workspace + LLVM |
-
-**Individual test commands:**
-
-| Command | Description |
-|---------|-------------|
-| `cargo t` | Run Rust unit tests only |
-| `cargo st` | Run Ori language tests (`tests/`) |
-| `cargo st tests/spec/capabilities/` | Run specific Ori test directory |
-| `cargo st tests/spec/types/primitives.ori` | Run specific Ori test file |
-| `./llvm-test` | Run LLVM Rust unit tests (Docker) |
-
-**Build and check commands** (workspace only, excludes LLVM):
-
-| Command | Description |
-|---------|-------------|
-| `cargo c` | Check all crates (fast compile check) |
-| `cargo cl` | Run clippy on all crates |
-| `cargo b` | Build all crates |
-| `cargo fmt` | Format all crates |
-| `./llvm-build` | Build LLVM crate |
-| `./llvm-clippy` | Run clippy on LLVM crate |
-
-**Always run `./test-all` after making compiler changes to verify everything works.**
-
-## Design Philosophy
-
-**Code that proves itself.** Every function tested. Every change traced. Every effect explicit.
-
-Ori makes verification automatic — the compiler enforces what discipline alone cannot.
-
-### The Four Pillars
-
-1. **Mandatory Verification**
-   - Every function requires tests or it doesn't compile
-   - Tests are bound to functions (`@test tests @target`)
-   - Contracts (`pre_check:`/`post_check:`) enforce invariants
-   - The compiler refuses to produce code it can't verify
-
-2. **Dependency-Aware Integrity**
-   - Tests are in the dependency graph, not external
-   - Change a function → its tests run
-   - Change a function → callers' tests run too
-   - Fast feedback because only affected tests execute
-   - **Causality Tracking**: know impact before changing, trace failures after
-
-3. **Explicit Effects**
-   - Capabilities declare what a function can do (`uses Http`)
-   - No hidden side effects
-   - Mocking is trivial (`with Http = MockHttp(...) in`)
-   - Tests are fast because everything is injectable
-
-4. **ARC-Safe by Design**
-   - Memory managed via ARC (no tracing GC, no borrow checker)
-   - Closures capture by value — no reference cycles through environments
-   - No shared mutable references — single ownership of mutable data
-   - Value semantics by default — reference types are explicit
-   - See `spec/15-memory-model.md` for invariants that new features must maintain
-
-### The Virtuous Cycle
-
-```
-Capabilities make mocking easy
-    → Tests are fast
-        → Dependency-aware testing is practical
-            → Mandatory testing isn't painful
-                → Code integrity is enforced
-                    → Code that works, stays working
-```
-
-### Lean Core, Rich Libraries
-
-The compiler implements only constructs that require special syntax or static analysis. Everything else belongs in the standard library.
-
-**Compiler patterns** (require special handling):
-- `run`, `try`, `match` — sequential evaluation with bindings
-- `recurse` — self-referential recursion with `self()`
-- `parallel`, `spawn`, `timeout` — concurrency primitives
-- `cache`, `with` — capability-aware resource management
-
-**Stdlib methods** (no special syntax needed):
-- `map`, `filter`, `fold`, `find` — data transformation on collections
-- `retry`, `validate` — resilience and validation logic
-
-This separation keeps the compiler focused and maintainable while allowing the standard library to evolve independently. New data transformations don't require compiler changes.
-
-## Core Features
-
-- **Patterns over loops**: `recurse`, `parallel`, `for` patterns; `map`, `filter`, `fold` as stdlib methods
-- **Mandatory testing**: every function requires tests or compilation fails
-- **Dependency-aware tests**: tests bound to functions, run on change propagation
-- **Causality tracking**: `ori impact` shows blast radius, `ori why` traces failures to source
-- **Contracts**: `pre_check:`/`post_check:` for function invariants
-- **Explicit sigils**: `@` functions, `$` immutable bindings
-- **No null/exceptions**: `Option<T>` for optional, `Result<T, E>` for fallible
-- **Capabilities for effects**: `uses Http`, `uses Async` — explicit, injectable, testable
-- **Zero-config formatting**: one canonical style, enforced
+**Always run `./test-all` after compiler changes.**
 
 ## Key Paths
 
-| Path | Purpose |
-|------|---------|
-| `compiler/oric/` | Rust compiler (lexer, parser, types, interpreter, LLVM backend) |
-| `docs/ori_lang/0.1-alpha/spec/` | **Formal specification** (authoritative) |
-| `docs/ori_lang/proposals/` | Proposals and decision rationale |
-| `library/std/` | Standard library |
-| `tests/spec/` | Specification conformance tests |
-| `plans/roadmap/` | **Compiler roadmap** (phases, tracking, priorities) |
+- `compiler/oric/` — Rust compiler (lexer, parser, types, interpreter, LLVM)
+- `docs/ori_lang/0.1-alpha/spec/` — **Formal specification (authoritative)**
+- `docs/ori_lang/proposals/` — Proposals and rationale
+- `library/std/` — Standard library
+- `tests/spec/` — Spec conformance tests
+- `plans/roadmap/` — Compiler roadmap
 
-## Roadmap
+## Design Pillars
 
-The compiler development roadmap is in `plans/roadmap/`.
+1. **Mandatory Verification**: Every function needs tests; contracts (`pre_check:`/`post_check:`)
+2. **Dependency-Aware Integrity**: Tests in dependency graph; change propagates to callers' tests
+3. **Explicit Effects**: Capabilities (`uses Http`); trivial mocking (`with Http = Mock in`)
+4. **ARC-Safe**: No GC/borrow checker; capture by value; no shared mutable refs; see `spec/15-memory-model.md`
 
-## Reference Repos
+## Reference Repos (`~/lang_repos/`)
 
-External language repos for reference when implementing compiler features:
-
-| Path | Purpose |
-|------|---------|
-| `~/lang_repos/rust/` | Rust compiler - diagnostics, suggestions, applicability levels |
-| `~/lang_repos/golang/` | Go compiler - error handling, go fix tool |
-| `~/lang_repos/typescript/` | TypeScript compiler - diagnostics, code fixes, quick fixes |
-| `~/lang_repos/zig/` | Zig compiler - explicit errors, comptime, no hidden control flow |
-| `~/lang_repos/gleam/` | Gleam compiler - Result types, functional patterns, Rust-based |
-| `~/lang_repos/elm/` | Elm compiler - excellent error messages, Haskell-based |
-| `~/lang_repos/roc/` | Roc compiler - effects/abilities system, modern functional |
-
-These are shallow clones. To update: `cd ~/lang_repos/<name> && git pull --depth 1`
-
-**Key Rust files** (diagnostics/suggestions):
-- `compiler/rustc_errors/src/lib.rs` - Core diagnostic types, `CodeSuggestion`, `Substitution`
-- `compiler/rustc_errors/src/diagnostic.rs` - `Diag`, suggestion methods
-- `compiler/rustc_errors/src/json.rs` - JSON serialization for machine consumption
-- `compiler/rustc_lint_defs/src/lib.rs` - `Applicability` enum (MachineApplicable, MaybeIncorrect, etc.)
-
-**Key Go files** (diagnostics/fixes):
-- `src/cmd/compile/internal/base/print.go` - Compiler error queuing and flushing
-- `src/go/types/errors.go` - Type-checker multi-part error building
-- `src/internal/types/errors/codes.go` - Error code registry (100+ codes)
-- `src/cmd/vendor/golang.org/x/tools/go/analysis/diagnostic.go` - `Diagnostic`, `SuggestedFix`, `TextEdit`
-- `src/cmd/vendor/golang.org/x/tools/go/analysis/analysis.go` - `Analyzer`, `Pass` definitions
-- `src/internal/analysis/driverutil/fix.go` - Three-way merge for fix application
-- `src/cmd/fix/main.go` - `go fix` tool entry point
-- `src/cmd/vet/main.go` - `go vet` tool entry point
-- `src/cmd/vendor/golang.org/x/tools/go/analysis/passes/modernize/` - Modern fix examples
-
-**Key TypeScript files** (diagnostics/code fixes):
-- `src/compiler/types.ts` - `Diagnostic`, `DiagnosticCategory`, `CodeFixAction` types
-- `src/compiler/diagnosticMessages.json` - All diagnostic message definitions
-- `src/services/codeFixProvider.ts` - Registration system, `errorCodeToFixes` multimap
-- `src/services/textChanges.ts` - `ChangeTracker` for building edits
-- `src/services/types.ts` - `CodeFixRegistration`, `CodeFixContext` interfaces
-- `src/services/services.ts` - LSP entry points (`getCodeFixesAtPosition`)
-- `src/services/codefixes/*.ts` - 73 individual fix implementations
-
-**Key Zig files** (explicit errors, comptime):
-- `src/Compilation.zig` - Main compilation driver, error aggregation
-- `src/Sema.zig` - Semantic analysis, type checking
-- `src/Type.zig` - Type representation and operations
-- `src/Value.zig` - Compile-time value representation
-- `src/InternPool.zig` - Interned types and values (memory efficiency)
-- `src/Zcu.zig` - Zig Compilation Unit, module management
-- `src/main.zig` - CLI entry point, error formatting
-
-**Key Gleam files** (Result types, diagnostics):
-- `compiler-core/src/error.rs` - Main error type, formatting, `wrap_format!` macro
-- `compiler-core/src/diagnostic.rs` - `Diagnostic`, `Label`, `Location` using codespan
-- `compiler-core/src/warning.rs` - Warning types and formatting
-- `compiler-core/src/type_/error.rs` - Type error details, hints
-- `compiler-core/src/type_.rs` - Type representation, unification
-- `compiler-core/src/analyse.rs` - Semantic analysis
-- `compiler-core/src/exhaustiveness.rs` - Pattern match exhaustiveness checking
-
-**Key Elm files** (error messages, Haskell):
-- `compiler/src/Reporting/Error.hs` - Top-level error type, routing to specific modules
-- `compiler/src/Reporting/Error/Type.hs` - Type mismatch messages (famous for clarity)
-- `compiler/src/Reporting/Error/Syntax.hs` - Parse error messages with suggestions
-- `compiler/src/Reporting/Error/Canonicalize.hs` - Name resolution errors
-- `compiler/src/Reporting/Suggest.hs` - "Did you mean?" suggestions
-- `compiler/src/Reporting/Doc.hs` - Pretty printing document combinators
-- `compiler/src/Reporting/Render/` - Output rendering (terminal, JSON)
-- `compiler/src/Type/Solve.hs` - Constraint solving, unification
-
-**Key Roc files** (effects/abilities, error reporting):
-- `crates/reporting/src/report.rs` - `RocDocAllocator`, pretty printing, cycle display
-- `crates/reporting/src/error/type.rs` - Type error formatting, unification failures
-- `crates/reporting/src/error/canonicalize.rs` - Name resolution error messages
-- `crates/reporting/src/error/parse.rs` - Parse error formatting
-- `crates/compiler/solve/src/` - Constraint solving, abilities
-- `crates/compiler/types/src/` - Type representation
-- `crates/compiler/can/src/` - Canonicalization (name resolution)
-- `crates/compiler/constrain/src/` - Constraint generation
-- `crates/compiler/problem/src/` - Problem types (errors/warnings)
+- `rust/` — diagnostics: `rustc_errors/src/{lib,diagnostic,json}.rs`, `rustc_lint_defs/src/lib.rs`
+- `golang/` — errors: `cmd/compile/internal/base/print.go`, `go/types/errors.go`, `internal/types/errors/codes.go`; fixes: `cmd/vendor/.../analysis/{diagnostic,analysis}.go`, `cmd/fix/main.go`
+- `typescript/` — `compiler/{types.ts,diagnosticMessages.json}`, `services/{codeFixProvider,textChanges,types,services}.ts`, `services/codefixes/*.ts`
+- `zig/` — `src/{Compilation,Sema,Type,Value,InternPool,Zcu,main}.zig`
+- `gleam/` — `compiler-core/src/{error,diagnostic,warning,analyse,exhaustiveness}.rs`, `type_/{error,mod}.rs`
+- `elm/` — `compiler/src/Reporting/{Error,Suggest,Doc}.hs`, `Error/{Type,Syntax,Canonicalize}.hs`, `Type/Solve.hs`
+- `roc/` — `crates/reporting/src/{report,error/{type,canonicalize,parse}}.rs`, `compiler/{solve,types,can,constrain,problem}/src/`
 
 ## CLI
 
-| Command | Action |
-|---------|--------|
-| `ori run file.ori` | Run program |
-| `ori check file.ori` | Compile + run affected targeted tests |
-| `ori check --no-test` | Compile only, skip tests |
-| `ori check --strict` | Fail build on test failure (for CI) |
-| `ori test` | Run all tests (targeted + free-floating) |
-| `ori test --only-targeted` | Run only targeted tests |
-| `ori fmt src/` | Format files |
+`ori run file.ori` | `ori check file.ori` | `ori check --no-test` | `ori check --strict` | `ori test` | `ori test --only-targeted` | `ori fmt src/`
 
 ## Files & Tests
 
-- `.ori` source, `.test.ori` tests in `_test/` subdirectory
-- Targeted test: `@test_name tests @target () -> void = run(...)`
-- Free-floating test: `@test_name tests _ () -> void = run(...)` — targets nothing, runs only via `ori test`
-- `tests` keyword required for all tests; `_` indicates free-floating
+- `.ori` source, `.test.ori` in `_test/` subdirectory
+- Targeted: `@test tests @target () -> void = run(...)` — runs on target/caller changes
+- Free-floating: `@test tests _ () -> void = run(...)` — runs only via `ori test`
 - Private access via `::` prefix; every function (except `@main`) requires tests
-- Targeted tests auto-run during `ori check` when their target functions (or callers of those functions) change
-- Dependency-aware: change `@foo` → tests for `@foo` AND tests for functions that call `@foo` run
 
-## Program Entry
+## Entry Points
 
-- `@main () -> void` — basic entry, exit code 0
-- `@main () -> int` — return exit code
-- `@main (args: [str]) -> void` — with command-line args
-- `@main (args: [str]) -> int` — args and exit code
-- `args` contains arguments only (not program name)
+- `@main () -> void` | `@main () -> int` | `@main (args: [str]) -> void` | `@main (args: [str]) -> int`
+- `args` excludes program name
 
 ---
 
-## ⚠️ IMPORTANT: This Is NOT The Specification
-
-**The syntax reference below is a QUICK REFERENCE ONLY — not the authoritative specification.**
-
-| What you want | Where to look |
-|---------------|---------------|
-| **Authoritative language spec** | `docs/ori_lang/0.1-alpha/spec/` |
-| **Decision rationale** | `docs/ori_lang/proposals/` |
-| **Quick syntax reminder** | The reference below |
-
-**If this quick reference contradicts the spec, the spec is correct.** Always consult the spec for:
-- Compiler/language implementation work
-- Edge cases and exact semantics
-- Grammar productions and formal definitions
-- Any ambiguity in behavior
-
-The reference below is a condensed cheat sheet for writing Ori code quickly.
+## ⚠️ Quick Reference Only — Spec is authoritative: `docs/ori_lang/0.1-alpha/spec/`
 
 ---
 
-## Ori Quick Reference
+## Declarations
 
-### Declarations
+**Functions**: `@name (p: T) -> R = expr` | `pub @name` | `@name<T>` | `@name<T: Trait>` | `@name<T: A + B>` | `where T: Clone` | `uses Capability` | `(x: int = 10)` defaults
+**Clauses**: `@f (0: int) -> int = 1` then `@f (n) = n * f(n-1)` | `if guard` | exhaustive, top-to-bottom
+**Constants**: `let $name = value` | `pub let $name` | module-level must be `$`
+**Const Functions**: `$name (p: T) -> R = expr` — pure, comptime with const args, limits: 1M steps/1000 depth/100MB/10s
+**Types**: `type N = { f: T }` struct | `A | B | C(f: T)` sum | `type N = Existing` newtype | `type N<T>` | `#derive(Eq)` | `pub type`
+**Traits**: `trait N { @m (self) -> T }` | `@m (self) -> T = default` | `type Item` assoc | `trait C: P` inheritance
+**Impls**: `impl T { @m }` inherent | `impl Trait for T` | `impl<T: B> Trait for C<T>` | `self`/`Self`
+**Default Impls**: `pub def impl Trait { @m }` — stateless, one per trait/module, auto-bound on import, override with `with`
+**Resolution**: Diamond=single impl; Inherent>Trait>Extension; qualified: `Trait.method(v)`; `Type::Trait::Assoc`
+**Object Safety**: No `Self` return/param (except receiver), no generic methods; safe: `Printable`, `Debug`, `Hashable`; unsafe: `Clone`, `Eq`, `Iterator`
+**Tests**: `@t tests @fn () -> void` | `tests _` free-floating | `tests @a tests @b` multi | `#skip("r")` | `#compile_fail("e")` | `#fail("e")`
 
-**Functions**
-- `@name (param: Type) -> ReturnType = expression`
-- `pub @name ...` — public visibility
-- `@name<T> (x: T) -> T` — generic
-- `@name<T: Trait> (x: T) -> T` — constrained generic
-- `@name<T: A + B> (x: T) -> T` — multiple bounds
-- `@name<T> (...) -> T where T: Clone, U: Default = ...` — where clause
-- `@name (...) -> Type uses Capability = ...` — capability
-- `@name (x: int = 10) -> int` — default parameter value
-- `@name (a: int, b: int = 0, c: int = 0) -> int` — multiple defaults (any position)
-- Default expressions evaluated at call time, cannot reference other parameters
+## Conditional Compilation
 
-**Function Clauses** (pattern matching in parameters)
-- `@f (0: int) -> int = 1` then `@f (n) -> int = n * f(n - 1)` — multiple clauses
-- First clause establishes signature (visibility, generics, types)
-- Subsequent clauses: types optional, matched top-to-bottom
-- `@f (n: int) -> int if n < 0 = -n` — guard with `if`
-- All clauses must be exhaustive; compiler warns about unreachable clauses
+**Target**: `#target(os: "linux")` | `arch: "x86_64"` | `family: "unix"` | `any_os: [...]` | `not_os:` | file-level: `#!target(...)`
+**Config**: `#cfg(debug)` | `release` | `feature: "ssl"` | `any_feature:` | `not_debug` | `not_feature:`
+**Constants**: `$target_os`, `$target_arch`, `$target_family`, `$debug`, `$release` — false branch not type-checked
 
-**Constants** (immutable bindings with `$` prefix)
-- `let $name = value` — immutable binding
-- `pub let $name = value` — public immutable binding
-- `let $name = $other * 2` — can reference other constants
-- `use "./config" { $timeout }` — import constants (must include `$`)
-- Module-level bindings must be immutable (`$` prefix required)
-- `$` is a modifier, not part of the name — `x` and `$x` cannot coexist in same scope
+## Types
 
-**Const Functions** (compile-time evaluation)
-- `$name (param: Type) -> ReturnType = expression`
-- `$square (x: int) -> int = x * x`
-- `$factorial (n: int) -> int = if n <= 1 then 1 else n * $factorial(n: n - 1)`
-- Must be pure: no capabilities, no I/O, no external state access
-- May use local mutable bindings and loop expressions (`for`, `loop`)
-- Called with constant args → evaluated at compile time
-- Called with runtime args → evaluated at runtime
-- Partial evaluation: when mixed args, compiler must fold const portions
-- Evaluation limits: 1M steps, 1000 depth, 100MB memory, 10s time (configurable)
-
-**Type Definitions**
-- `type Name = { field: Type }` — struct
-- `type Name = A | B | C(field: Type)` — sum type
-- `type Name = ExistingType` — newtype
-- `type Name<T> = ...` — generic
-- `#derive(Eq, Clone) type Name = ...` — derive
-- `pub type Name = ...` — public
-
-**Traits**
-- `trait Name { @method (self) -> Type }` — required method
-- `trait Name { @method (self) -> Type = expr }` — default impl
-- `trait Name { type Item }` — associated type
-- `trait Child: Parent { ... }` — inheritance
-
-**Implementations**
-- `impl Type { @method (self) -> Type = ... }` — inherent
-- `impl Trait for Type { ... }` — trait impl
-- `impl<T: Bound> Trait for Container<T> { ... }` — generic
-- `self` — instance in methods; `Self` — implementing type
-
-**Default Implementations** (automatic capability binding)
-- `pub def impl Trait { @method (...) -> Type = ... }` — default for trait
-- `def impl Trait { ... }` — module-internal default
-- No `self` parameter — stateless; use module-level `$` bindings for config
-- One `def impl` per trait per module
-- Importing trait automatically binds the default
-- Override with `with Trait = other in ...`
-
-**Trait Resolution**
-- Diamond inheritance: single impl satisfies all paths (no duplication)
-- Conflicting defaults: explicit impl required when supertraits conflict
-- Coherence (orphan rules): trait OR type must be local for `impl Trait for Type`
-- Method resolution order: Inherent > Trait > Extension
-- Ambiguous methods: use fully-qualified `Trait.method(value)` syntax
-- Super trait calls: `Trait.method(self)` calls parent's default impl
-- Associated type disambiguation: `Type::Trait::AssocType` qualified path
-- Extension conflicts: only one extension per method in scope (error if multiple)
-- Impl specificity: Concrete > Constrained blanket > Generic blanket
-
-**Object Safety** (rules for using traits as types)
-- Rule 1: No `Self` in return position — `@clone (self) -> Self` is NOT object-safe
-- Rule 2: No `Self` in parameter position (except receiver) — `@equals (self, other: Self)` is NOT object-safe
-- Rule 3: No generic methods — `@convert<T> (self) -> T` is NOT object-safe
-- All bounds in `Trait1 + Trait2` must be object-safe
-- Object-safe: `Printable`, `Formattable`, `Debug`, `Hashable`
-- NOT object-safe: `Clone`, `Default`, `Eq`, `Comparable`, `Iterator`, `Collect`
-- Workaround: wrap non-safe traits using `Arc<Trait>` return types
-
-**Tests**
-- `@test_name tests @target () -> void = run(...)` — targeted test
-- `@test_name tests _ () -> void = run(...)` — free-floating test (targets nothing)
-- `@test_name tests @a tests @b () -> void = ...` — multiple targets
-- `#skip("reason") @test_name ...` — skipped test
-- `#compile_fail("error") @test_name ...` — compile-fail test
-- `#fail("error") @test_name ...` — expected failure test
-- All tests require `tests` keyword; `_` for free-floating, `@fn` for targeted
-
-### Conditional Compilation
-
-**Target Conditions** (platform-specific code)
-- `#target(os: "linux")` — operating system (linux, macos, windows, freebsd, android, ios)
-- `#target(arch: "x86_64")` — architecture (x86_64, aarch64, arm, wasm32, riscv64)
-- `#target(family: "unix")` — target family (unix, windows, wasm)
-- `#target(os: "linux", arch: "x86_64")` — AND conditions (both must match)
-- `#target(any_os: ["linux", "macos"])` — OR conditions (any must match)
-- `#target(not_os: "windows")` — negation
-- Multiple attributes on same item = AND
-
-**Configuration Flags** (build-time flags)
-- `#cfg(debug)` — debug build
-- `#cfg(release)` — release build
-- `#cfg(feature: "ssl")` — feature flag enabled
-- `#cfg(any_feature: ["ssl", "tls"])` — OR for features
-- `#cfg(not_debug)` — negation
-- `#cfg(not_feature: "ssl")` — negation for features
-- Feature names must be valid identifiers (no hyphens)
-
-**File-Level Conditions** (entire file)
-- `#!target(os: "linux")` — at top of file, applies to entire file
-
-**Applicable Items**
-- Functions, types, trait implementations, constants, imports
-
-**Compile-Time Constants** (in expressions)
-- `$target_os: str` — "linux", "macos", "windows", etc.
-- `$target_arch: str` — "x86_64", "aarch64", etc.
-- `$target_family: str` — "unix", "windows", "wasm"
-- `$debug: bool` — true in debug builds
-- `$release: bool` — true in release builds
-- Dead code elimination: `if $target_os == "windows" then ... else ...` — false branch not type-checked
-
-### Types
-
-**Primitives**: `int` (64-bit signed), `float` (64-bit IEEE 754), `bool`, `str` (UTF-8), `char`, `byte`, `void`, `Never`
+**Primitives**: `int` (i64), `float` (f64), `bool`, `str` (UTF-8), `char`, `byte`, `void`, `Never`
 **Special**: `Duration` (`30s`, `100ms`), `Size` (`4kb`, `10mb`)
-**Collections**: `[T]` list, `{K: V}` map, `Set<T>` set
-**Compound**: `(T, U)` tuple, `()` unit, `(T) -> U` function, `Trait` trait object
+**Collections**: `[T]` list, `{K: V}` map, `Set<T>`
+**Compound**: `(T, U)` tuple, `()` unit, `(T) -> U` fn, `Trait` object
 **Generic**: `Option<T>`, `Result<T, E>`, `Range<T>`, `Ordering`
-**Channels**: `Producer<T>`, `Consumer<T>`, `CloneableProducer<T>`, `CloneableConsumer<T>` (role-based, `T: Sendable`)
+**Channels**: `Producer<T>`, `Consumer<T>`, `CloneableProducer<T>`, `CloneableConsumer<T>` (`T: Sendable`)
 **Concurrency**: `Nursery`, `NurseryErrorMode` (`CancelRemaining | CollectAll | FailFast`)
-**Marker traits**: `Sendable` (auto-implemented for types safe to send across tasks)
-**No implicit conversions**: use `int(x)`, `float(x)`, `str(x)` explicitly
-**Integer overflow**: panics (use `std.math` for wrapping/saturating alternatives)
-**String indexing**: `str[i]` returns single codepoint as `str`
+**Rules**: No implicit conversions; overflow panics; `str[i]` returns single-codepoint `str`
 
-### Literals
+## Literals
 
-- **Integer**: `42`, `1_000_000`, `0xFF` (hex)
-- **Float**: `3.14`, `2.5e-8`
-- **String**: `"hello"`, `"line1\nline2"` (escapes: `\\`, `\"`, `\n`, `\t`, `\r`, `\0`)
-- **Template String**: `` `Hello, {name}!` ``, `` `Value: {x:.2}` `` (escapes: `{{`, `}}`, `` \` ``, `\\`, `\n`, `\t`, `\r`, `\0`)
-- **Char**: `'a'`, `'\n'`, `'λ'` (escapes: `\\`, `\'`, `\n`, `\t`, `\r`, `\0`)
-- **Bool**: `true`, `false`
-- **Duration**: `100ms`, `30s`, `5m`, `2h`
-- **Size**: `1024b`, `4kb`, `10mb`, `2gb`
-- **List**: `[]`, `[1, 2, 3]`, `[...a, ...b]` (spread)
-- **Map**: `{}`, `{"key": value}`, `{...defaults, ...overrides}` (spread)
-- **Struct**: `Point { x: 0, y: 0 }`, `Point { x, y }` (shorthand), `Point { ...original, x: 10 }` (spread)
+`42`, `1_000_000`, `0xFF` | `3.14`, `2.5e-8` | `"hello"` (escapes: `\\\"\n\t\r\0`) | `` `{name}` `` template | `'a'` char | `true`/`false` | `100ms`, `30s`, `5m`, `2h` | `4kb`, `10mb` | `[1, 2]`, `[...a, ...b]` | `{"k": v}`, `{...a, ...b}` | `Point { x, y }`, `{ ...p, x: 10 }`
 
-### Operators (by precedence, highest first)
+## Operators (precedence high→low)
 
-1. `.` `[]` `()` `?` — access, call, propagate
-2. `!` `-` `~` — unary not, negate, bitwise not
-3. `*` `/` `%` `div` — multiply, divide, modulo, floor div
-4. `+` `-` — add/concat, subtract
-5. `<<` `>>` — left shift, right shift
-6. `..` `..=` `by` — exclusive range, inclusive range, range step
-7. `<` `>` `<=` `>=` — comparison
-8. `==` `!=` — equality
-9. `&` — bitwise and
-10. `^` — bitwise xor
-11. `|` — bitwise or
-12. `&&` — logical and (short-circuit)
-13. `||` — logical or (short-circuit)
-14. `??` — coalesce (None/Err to default)
+1. `.` `[]` `()` `?` — 2. `!` `-` `~` — 3. `*` `/` `%` `div` — 4. `+` `-` — 5. `<<` `>>` — 6. `..` `..=` `by` — 7. `<` `>` `<=` `>=` — 8. `==` `!=` — 9. `&` — 10. `^` — 11. `|` — 12. `&&` — 13. `||` — 14. `??`
 
-### Expressions
+## Expressions
 
-**Conditionals**
-- `if cond then expr else expr`
-- `if cond then expr else if cond then expr else expr`
-- `if cond then expr` — no else, result type is `void`
+**Conditionals**: `if c then e else e` | `if c then e` (void)
+**Bindings**: `let x = v` mutable | `let $x` immutable | `let x: T` | shadowing OK | `let { x, y }` | `let { x: px }` | `let (a, b)` | `let [$h, ..t]`
+**Indexing**: `list[0]`, `list[# - 1]` (`#`=length, panics OOB) | `map["k"]` → `Option<V>`
+**Access**: `v.field`, `v.method(arg: v)` — named args required except: fn variables, single-param with inline lambda
+**Lambdas**: `x -> x + 1` | `(a, b) -> a + b` | `() -> 42` | `(x: int) -> int = x * 2` — capture by value
+**Ranges**: `0..10` excl | `0..=10` incl | `0..10 by 2` step | descending: `10..0 by -1` | int only
+**Loops**: `for i in items do e` | `for x in items yield x * 2` | `for x in items if g yield x` | `loop(e)` + `break`/`continue` | `break value` | `continue value`
+**Labels**: `loop:name(...)` | `for:name` | `break:name` | `continue:name`
+**Spread**: `[...a, ...b]` | `{...a, ...b}` | `P { ...orig, x: 10 }` — later wins, literal contexts only
 
-**Bindings**
-- `let x = value` — mutable (can reassign)
-- `let $x = value` — immutable (cannot reassign)
-- `let x: Type = value` — annotated
-- `let x = value` then `let x = x + 1` — shadowing allowed (can change mutability)
-- `let { x, y } = point` — struct destructure (both mutable)
-- `let { $x, y } = point` — struct destructure (x immutable, y mutable)
-- `let { x: px, y: py } = point` — destructure with rename
-- `let { position: { x, y } } = entity` — nested destructure
-- `let (a, b) = tuple` — tuple destructure
-- `let [$head, ..tail] = list` — list destructure (head immutable)
+## Patterns (compiler constructs)
 
-**Indexing**
-- `list[0]`, `list[# - 1]` — `#` is length inside brackets (panics on out-of-bounds)
-- `str[0]` — returns single-codepoint `str` (panics on out-of-bounds)
-- `map["key"]` — returns `Option<V>` (`None` if key missing)
+**function_seq**: `run(let x = a, result)` | `run(pre_check: c, body, post_check: r -> c)` | `try(let x = f()?, Ok(x))` | `match(v, P -> e, _ -> d)`
+**function_exp**: `recurse(condition:, base:, step: self(...), memo:, parallel:)` | `parallel(tasks:, max_concurrent:, timeout:)` → `[Result]` | `spawn(tasks:, max_concurrent:)` → `void` | `timeout(op:, after:)` | `cache(key:, op:, ttl:)` | `with(acquire:, use: r ->, release: r ->)` | `for(over:, match:, default:)` | `catch(expr:)` → `Result<T, str>` | `nursery(body: n ->, on_error:, timeout:)`
+**Channels**: `channel<T>(buffer:)` → `(Producer, Consumer)` | `channel_in` fan-in | `channel_out` fan-out | `channel_all` many-many
+**Conversions**: `42 as float` infallible | `"42" as? int` fallible → `Option`
+**Match patterns**: literal | `x` binding | `_` | `Some(x)` | `{ x, y }` | `[a, ..rest]` | `1..10` | `A | B` | `x @ pat` | `x.match(guard)`
 
-**Access**
-- `value.field`, `value.method()`, `value.method(arg: value)`
-- Named arguments required for all function calls: `print(msg: "Hello")`, `len(collection: items)`, `fetch_user(id: 1)`
-- Positional allowed for function variable calls: `let f = x -> x + 1; f(5)` (param names unknowable)
-- Positional allowed for single-param functions with lambda literals: `items.map(x -> x * 2)`, `items.filter(x -> x > 0)`
-  - Only for inline lambdas, not function references: `items.map(double)` requires named arg
-  - `self` excluded from param count for methods
-- Type conversions use `as` keyword, not functions (see Expressions below)
-- Evaluation: left-to-right, arguments in written order (not parameter order)
-- Formatting: width-based (inline if fits, stack if not):
-  ```
-  // Inline
-  send_email(to: a, subject: b, body: c)
+## Imports
 
-  // Stacked (exceeds line width)
-  send_email(
-      to: recipient_address,
-      subject: email_subject,
-      body: email_content,
-  )
-  ```
+**Relative**: `use "./math" { add }` | `"../utils"` | `"./http/client"`
+**Module**: `use std.math { sqrt }` | `use std.net.http as http`
+**Private**: `use "./m" { ::internal }` | **Alias**: `{ add as plus }` | **Re-export**: `pub use`
+**Without default**: `use "m" { Trait without def }` — import trait without its `def impl`
+**Extensions**: `extension std.iter.extensions { Iterator.count }` | `extend Iterator { @count (self) = ... }`
 
-**Lambdas**
-- `x -> x + 1` — single param
-- `(a, b) -> a + b` — multiple params
-- `() -> 42` — no params
-- `(x: int) -> int = x * 2` — typed lambda with explicit signature
-- Capture by value: lambdas snapshot outer variables, cannot mutate outer scope
+## Capabilities
 
-**Ranges**
-- `0..10` — exclusive range (0, 1, 2, ..., 9)
-- `0..=10` — inclusive range (0, 1, 2, ..., 10)
-- `0..10 by 2` — stepped range (0, 2, 4, 6, 8)
-- `10..0 by -1` — descending range (10, 9, 8, ..., 1)
-- `by` is context-sensitive keyword (only after `..` or `..=`)
-- Step must be non-zero (panics at runtime)
-- Mismatched direction produces empty range (no panic)
-- Range with step supported only for `int` (compile error for `float`)
+**Declare**: `@f (...) -> T uses Http = ...` | `uses FileSystem, Async`
+**Provide**: `with Http = RealHttp { } in expr` | `with Http = mock, Cache = mock in expr`
+**Resolution**: with...in > imported `def impl` > module-local `def impl`
+**Async**: `uses Async` = may suspend; no `uses` = sync; no `.await`; concurrency via `parallel(...)`
+**Standard**: `Http`, `FileSystem`, `Clock`, `Random`, `Crypto`, `Cache`, `Print` (has default), `Logger`, `Env`, `Async`
 
-**Loops**
-- `for item in items do expr` — imperative
-- `for x in items yield x * 2` — collect
-- `for x in items if x > 0 yield x` — with guard
-- `loop(expr)` with `break`, `continue`
-- `break value` — exit loop with value
-- `continue` — skip iteration (in `for...yield`: skip element)
-- `continue value` — use value for this iteration (in `for...yield`)
+## Comments
 
-**Labeled Loops**
-- `loop:name(...)` — labeled loop
-- `for:name x in items do ...` — labeled for
-- `break:name` — break outer loop
-- `break:name value` — break outer loop with value
-- `continue:name` — continue outer loop
+`// comment` — own line only, no inline | Doc: `// #Desc` | `// @param name` | `// @field name` | `// !Error:` | `// >expr -> result`
 
-**Spread Operator**
-- `[...a, ...b]` — concatenate lists
-- `{...defaults, ...overrides}` — merge maps (later wins on conflicts)
-- `Point { ...original, x: 10 }` — copy struct with field overrides
-- Order determines precedence: later entries override earlier ones
-- Spread only in literal contexts, not function calls
-- Type constraints: list spread requires same element type, map spread requires compatible K/V, struct spread requires exact same type
+## Formatting (enforced)
 
-### Patterns
+- 4 spaces, 100 char limit, trailing commas on multi-line only
+- Space around: binary ops, arrows, after colons/commas, after `pub`, inside struct braces `{ }`, around `as`/`by`/`|`
+- No space: inside parens/brackets, around `.`/`..`/`?`, empty delimiters
+- Width-based breaking: inline ≤100, else break; `run`/`try`/`match`/`recurse`/`parallel`/`spawn`/`nursery` always stacked
+- Breaking: params/args/generics/where/fields/variants one-per-line; lists wrap (simple) or one-per-line (complex); chains break each `.method()`; binary break before op; conditionals: `if...then` together, `else` newline
 
-Patterns are compiler constructs with special syntax. Three categories:
+## Keywords
 
-**function_seq** — Sequential expressions (order matters)
-- `run(let x = a, let y = b, result)`
-- `run(pre_check: cond, body, post_check: r -> cond)` — with contract checks
-- `run(pre_check: x > 0 | "msg", body)` — check with custom message
-- `try(let x = fallible()?, Ok(x))`
-- `match(value, Pattern -> expr, _ -> default)`
+**Reserved**: `async break continue def do else false for if impl in let loop match pub self Self then trait true type use uses void where with yield`
+**Context-sensitive**: `by cache catch for parallel recurse run spawn timeout try with without`
+**Built-in names** (call position only): `int float str byte len is_empty is_some is_none is_ok is_err assert assert_eq assert_ne assert_some assert_none assert_ok assert_err assert_panics assert_panics_with compare min max print panic`
 
-**function_exp** — Named expressions (`name: expr`)
-- `recurse(condition: base_case, base: value, step: self(...), memo: true, parallel: threshold)`
-- `parallel(tasks: [...], max_concurrent: Option<int>, timeout: Option<Duration>)` → `[Result<T, E>]`
-  - Tasks start in list order, results in list order
-  - `None` = unlimited/no-timeout; errors don't stop other tasks
-- `spawn(tasks: [...], max_concurrent: n)` → `void` (fire and forget)
-- `timeout(op: expr, after: 5s)`
-- `cache(key: k, op: expr, ttl: 5m)`
-- `with(acquire: expr, use: r -> expr, release: r -> expr)`
-- `for(over: items, match: pattern, default: fallback)`
-- `catch(expr: expression)` — catch panics, returns `Result<T, str>`
-- `nursery(body: n -> expr, on_error: mode, timeout: dur)` → `[Result<T, E>]` (structured concurrency)
+## Prelude
 
-**Channel constructors** (return tuples)
-- `channel<T>(buffer: n)` → `(Producer<T>, Consumer<T>)` — one-to-one
-- `channel_in<T>(buffer: n)` → `(CloneableProducer<T>, Consumer<T>)` — fan-in (many-to-one)
-- `channel_out<T>(buffer: n)` → `(Producer<T>, CloneableConsumer<T>)` — fan-out (one-to-many)
-- `channel_all<T>(buffer: n)` → `(CloneableProducer<T>, CloneableConsumer<T>)` — many-to-many
-
-**Type Conversions** — Use `as`/`as?` keyword syntax
-- `42 as float` — infallible conversion (42.0)
-- `"42" as? int` — fallible conversion (Some(42) or None)
-- Backed by `As<T>` and `TryAs<T>` traits (see Prelude)
-
-**Stdlib methods** (not compiler patterns — use method call syntax):
-- `items.map(transform: fn)` → `[U]`
-- `items.filter(predicate: fn)` → `[T]`
-- `items.fold(initial: val, op: fn)` → `U`
-- `items.find(where: fn)` → `Option<T>`
-- `range.collect()` → `[T]`
-- `retry(op: fn, attempts: n, backoff: strategy)` — in `std.resilience`
-- `validate(rules: [...], value: v)` — in `std.validate`
-
-**Match patterns**
-- `42` — literal
-- `x` — binding
-- `_` — wildcard
-- `Some(x)` — variant
-- `{ x, y }` — struct
-- `[a, b, ..rest]` — list
-- `1..10` — range
-- `A | B` — or-pattern
-- `x @ pat` — at-pattern
-- `x.match(guard_expr)` — guard
-
-### Imports
-
-**Relative (local files)** — path in quotes, relative to current file:
-- `use "./math" { add, subtract }` — same directory
-- `use "../utils" { helper }` — parent directory
-- `use "./http/client" { get }` — subdirectory
-
-**Module (stdlib/packages)** — dot-separated, no quotes:
-- `use std.math { sqrt, abs }` — standard library
-- `use std.time { Duration }` — standard library
-
-**Private imports** — `::` prefix for non-public items:
-- `use "./math" { ::internal_helper }` — explicit private access
-- `use "../utils" { pub_fn, ::priv_fn }` — mixed
-
-**Aliases and re-exports**:
-- `use "./math" { add as plus }` — with alias
-- `use std.net.http as http` — module alias
-- `pub use "./internal" { Widget }` — re-export
-
-**Extension imports** — bring trait extension methods into scope:
-- `extension std.iter.extensions { Iterator.count, Iterator.last }`
-- `extension "./my_extensions" { Iterator.sum }` — local extensions
-
-**Extension definitions** — add methods to existing traits:
-- `extend Iterator { @count (self) -> int = ... }` — define extension
-- `extend Iterator where Self.Item: Add { @sum (self) -> Self.Item = ... }` — constrained
-
-### Capabilities
-
-Capabilities track effects and async behavior. Functions must declare required capabilities.
-
-**Declaring capabilities**
-- `@fetch (url: str) -> Result<str, Error> uses Http = ...`
-- `@save (data: str) -> Result<void, Error> uses FileSystem, Async = ...`
-
-**Providing capabilities** — `with...in` expression:
-- `with Http = RealHttp { base_url: "https://api.example.com" } in fetch("/data")`
-- `with Http = MockHttp { responses: {...} } in test_fetch()` — for testing
-- `with Http = mock_http, Cache = mock_cache in operation()` — multiple bindings
-
-**The Async capability** — replaces `async/await`:
-- `uses Async` — function may suspend (non-blocking I/O)
-- No `uses Async` — function blocks until complete (synchronous)
-- No `.await` expression — suspension declared at function level, not call site
-- Concurrency via `parallel(...)` pattern
-
-**Standard capabilities**:
-- `Http` — HTTP client (`get`, `post`, `put`, `delete`)
-- `FileSystem` — file I/O (`read`, `write`, `exists`, `delete`)
-- `Clock` — time (`now` returns `Instant`, `local_timezone` returns `Timezone`)
-- `Random` — random numbers (`rand_int`, `rand_float`)
-- `Crypto` — cryptographic operations (`hash`, `encrypt`, `sign`, `random_bytes`)
-- `Cache` — caching (`get`, `set`, `delete`)
-- `Print` — standard output (`print`, `println`, `output`, `clear`) — has default
-- `Logger` — structured logging (`debug`, `info`, `warn`, `error`)
-- `Env` — environment variables (`get`)
-- `Async` — marker for functions that may suspend
-
-**Pure functions**: no `uses` clause = no side effects, cannot suspend
-
-### Comments
-
-- `// comment` — line comment (must be on its own line, no inline comments)
-- Doc comments use special markers (see below)
-
-**Important:** Inline comments are not allowed. Comments must appear on their own line:
-
-```ori
-// This is valid
-let x = 42
-
-let y = 42  // This is a syntax error
-```
-
-### Doc Comments
-
-- `// #Description` — main description
-- `// @param name constraint` — parameter note
-- `// @field name description` — struct field
-- `// !ErrorCondition: when it happens` — error/panic
-- `// >expr -> result` — example
-
-### Formatting Rules (enforced, zero config)
-
-**Indentation**: 4 spaces, no tabs
-**Line length**: 100 characters hard limit
-**Trailing commas**: always on multi-line, forbidden on single-line
-
-**Spacing**
-- Space around binary operators: `a + b`, `x == y`
-- Space around arrows: `x -> x + 1`, `-> Type`
-- Space after colons: `x: int`, `key: value`
-- Space after commas: `f(a, b, c)`
-- No space inside parens/brackets: `f(x)`, `[1, 2]`
-- Space inside struct braces: `Point { x, y }`
-- No space in empty delimiters: `[]`, `{}`, `()`
-- No space around `.`, `..`, `..=`, `?`: `point.x`, `0..10`, `fetch()?`
-- Space around `as`/`as?`, `by`, `|`: `42 as float`, `0..10 by 2`, `Red | Green`
-- Space after `//`: `// comment`
-- Space after `pub`: `pub @name`
-
-**Width-Based Breaking**
-
-Core principle: **inline if ≤100 characters, break otherwise**.
-
-```ori
-// Inline - fits in 100 chars
-assert_eq(actual: result, expected: 10)
-
-// Broken - exceeds 100 chars
-send_notification(
-    user_id: current_user,
-    message: notification_text,
-    priority: Priority.High,
-)
-```
-
-Nested constructs break independently based on their own width.
-
-**Always-Stacked Constructs**
-- `run`/`try`: always stacked (never inline)
-- `match` arms: always one per line
-- `recurse`, `parallel`, `spawn`, `nursery`: always stacked
-
-**Breaking Behavior by Construct**
-
-| Construct | Broken Format |
-|-----------|---------------|
-| Function params/args | One per line |
-| Generics, where clauses | One per line |
-| Struct fields, map entries | One per line |
-| Sum type variants | One per line with leading `\|` |
-| Lists (simple items) | Wrap multiple per line |
-| Lists (complex items) | One per line |
-| Chains | Every `.method()` on own line |
-| Binary expressions | Break before operator |
-| Conditionals | `if cond then expr` together, `else` on new line |
-| Lambdas | Break after `->` only for always-stacked patterns |
-
-**Blank lines**
-- One after import block
-- One after constants block
-- One between functions
-- One between trait/impl methods (except single-method blocks)
-- No consecutive blank lines
-
-### Keywords
-
-**Reserved**: `async`, `break`, `continue`, `def`, `do`, `else`, `false`, `for`, `if`, `impl`, `in`, `let`, `loop`, `match`, `pub`, `self`, `Self`, `then`, `trait`, `true`, `type`, `use`, `uses`, `void`, `where`, `with`, `yield`
-
-**Context-sensitive** (compiler patterns only): `by`, `cache`, `catch`, `for`, `parallel`, `recurse`, `run`, `spawn`, `timeout`, `try`, `with`
-
-**Reserved built-in function names** (cannot be used for user-defined functions, but CAN be used as variable names):
-`int`, `float`, `str`, `byte`, `len`, `is_empty`, `is_some`, `is_none`, `is_ok`, `is_err`, `assert`, `assert_eq`, `assert_ne`, `assert_some`, `assert_none`, `assert_ok`, `assert_err`, `assert_panics`, `assert_panics_with`, `compare`, `min`, `max`, `print`, `panic`
-
-Built-in names are reserved **in call position only** (`name(`). The same names may be used as variables:
-- `let min = 5` — OK, variable binding
-- `min(a, b)` — OK, calls built-in function
-- `@min (...) -> int = ...` — Error, reserved function name
-
-### Prelude (auto-imported)
-
-**Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `TraceEntry`, `Ordering` (`Less`/`Equal`/`Greater`), `PanicInfo` (`message`, `location`), `CancellationError`, `CancellationReason`
+**Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `TraceEntry`, `Ordering`, `PanicInfo`, `CancellationError`, `CancellationReason`
 **Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Formattable`, `Debug`, `Clone`, `Default`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`, `Index`
 
-**Type conversions** (use `as`/`as?` syntax, not functions):
-- `42 as float`, `"42" as? int`, `value as str`
+**Built-ins**: `print(msg:)`, `len(collection:)`, `is_empty(collection:)`, `is_some/is_none(option:)`, `is_ok/is_err(result:)`, `assert(condition:)`, `assert_eq(actual:, expected:)`, `assert_ne(actual:, unexpected:)`, `assert_some/none/ok/err(...)`, `assert_panics(f:)`, `assert_panics_with(f:, msg:)`, `panic(msg:)` → `Never`, `compare(left:, right:)` → `Ordering`, `min/max(left:, right:)`, `repeat(value:)` → infinite iter, `is_cancelled()` → `bool`
 
-**Built-in functions** (named arguments required):
-- `print(msg: str)` → `void`
-- `len(collection: T)` → `int`
-- `is_empty(collection: T)` → `bool`
-- `is_some(option: Option<T>)` → `bool`
-- `is_none(option: Option<T>)` → `bool`
-- `is_ok(result: Result<T, E>)` → `bool`
-- `is_err(result: Result<T, E>)` → `bool`
-- `assert(condition: bool)` → `void`
-- `assert_eq(actual: T, expected: T)` → `void`
-- `assert_ne(actual: T, unexpected: T)` → `void`
-- `assert_some(option: Option<T>)` → `void`
-- `assert_none(option: Option<T>)` → `void`
-- `assert_ok(result: Result<T, E>)` → `void`
-- `assert_err(result: Result<T, E>)` → `void`
-- `assert_panics(f: () -> void)` → `void` — asserts the thunk panics
-- `assert_panics_with(f: () -> void, msg: str)` → `void` — asserts the thunk panics with a specific message
-- `panic(msg: str)` → `Never`
-- `compare(left: T, right: T)` → `Ordering`
-- `min(left: T, right: T)` → smallest value
-- `max(left: T, right: T)` → largest value
-- `repeat(value: T)` → infinite iterator of `value`
-- `is_cancelled()` → `bool` — check cancellation in async contexts
+**Option**: `.map(transform:)`, `.unwrap_or(default:)`, `.ok_or(error:)`, `.and_then(transform:)`, `.filter(predicate:)`
+**Result**: `.map(transform:)`, `.map_err(transform:)`, `.unwrap_or(default:)`, `.ok()`, `.err()`, `.and_then(transform:)`, `.context(msg:)`
+**Error**: `.trace()` → `str`, `.trace_entries()` → `[TraceEntry]`, `.has_trace()` → `bool`
 
-**Option methods**: `.map(transform: fn)`, `.unwrap_or(default: value)`, `.ok_or(error: value)`, `.and_then(transform: fn)`, `.filter(predicate: fn)`
-**Result methods**: `.map(transform: fn)`, `.map_err(transform: fn)`, `.unwrap_or(default: value)`, `.ok()`, `.err()`, `.and_then(transform: fn)`, `.context(msg: str)` (preserves trace)
-**Error methods**: `.trace()` → `str`, `.trace_entries()` → `[TraceEntry]`, `.has_trace()` → `bool`
-
-**Printable trait** (user-facing string representation):
-```ori
-trait Printable { @to_str (self) -> str }
-```
-- Required for template string interpolation: `` `Hello, {name}!` ``
-- All primitives implement Printable
-- Custom types need explicit impl or derive
-
-**Formattable trait** (formatted output with specifiers):
-```ori
-trait Formattable { @format (self, spec: FormatSpec) -> str }
-```
-- Blanket impl: all `Printable` types automatically implement `Formattable`
-- Used for format specifiers in template strings: `` `{price:.2}` ``, `` `{count:05}` ``
-- Format spec: `[[fill]align][width][.precision][type]`
-- Align: `<` (left), `>` (right), `^` (center)
-- Types: `b` (binary), `x`/`X` (hex), `o` (octal), `e`/`E` (scientific)
-
-**Debug trait** (developer-facing representation):
-```ori
-trait Debug { @debug (self) -> str }
-```
-
-- All primitives implement Debug (strings/chars show escaped: `"\"hello\""`, `"'\\n'"`)
-- Collections implement Debug when element types do (`[T]`, `{K: V}`, `Set<T>`)
-- `Option<T>` and `Result<T, E>` implement Debug when inner types do
-- Derivable for user types: `#derive(Debug) type Point = { x: int, y: int }`
-- Shows complete internal structure (vs `Printable` for user-facing display)
-
-**Clone trait** (explicit value duplication):
-```ori
-trait Clone { @clone (self) -> Self }
-```
-
-- All primitives implement Clone (`int`, `float`, `bool`, `str`, `char`, `byte`, `Duration`, `Size`)
-- Collections implement Clone when element types implement Clone (`[T]`, `{K: V}`, `Set<T>`)
-- `Option<T>` and `Result<T, E>` implement Clone when inner types do
-- Tuples implement Clone when all elements do
-- Derivable for user types: `#derive(Clone) type Point = { x: int, y: int }`
-- Element-wise recursive: cloning a container clones each element via `.clone()`
-
-**Iterator traits** (functional iteration with `(Option<Item>, Self)` return):
-```ori
-trait Iterator { type Item; @next (self) -> (Option<Self.Item>, Self) }
-trait DoubleEndedIterator: Iterator { @next_back (self) -> (Option<Self.Item>, Self) }
-trait Iterable { type Item; @iter (self) -> impl Iterator }
-trait Collect<T> { @from_iter (iter: impl Iterator) -> Self }
-```
-
-**Iterator methods** (default implementations):
-- `.map(transform: fn)` → `MapIterator`
-- `.filter(predicate: fn)` → `FilterIterator`
-- `.fold(initial: val, op: fn)` → `U`
-- `.find(predicate: fn)` → `Option<T>`
-- `.collect()` → target collection (type inferred)
-- `.count()` → `int`
-- `.any(predicate: fn)` → `bool`
-- `.all(predicate: fn)` → `bool`
-- `.take(count: n)` → `TakeIterator`
-- `.skip(count: n)` → `SkipIterator`
-- `.enumerate()` → `EnumerateIterator` (yields `(int, Item)`)
-- `.zip(other: Iterator)` → `ZipIterator`
-- `.chain(other: Iterator)` → `ChainIterator`
-- `.flatten()` → `FlattenIterator`
-- `.flat_map(transform: fn)` → flattened map
-- `.cycle()` → infinite repeating iterator (requires `Clone`)
-
-**DoubleEndedIterator methods** (traverse from both ends):
-- `.rev()` → `RevIterator` (reversed)
-- `.last()` → `Option<T>` (efficient O(1))
-- `.rfind(predicate: fn)` → `Option<T>` (find from back)
-- `.rfold(initial: val, op: fn)` → `U` (fold from back)
-
-**Iteration notes**:
-- Fused guarantee: once `next()` returns `None`, always returns `None`
-- `Range<float>` is NOT iterable (precision issues)
-- `for` loop desugars to `.iter()` and `.next()`
-- `for...yield` desugars to `.iter().map().collect()`
-
-**Into trait** (type conversions):
-```ori
-trait Into<T> { @into (self) -> T }
-```
-Standard impl: `str` implements `Into<Error>` for `.context()` method.
-
-**Traceable trait** (optional for custom errors):
-```ori
-trait Traceable {
-    @with_trace (self, trace: [TraceEntry]) -> Self
-    @trace (self) -> [TraceEntry]
-}
-```
-For non-Traceable error types, traces attach to the `Result` wrapper during propagation.
-
-**TraceEntry type** (error return trace entries):
-```ori
-type TraceEntry = { function: str, file: str, line: int, column: int }
-```
-Traces are collected automatically at `?` propagation points. Use `.context()` to preserve traces when converting error types.
-
-**Index trait** (custom subscripting):
-```ori
-trait Index<Key, Value> { @index (self, key: Key) -> Value }
-```
-- Enables `[]` syntax for user-defined types: `x[key]` desugars to `x.index(key: key)`
-- A type can implement multiple `Index` traits for different key types
-- Return type encodes error handling: `T` (panics), `Option<T>` (missing key), `Result<T, E>` (detailed error)
-- Built-in impls: `[T]` → `Index<int, T>`, `{K: V}` → `Index<K, Option<V>>`, `str` → `Index<int, str>`
-- The `#` shorthand is built-in only; custom types use `len()` explicitly
+**Printable**: `trait { @to_str (self) -> str }` — required for `` `{x}` ``; all primitives impl
+**Formattable**: `trait { @format (self, spec: FormatSpec) -> str }` — blanket impl for Printable; spec: `[[fill]align][width][.precision][type]`; align: `<>^`; types: `bxXoeE`
+**Debug**: `trait { @debug (self) -> str }` — shows escaped strings, derivable, internal structure
+**Clone**: `trait { @clone (self) -> Self }` — all primitives/collections impl when elements do, derivable
+**Iterator**: `trait { type Item; @next (self) -> (Option<Self.Item>, Self) }` — fused guarantee
+**DoubleEndedIterator**: `trait: Iterator { @next_back (self) -> (Option<Self.Item>, Self) }`
+**Iterable**: `trait { type Item; @iter (self) -> impl Iterator }`
+**Collect**: `trait<T> { @from_iter (iter: impl Iterator) -> Self }`
+**Iterator methods**: `.map`, `.filter`, `.fold`, `.find`, `.collect`, `.count`, `.any`, `.all`, `.take`, `.skip`, `.enumerate`, `.zip`, `.chain`, `.flatten`, `.flat_map`, `.cycle`
+**DoubleEnded methods**: `.rev`, `.last`, `.rfind`, `.rfold`
+**Into**: `trait<T> { @into (self) -> T }` — `str` impls `Into<Error>`
+**Traceable**: `trait { @with_trace (self, trace:) -> Self; @trace (self) -> [TraceEntry] }`
+**TraceEntry**: `type = { function: str, file: str, line: int, column: int }`
+**Index**: `trait<Key, Value> { @index (self, key: Key) -> Value }` — `x[k]` → `x.index(key: k)`; return `T` (panics), `Option<T>`, or `Result<T, E>`; `#` shorthand built-in only
