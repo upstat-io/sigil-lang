@@ -132,6 +132,7 @@ Expression-based language with strict static typing, type inference, mandatory t
 **Channels**: `channel<T>(buffer:)` → `(Producer, Consumer)` | `channel_in` fan-in | `channel_out` fan-out | `channel_all` many-many
 **Conversions**: `42 as float` infallible | `"42" as? int` fallible → `Option`
 **Match patterns**: literal | `x` binding | `_` | `Some(x)` | `{ x, y }` | `[a, ..rest]` | `1..10` | `A | B` | `x @ pat` | `x.match(guard)`
+**Exhaustiveness**: match must be exhaustive; guards require catch-all `_`; `let` binding patterns must be irrefutable
 
 ## Imports
 
