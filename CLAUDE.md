@@ -91,6 +91,7 @@ Expression-based language with strict static typing, type inference, mandatory t
 **Generic**: `Option<T>`, `Result<T, E>`, `Range<T>`, `Ordering`
 **Channels**: `Producer<T>`, `Consumer<T>`, `CloneableProducer<T>`, `CloneableConsumer<T>` (`T: Sendable`)
 **Concurrency**: `Nursery`, `NurseryErrorMode` (`CancelRemaining | CollectAll | FailFast`)
+**FFI**: `CPtr` (C opaque pointer), `JsValue` (JS object handle), `JsPromise<T>` (JS async)
 **Rules**: No implicit conversions; overflow panics; `str[i]` returns single-codepoint `str`
 
 ## Literals
@@ -129,13 +130,25 @@ Expression-based language with strict static typing, type inference, mandatory t
 **Without default**: `use "m" { Trait without def }` — import trait without its `def impl`
 **Extensions**: `extension std.iter.extensions { Iterator.count }` | `extend Iterator { @count (self) = ... }`
 
+## FFI (Foreign Function Interface)
+
+**Native (C ABI)**: `extern "c" from "m" { @_sin (x: float) -> float as "sin" }` | `from "lib"` specifies library | `as "name"` maps C name
+**JavaScript (WASM)**: `extern "js" { @_sin (x: float) -> float as "Math.sin" }` | `extern "js" from "./utils.js"` for modules
+**FFI Types**: `CPtr` opaque pointer | `Option<CPtr>` nullable | `JsValue` JS object handle | `JsPromise<T>` async JS
+**C Types**: `c_char`, `c_short`, `c_int`, `c_long`, `c_longlong`, `c_float`, `c_double`, `c_size` — platform-specific sizes
+**Struct Layout**: `#repr("c") type T = { ... }` — C-compatible memory layout
+**Unsafe**: `unsafe { ptr_read(...) }` — operations Ori cannot verify
+**Capability**: `uses FFI` — required for all foreign function calls
+**Async WASM**: `JsPromise<T>` implicitly resolved at binding sites in async context (no `await` keyword)
+**Compile Error**: `compile_error("message")` — compile-time error for platform availability
+
 ## Capabilities
 
 **Declare**: `@f (...) -> T uses Http = ...` | `uses FileSystem, Async`
 **Provide**: `with Http = RealHttp { } in expr` | `with Http = mock, Cache = mock in expr`
 **Resolution**: with...in > imported `def impl` > module-local `def impl`
 **Async**: `uses Async` = may suspend; no `uses` = sync; no `.await`; concurrency via `parallel(...)`
-**Standard**: `Http`, `FileSystem`, `Clock`, `Random`, `Crypto`, `Cache`, `Print` (has default), `Logger`, `Env`, `Async`
+**Standard**: `Http`, `FileSystem`, `Clock`, `Random`, `Crypto`, `Cache`, `Print` (has default), `Logger`, `Env`, `Async`, `FFI`
 
 ## Comments
 
@@ -151,16 +164,16 @@ Expression-based language with strict static typing, type inference, mandatory t
 
 ## Keywords
 
-**Reserved**: `async break continue def do else false for if impl in let loop match pub self Self then trait true type use uses void where with yield`
+**Reserved**: `async break continue def do else extern false for if impl in let loop match pub self Self then trait true type unsafe use uses void where with yield`
 **Context-sensitive**: `by cache catch for parallel recurse run spawn timeout try with without`
-**Built-in names** (call position only): `int float str byte len is_empty is_some is_none is_ok is_err assert assert_eq assert_ne assert_some assert_none assert_ok assert_err assert_panics assert_panics_with compare min max print panic todo unreachable dbg`
+**Built-in names** (call position only): `int float str byte len is_empty is_some is_none is_ok is_err assert assert_eq assert_ne assert_some assert_none assert_ok assert_err assert_panics assert_panics_with compare min max print panic todo unreachable dbg compile_error`
 
 ## Prelude
 
 **Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `TraceEntry`, `Ordering`, `PanicInfo`, `CancellationError`, `CancellationReason`
 **Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Formattable`, `Debug`, `Clone`, `Default`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`, `Index`
 
-**Built-ins**: `print(msg:)`, `len(collection:)`, `is_empty(collection:)`, `is_some/is_none(option:)`, `is_ok/is_err(result:)`, `assert(condition:)`, `assert_eq(actual:, expected:)`, `assert_ne(actual:, unexpected:)`, `assert_some/none/ok/err(...)`, `assert_panics(f:)`, `assert_panics_with(f:, msg:)`, `panic(msg:)` → `Never`, `todo()`, `todo(reason:)` → `Never`, `unreachable()`, `unreachable(reason:)` → `Never`, `dbg(value:)`, `dbg(value:, label:)` → `T`, `compare(left:, right:)` → `Ordering`, `min/max(left:, right:)`, `repeat(value:)` → infinite iter, `is_cancelled()` → `bool`
+**Built-ins**: `print(msg:)`, `len(collection:)`, `is_empty(collection:)`, `is_some/is_none(option:)`, `is_ok/is_err(result:)`, `assert(condition:)`, `assert_eq(actual:, expected:)`, `assert_ne(actual:, unexpected:)`, `assert_some/none/ok/err(...)`, `assert_panics(f:)`, `assert_panics_with(f:, msg:)`, `panic(msg:)` → `Never`, `todo()`, `todo(reason:)` → `Never`, `unreachable()`, `unreachable(reason:)` → `Never`, `dbg(value:)`, `dbg(value:, label:)` → `T`, `compare(left:, right:)` → `Ordering`, `min/max(left:, right:)`, `repeat(value:)` → infinite iter, `is_cancelled()` → `bool`, `compile_error(msg:)` → compile-time error
 
 **Option**: `.map(transform:)`, `.unwrap_or(default:)`, `.ok_or(error:)`, `.and_then(transform:)`, `.filter(predicate:)`
 **Result**: `.map(transform:)`, `.map_err(transform:)`, `.unwrap_or(default:)`, `.ok()`, `.err()`, `.and_then(transform:)`, `.context(msg:)`, `.trace()` → `str`, `.trace_entries()` → `[TraceEntry]`, `.has_trace()` → `bool`
