@@ -507,7 +507,9 @@ Patterns are compiler constructs with special syntax. Three categories:
 
 **function_exp** — Named expressions (`name: expr`)
 - `recurse(condition: base_case, base: value, step: self(...), memo: true, parallel: threshold)`
-- `parallel(tasks: [...], max_concurrent: n, timeout: duration)` → `[Result<T, E>]`
+- `parallel(tasks: [...], max_concurrent: Option<int>, timeout: Option<Duration>)` → `[Result<T, E>]`
+  - Tasks start in list order, results in list order
+  - `None` = unlimited/no-timeout; errors don't stop other tasks
 - `spawn(tasks: [...], max_concurrent: n)` → `void` (fire and forget)
 - `timeout(op: expr, after: 5s)`
 - `cache(key: k, op: expr, ttl: 5m)`
@@ -711,7 +713,7 @@ Built-in names are reserved **in call position only** (`name(`). The same names 
 
 ### Prelude (auto-imported)
 
-**Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `TraceEntry`, `Ordering` (`Less`/`Equal`/`Greater`), `PanicInfo` (`message`, `location`)
+**Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `TraceEntry`, `Ordering` (`Less`/`Equal`/`Greater`), `PanicInfo` (`message`, `location`), `CancellationError`, `CancellationReason`
 **Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Formattable`, `Debug`, `Clone`, `Default`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`
 
 **Type conversions** (use `as`/`as?` syntax, not functions):
@@ -739,6 +741,7 @@ Built-in names are reserved **in call position only** (`name(`). The same names 
 - `min(left: T, right: T)` → smallest value
 - `max(left: T, right: T)` → largest value
 - `repeat(value: T)` → infinite iterator of `value`
+- `is_cancelled()` → `bool` — check cancellation in async contexts
 
 **Option methods**: `.map(transform: fn)`, `.unwrap_or(default: value)`, `.ok_or(error: value)`, `.and_then(transform: fn)`, `.filter(predicate: fn)`
 **Result methods**: `.map(transform: fn)`, `.map_err(transform: fn)`, `.unwrap_or(default: value)`, `.ok()`, `.err()`, `.and_then(transform: fn)`, `.context(msg: str)` (preserves trace)
