@@ -31,8 +31,6 @@ Create a commit message following conventional commit format:
 <type>(<scope>): <description>
 
 <body>
-
-Co-Authored-By: Claude <model> <noreply@anthropic.com>
 ```
 
 **Valid types:**
@@ -79,8 +77,6 @@ perf(typeck): optimize line lookup and hash map usage
 - Switch to FxHashMap/FxHashSet in type checker components
 - Add index for O(1) associated type lookups
 - Optimize diagnostic queue sorting
-
-Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 ```
 
 ---
