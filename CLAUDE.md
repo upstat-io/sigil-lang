@@ -107,7 +107,7 @@ Expression-based language with strict static typing, type inference, mandatory t
 
 ## Literals
 
-`42`, `1_000_000`, `0xFF` | `3.14`, `2.5e-8` | `"hello"` (escapes: `\\\"\n\t\r\0`) | `` `{name}` `` template | `'a'` char | `true`/`false` | `100ms`, `30s`, `5m`, `2h` | `4kb`, `10mb` | `[1, 2]`, `[...a, ...b]` | `{"k": v}`, `{...a, ...b}` | `Point { x, y }`, `{ ...p, x: 10 }`
+`42`, `1_000_000`, `0xFF` | `3.14`, `2.5e-8` | `"hello"` (escapes: `\\\"\n\t\r\0`) | `` `{name}` `` template | `'a'` char | `true`/`false` | `100ms`, `30s`, `5m`, `2h` | `4kb`, `10mb` | `[1, 2]`, `[...a, ...b]` | `{key: v}` or `{"key": v}` (literal str key), `{[expr]: v}` (computed key), `{...a, ...b}` | `Point { x, y }`, `{ ...p, x: 10 }`
 
 ## Operators (precedence high→low)
 
