@@ -86,13 +86,21 @@ Expression-based language with strict static typing, type inference, mandatory t
 
 **Primitives**: `int` (i64), `float` (f64), `bool`, `str` (UTF-8), `char`, `byte`, `void`, `Never`
 **Special**: `Duration` (`30s`, `100ms`), `Size` (`4kb`, `10mb`)
-**Collections**: `[T]` list, `{K: V}` map, `Set<T>`
+**Collections**: `[T]` list, `[T, max N]` fixed-capacity list, `{K: V}` map, `Set<T>`
 **Compound**: `(T, U)` tuple, `()` unit, `(T) -> U` fn, `Trait` object
 **Generic**: `Option<T>`, `Result<T, E>`, `Range<T>`, `Ordering`
+**Const Generics**: `$N: int` const param | `@f<T, $N: int>` | `type Buffer<$N: int>` | `where N > 0` bounds
 **Channels**: `Producer<T>`, `Consumer<T>`, `CloneableProducer<T>`, `CloneableConsumer<T>` (`T: Sendable`)
 **Concurrency**: `Nursery`, `NurseryErrorMode` (`CancelRemaining | CollectAll | FailFast`)
 **FFI**: `CPtr` (C opaque pointer), `JsValue` (JS object handle), `JsPromise<T>` (JS async)
 **Rules**: No implicit conversions; overflow panics; `str[i]` returns single-codepoint `str`
+
+### Fixed-Capacity Lists
+
+`[T, max N]` — inline-allocated list with compile-time max capacity N, dynamic length 0 to N
+**Subtype**: `[T, max N] <: [T]` — can pass to functions expecting `[T]`; capacity limits retained
+**Methods**: `.capacity()`, `.is_full()`, `.remaining()`, `.push()` (panics if full), `.try_push()` → `bool`, `.push_or_drop()`, `.push_or_oldest()` (FIFO), `.to_dynamic()` → `[T]`
+**Conversion**: `list.to_fixed<$N: int>()` panics if too large | `list.try_to_fixed<$N: int>()` → `Option`
 
 ## Literals
 
@@ -165,7 +173,7 @@ Expression-based language with strict static typing, type inference, mandatory t
 ## Keywords
 
 **Reserved**: `async break continue def do else extern false for if impl in let loop match pub self Self then trait true type unsafe use uses void where with yield`
-**Context-sensitive**: `by cache catch for parallel recurse run spawn timeout try with without`
+**Context-sensitive**: `by cache catch for max parallel recurse run spawn timeout try with without`
 **Built-in names** (call position only): `int float str byte len is_empty is_some is_none is_ok is_err assert assert_eq assert_ne assert_some assert_none assert_ok assert_err assert_panics assert_panics_with compare min max print panic todo unreachable dbg compile_error`
 
 ## Prelude
