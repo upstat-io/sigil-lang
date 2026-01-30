@@ -153,14 +153,14 @@ Expression-based language with strict static typing, type inference, mandatory t
 
 **Reserved**: `async break continue def do else false for if impl in let loop match pub self Self then trait true type use uses void where with yield`
 **Context-sensitive**: `by cache catch for parallel recurse run spawn timeout try with without`
-**Built-in names** (call position only): `int float str byte len is_empty is_some is_none is_ok is_err assert assert_eq assert_ne assert_some assert_none assert_ok assert_err assert_panics assert_panics_with compare min max print panic`
+**Built-in names** (call position only): `int float str byte len is_empty is_some is_none is_ok is_err assert assert_eq assert_ne assert_some assert_none assert_ok assert_err assert_panics assert_panics_with compare min max print panic todo unreachable dbg`
 
 ## Prelude
 
 **Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `TraceEntry`, `Ordering`, `PanicInfo`, `CancellationError`, `CancellationReason`
 **Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Formattable`, `Debug`, `Clone`, `Default`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`, `Index`
 
-**Built-ins**: `print(msg:)`, `len(collection:)`, `is_empty(collection:)`, `is_some/is_none(option:)`, `is_ok/is_err(result:)`, `assert(condition:)`, `assert_eq(actual:, expected:)`, `assert_ne(actual:, unexpected:)`, `assert_some/none/ok/err(...)`, `assert_panics(f:)`, `assert_panics_with(f:, msg:)`, `panic(msg:)` → `Never`, `compare(left:, right:)` → `Ordering`, `min/max(left:, right:)`, `repeat(value:)` → infinite iter, `is_cancelled()` → `bool`
+**Built-ins**: `print(msg:)`, `len(collection:)`, `is_empty(collection:)`, `is_some/is_none(option:)`, `is_ok/is_err(result:)`, `assert(condition:)`, `assert_eq(actual:, expected:)`, `assert_ne(actual:, unexpected:)`, `assert_some/none/ok/err(...)`, `assert_panics(f:)`, `assert_panics_with(f:, msg:)`, `panic(msg:)` → `Never`, `todo()`, `todo(reason:)` → `Never`, `unreachable()`, `unreachable(reason:)` → `Never`, `dbg(value:)`, `dbg(value:, label:)` → `T`, `compare(left:, right:)` → `Ordering`, `min/max(left:, right:)`, `repeat(value:)` → infinite iter, `is_cancelled()` → `bool`
 
 **Option**: `.map(transform:)`, `.unwrap_or(default:)`, `.ok_or(error:)`, `.and_then(transform:)`, `.filter(predicate:)`
 **Result**: `.map(transform:)`, `.map_err(transform:)`, `.unwrap_or(default:)`, `.ok()`, `.err()`, `.and_then(transform:)`, `.context(msg:)`
