@@ -748,7 +748,7 @@ Built-in names are reserved **in call position only** (`name(`). The same names 
 ### Prelude (auto-imported)
 
 **Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `TraceEntry`, `Ordering` (`Less`/`Equal`/`Greater`), `PanicInfo` (`message`, `location`), `CancellationError`, `CancellationReason`
-**Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Formattable`, `Debug`, `Clone`, `Default`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`
+**Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Formattable`, `Debug`, `Clone`, `Default`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`, `Index`
 
 **Type conversions** (use `as`/`as?` syntax, not functions):
 - `42 as float`, `"42" as? int`, `value as str`
@@ -880,3 +880,13 @@ For non-Traceable error types, traces attach to the `Result` wrapper during prop
 type TraceEntry = { function: str, file: str, line: int, column: int }
 ```
 Traces are collected automatically at `?` propagation points. Use `.context()` to preserve traces when converting error types.
+
+**Index trait** (custom subscripting):
+```ori
+trait Index<Key, Value> { @index (self, key: Key) -> Value }
+```
+- Enables `[]` syntax for user-defined types: `x[key]` desugars to `x.index(key: key)`
+- A type can implement multiple `Index` traits for different key types
+- Return type encodes error handling: `T` (panics), `Option<T>` (missing key), `Result<T, E>` (detailed error)
+- Built-in impls: `[T]` → `Index<int, T>`, `{K: V}` → `Index<K, Option<V>>`, `str` → `Index<int, str>`
+- The `#` shorthand is built-in only; custom types use `len()` explicitly
