@@ -12,18 +12,22 @@ Stage, commit, and push all changes to the remote repository using conventional 
 
 ## Workflow
 
-### Step 1: Check Status
+### Step 1: Sync Website
+
+Run `/sync-webpage` to ensure website content is up to date with the spec and codebase.
+
+### Step 2: Check Status
 
 Run `git status` and `git diff --stat` to understand what changes will be committed.
 
-### Step 2: Analyze Changes
+### Step 3: Analyze Changes
 
 Review the changes to determine:
 - The primary type of change (feat, fix, refactor, perf, docs, test, chore, etc.)
 - An optional scope (e.g., typeck, diagnostic, parser)
 - A concise description of what changed
 
-### Step 3: Draft Commit Message
+### Step 4: Draft Commit Message
 
 Create a commit message following conventional commit format:
 
@@ -48,14 +52,14 @@ Create a commit message following conventional commit format:
 
 **Scope** is optional but recommended. Use the primary module/crate affected (e.g., `typeck`, `diagnostic`, `parser`, `eval`, `llvm`).
 
-### Step 4: Present to User
+### Step 5: Present to User
 
 Show the user:
 1. Summary of files changed
 2. The proposed commit message
 3. Ask for confirmation before committing
 
-### Step 5: Commit and Push
+### Step 6: Commit and Push
 
 If user confirms:
 1. Stage all changes: `git add -A`

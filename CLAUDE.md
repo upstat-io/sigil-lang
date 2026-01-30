@@ -163,7 +163,7 @@ Expression-based language with strict static typing, type inference, mandatory t
 
 ## Comments
 
-`// comment` — own line only, no inline | Doc: `// #Desc` | `// @param name` | `// @field name` | `// !Error:` | `// >expr -> result`
+`// comment` — own line only, no inline | Doc: `// Desc` | `// * name:` | `// ! Error:` | `// > expr -> result`
 
 ## Formatting (enforced)
 
