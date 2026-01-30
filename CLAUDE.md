@@ -362,6 +362,40 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 - `#fail("error") @test_name ...` — expected failure test
 - All tests require `tests` keyword; `_` for free-floating, `@fn` for targeted
 
+### Conditional Compilation
+
+**Target Conditions** (platform-specific code)
+- `#target(os: "linux")` — operating system (linux, macos, windows, freebsd, android, ios)
+- `#target(arch: "x86_64")` — architecture (x86_64, aarch64, arm, wasm32, riscv64)
+- `#target(family: "unix")` — target family (unix, windows, wasm)
+- `#target(os: "linux", arch: "x86_64")` — AND conditions (both must match)
+- `#target(any_os: ["linux", "macos"])` — OR conditions (any must match)
+- `#target(not_os: "windows")` — negation
+- Multiple attributes on same item = AND
+
+**Configuration Flags** (build-time flags)
+- `#cfg(debug)` — debug build
+- `#cfg(release)` — release build
+- `#cfg(feature: "ssl")` — feature flag enabled
+- `#cfg(any_feature: ["ssl", "tls"])` — OR for features
+- `#cfg(not_debug)` — negation
+- `#cfg(not_feature: "ssl")` — negation for features
+- Feature names must be valid identifiers (no hyphens)
+
+**File-Level Conditions** (entire file)
+- `#!target(os: "linux")` — at top of file, applies to entire file
+
+**Applicable Items**
+- Functions, types, trait implementations, constants, imports
+
+**Compile-Time Constants** (in expressions)
+- `$target_os: str` — "linux", "macos", "windows", etc.
+- `$target_arch: str` — "x86_64", "aarch64", etc.
+- `$target_family: str` — "unix", "windows", "wasm"
+- `$debug: bool` — true in debug builds
+- `$release: bool` — true in release builds
+- Dead code elimination: `if $target_os == "windows" then ... else ...` — false branch not type-checked
+
 ### Types
 
 **Primitives**: `int` (64-bit signed), `float` (64-bit IEEE 754), `bool`, `str` (UTF-8), `char`, `byte`, `void`, `Never`
