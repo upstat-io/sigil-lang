@@ -589,7 +589,7 @@ Capabilities track effects and async behavior. Functions must declare required c
 **Standard capabilities**:
 - `Http` — HTTP client (`get`, `post`, `put`, `delete`)
 - `FileSystem` — file I/O (`read`, `write`, `exists`, `delete`)
-- `Clock` — time (`now`, `today`)
+- `Clock` — time (`now` returns `Instant`, `local_timezone` returns `Timezone`)
 - `Random` — random numbers (`rand_int`, `rand_float`)
 - `Cache` — caching (`get`, `set`, `delete`)
 - `Print` — standard output (`print`, `println`, `output`, `clear`) — has default
