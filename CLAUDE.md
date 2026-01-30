@@ -182,7 +182,7 @@ Expression-based language with strict static typing, type inference, mandatory t
 ## Prelude
 
 **Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `TraceEntry`, `Ordering`, `PanicInfo`, `CancellationError`, `CancellationReason`
-**Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Formattable`, `Debug`, `Clone`, `Default`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`, `Index`
+**Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Formattable`, `Debug`, `Clone`, `Default`, `Drop`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`, `Index`
 
 **Built-ins**: `print(msg:)`, `len(collection:)`, `is_empty(collection:)`, `is_some/is_none(option:)`, `is_ok/is_err(result:)`, `assert(condition:)`, `assert_eq(actual:, expected:)`, `assert_ne(actual:, unexpected:)`, `assert_some/none/ok/err(...)`, `assert_panics(f:)`, `assert_panics_with(f:, msg:)`, `panic(msg:)` → `Never`, `todo()`, `todo(reason:)` → `Never`, `unreachable()`, `unreachable(reason:)` → `Never`, `dbg(value:)`, `dbg(value:, label:)` → `T`, `compare(left:, right:)` → `Ordering`, `min/max(left:, right:)`, `repeat(value:)` → infinite iter, `is_cancelled()` → `bool`, `compile_error(msg:)` → compile-time error
 
@@ -204,4 +204,5 @@ Expression-based language with strict static typing, type inference, mandatory t
 **Into**: `trait<T> { @into (self) -> T }` — `str` impls `Into<Error>`
 **Traceable**: `trait { @with_trace (self, trace:) -> Self; @trace (self) -> [TraceEntry] }`
 **TraceEntry**: `type = { function: str, file: str, line: int, column: int }` — function includes `@` prefix; entries ordered most recent first
+**Drop**: `trait { @drop (self) -> void }` — custom destructor; runs when refcount reaches zero; cannot be async; panic during unwind aborts
 **Index**: `trait<Key, Value> { @index (self, key: Key) -> Value }` — `x[k]` → `x.index(key: k)`; return `T` (panics), `Option<T>`, or `Result<T, E>`; `#` shorthand built-in only
