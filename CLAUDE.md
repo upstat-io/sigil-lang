@@ -321,6 +321,14 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 - `impl<T: Bound> Trait for Container<T> { ... }` — generic
 - `self` — instance in methods; `Self` — implementing type
 
+**Default Implementations** (automatic capability binding)
+- `pub def impl Trait { @method (...) -> Type = ... }` — default for trait
+- `def impl Trait { ... }` — module-internal default
+- No `self` parameter — stateless; use module-level `$` bindings for config
+- One `def impl` per trait per module
+- Importing trait automatically binds the default
+- Override with `with Trait = other in ...`
+
 **Tests**
 - `@test_name tests @target () -> void = run(...)` — targeted test
 - `@test_name tests _ () -> void = run(...)` — free-floating test (targets nothing)
@@ -663,7 +671,7 @@ Nested constructs break independently based on their own width.
 
 ### Keywords
 
-**Reserved**: `async`, `break`, `continue`, `do`, `else`, `false`, `for`, `if`, `impl`, `in`, `let`, `loop`, `match`, `pub`, `self`, `Self`, `then`, `trait`, `true`, `type`, `use`, `uses`, `void`, `where`, `with`, `yield`
+**Reserved**: `async`, `break`, `continue`, `def`, `do`, `else`, `false`, `for`, `if`, `impl`, `in`, `let`, `loop`, `match`, `pub`, `self`, `Self`, `then`, `trait`, `true`, `type`, `use`, `uses`, `void`, `where`, `with`, `yield`
 
 **Context-sensitive** (compiler patterns only): `by`, `cache`, `catch`, `for`, `parallel`, `recurse`, `run`, `spawn`, `timeout`, `try`, `with`
 
