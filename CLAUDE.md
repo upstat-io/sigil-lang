@@ -591,6 +591,7 @@ Capabilities track effects and async behavior. Functions must declare required c
 - `FileSystem` — file I/O (`read`, `write`, `exists`, `delete`)
 - `Clock` — time (`now` returns `Instant`, `local_timezone` returns `Timezone`)
 - `Random` — random numbers (`rand_int`, `rand_float`)
+- `Crypto` — cryptographic operations (`hash`, `encrypt`, `sign`, `random_bytes`)
 - `Cache` — caching (`get`, `set`, `delete`)
 - `Print` — standard output (`print`, `println`, `output`, `clear`) — has default
 - `Logger` — structured logging (`debug`, `info`, `warn`, `error`)
