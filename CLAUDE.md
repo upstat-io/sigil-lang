@@ -295,12 +295,15 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 - `$` is a modifier, not part of the name — `x` and `$x` cannot coexist in same scope
 
 **Const Functions** (compile-time evaluation)
-- `let $name = (param: Type) -> ReturnType = expression`
-- `let $square = (x: int) -> int = x * x`
-- `let $factorial = (n: int) -> int = if n <= 1 then 1 else n * $factorial(n: n - 1)`
-- Must be pure: no capabilities, no I/O, no mutable state access
+- `$name (param: Type) -> ReturnType = expression`
+- `$square (x: int) -> int = x * x`
+- `$factorial (n: int) -> int = if n <= 1 then 1 else n * $factorial(n: n - 1)`
+- Must be pure: no capabilities, no I/O, no external state access
+- May use local mutable bindings and loop expressions (`for`, `loop`)
 - Called with constant args → evaluated at compile time
 - Called with runtime args → evaluated at runtime
+- Partial evaluation: when mixed args, compiler must fold const portions
+- Evaluation limits: 1M steps, 1000 depth, 100MB memory, 10s time (configurable)
 
 **Type Definitions**
 - `type Name = { field: Type }` — struct
