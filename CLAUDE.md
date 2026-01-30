@@ -344,6 +344,15 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 - Extension conflicts: only one extension per method in scope (error if multiple)
 - Impl specificity: Concrete > Constrained blanket > Generic blanket
 
+**Object Safety** (rules for using traits as types)
+- Rule 1: No `Self` in return position — `@clone (self) -> Self` is NOT object-safe
+- Rule 2: No `Self` in parameter position (except receiver) — `@equals (self, other: Self)` is NOT object-safe
+- Rule 3: No generic methods — `@convert<T> (self) -> T` is NOT object-safe
+- All bounds in `Trait1 + Trait2` must be object-safe
+- Object-safe: `Printable`, `Formattable`, `Debug`, `Hashable`
+- NOT object-safe: `Clone`, `Default`, `Eq`, `Comparable`, `Iterator`, `Collect`
+- Workaround: wrap non-safe traits using `Arc<Trait>` return types
+
 **Tests**
 - `@test_name tests @target () -> void = run(...)` — targeted test
 - `@test_name tests _ () -> void = run(...)` — free-floating test (targets nothing)
