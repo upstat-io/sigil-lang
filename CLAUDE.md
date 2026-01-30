@@ -330,6 +330,17 @@ The reference below is a condensed cheat sheet for writing Ori code quickly.
 - Importing trait automatically binds the default
 - Override with `with Trait = other in ...`
 
+**Trait Resolution**
+- Diamond inheritance: single impl satisfies all paths (no duplication)
+- Conflicting defaults: explicit impl required when supertraits conflict
+- Coherence (orphan rules): trait OR type must be local for `impl Trait for Type`
+- Method resolution order: Inherent > Trait > Extension
+- Ambiguous methods: use fully-qualified `Trait.method(value)` syntax
+- Super trait calls: `Trait.method(self)` calls parent's default impl
+- Associated type disambiguation: `Type::Trait::AssocType` qualified path
+- Extension conflicts: only one extension per method in scope (error if multiple)
+- Impl specificity: Concrete > Constrained blanket > Generic blanket
+
 **Tests**
 - `@test_name tests @target () -> void = run(...)` — targeted test
 - `@test_name tests _ () -> void = run(...)` — free-floating test (targets nothing)
