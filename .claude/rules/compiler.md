@@ -111,6 +111,7 @@ Compiler implements only constructs requiring **special syntax or static analysi
 - **Run-pass**: `tests/run-pass/` — e2e
 - **Compile-fail**: `tests/compile-fail/` — expected failures
 - Ori spec tests can use `assert_panics` and `assert_panics_with` from the prelude to verify panic behavior
+- **TDD for bugs**: Issue found + tests pass → write test for correct behavior (must fail) → fix code → test passes unchanged
 
 ```bash
 cargo test --workspace       # all

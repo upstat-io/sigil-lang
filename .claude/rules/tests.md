@@ -19,6 +19,7 @@ defined in `docs/ori_lang/0.1-alpha/spec/`.
 - Each test references the spec section it validates
 - Each test must have a comment linking it to it's spec file and section reference (not line number)
 - Each test must have a comment linking it to it's design file and section reference (not line number)
+- **TDD for bugs**: Issue found + tests pass → write test for correct behavior (must fail) → fix code → test passes unchanged
 
 
 ## Running Spec Tests
