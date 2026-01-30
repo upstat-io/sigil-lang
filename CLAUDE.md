@@ -230,7 +230,8 @@ These are shallow clones. To update: `cd ~/lang_repos/<name> && git pull --depth
 - Free-floating test: `@test_name tests _ () -> void = run(...)` — targets nothing, runs only via `ori test`
 - `tests` keyword required for all tests; `_` indicates free-floating
 - Private access via `::` prefix; every function (except `@main`) requires tests
-- Targeted tests auto-run during `ori check` when their target functions change
+- Targeted tests auto-run during `ori check` when their target functions (or callers of those functions) change
+- Dependency-aware: change `@foo` → tests for `@foo` AND tests for functions that call `@foo` run
 
 ## Program Entry
 
@@ -563,6 +564,7 @@ Capabilities track effects and async behavior. Functions must declare required c
 **Providing capabilities** — `with...in` expression:
 - `with Http = RealHttp { base_url: "https://api.example.com" } in fetch("/data")`
 - `with Http = MockHttp { responses: {...} } in test_fetch()` — for testing
+- `with Http = mock_http, Cache = mock_cache in operation()` — multiple bindings
 
 **The Async capability** — replaces `async/await`:
 - `uses Async` — function may suspend (non-blocking I/O)
