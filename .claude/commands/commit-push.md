@@ -14,19 +14,7 @@ Stage, commit, and push all changes to the remote repository using conventional 
 
 **IMPORTANT:** Execute each step in order. Do not skip steps.
 
-### Step 1: Run /sync-webpage (MANDATORY)
-
-**ACTION:** Use the Skill tool to invoke `sync-webpage` BEFORE doing anything else.
-
-```
-Skill(skill: "sync-webpage")
-```
-
-This ensures the website roadmap is synchronized with the spec before committing.
-
-Wait for sync-webpage to complete before proceeding.
-
-### Step 2: Check Git Status
+### Step 1: Check Git Status
 
 **ACTION:** Run these commands to see what will be committed:
 
@@ -35,7 +23,7 @@ git status
 git diff --stat
 ```
 
-### Step 3: Analyze and Draft Commit Message
+### Step 2: Analyze and Draft Commit Message
 
 Review the changes and create a commit message following conventional commit format:
 
@@ -62,7 +50,7 @@ Review the changes and create a commit message following conventional commit for
 
 **Scope** is optional. Use the primary module affected (e.g., `typeck`, `parser`, `llvm`).
 
-### Step 4: Present to User and Get Confirmation
+### Step 3: Present to User and Get Confirmation
 
 Show the user:
 1. Summary of files changed
@@ -72,7 +60,7 @@ Ask: "Shall I proceed with this commit?"
 
 **Do NOT commit until user confirms.**
 
-### Step 5: Commit
+### Step 4: Commit Main Changes
 
 After user confirms:
 
@@ -84,7 +72,28 @@ EOF
 )"
 ```
 
-### Step 6: Push
+### Step 5: Run /sync-webpage
+
+**ACTION:** Use the Skill tool to invoke `sync-webpage` AFTER the main commit.
+
+```
+Skill(skill: "sync-webpage")
+```
+
+This syncs the website changelog to include the commit we just made.
+
+### Step 6: Commit Changelog Update
+
+If sync-webpage made changes, commit them automatically (no user confirmation needed):
+
+```bash
+git add website/public/changelog.json website/src/pages/roadmap.astro
+git commit -m "chore(website): sync changelog and roadmap"
+```
+
+Skip this step if there are no changes to commit.
+
+### Step 7: Push
 
 ```bash
 git push
@@ -98,12 +107,13 @@ Report success or any errors.
 
 Before completing, verify:
 
-- [ ] `/sync-webpage` was run FIRST (Step 1)
-- [ ] `git status` was checked (Step 2)
-- [ ] Commit message follows conventional format (Step 3)
-- [ ] User confirmed before committing (Step 4)
-- [ ] Changes committed (Step 5)
-- [ ] Changes pushed (Step 6)
+- [ ] `git status` was checked (Step 1)
+- [ ] Commit message follows conventional format (Step 2)
+- [ ] User confirmed before committing (Step 3)
+- [ ] Main changes committed (Step 4)
+- [ ] `/sync-webpage` was run AFTER main commit (Step 5)
+- [ ] Changelog update committed if needed (Step 6)
+- [ ] Changes pushed (Step 7)
 
 ---
 
@@ -124,9 +134,10 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 
 ## Rules
 
-- Always run `/sync-webpage` first — this is not optional
 - Always run `git status` before committing
-- Always get user confirmation before committing
+- Always get user confirmation before the main commit
+- Run `/sync-webpage` AFTER the main commit so the changelog includes it
+- Changelog commit is automatic (no confirmation needed)
 - Never force push or use destructive git operations
 - Keep the first line of commit message under 72 characters
 - Include `Co-Authored-By` line when Claude contributed
