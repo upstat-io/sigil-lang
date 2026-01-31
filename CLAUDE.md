@@ -75,7 +75,8 @@ Expression-based language with strict static typing, type inference, mandatory t
 **Traits**: `trait N { @m (self) -> T }` | `@m (self) -> T = default` | `type Item` assoc | `trait C: P` inheritance
 **Impls**: `impl T { @m }` inherent | `impl Trait for T` | `impl<T: B> Trait for C<T>` | `self`/`Self`
 **Default Impls**: `pub def impl Trait { @m }` — stateless, one per trait/module, auto-bound on import, override with `with`
-**Resolution**: Diamond=single impl; Inherent>Trait>Extension; qualified: `Trait.method(v)`; `Type::Trait::Assoc`
+**Extensions**: `extend Type { @m (self) -> T }` | `extend<T: Bound> [T]` | `extend T where T: Bound` | `pub extend` (block-level visibility) | no statics/fields/override
+**Resolution**: Diamond=single impl; Inherent>Trait>Extension; qualified: `Trait.method(v)`; `Type::Trait::Assoc`; extensions: `module.Type.method(v)`
 **Object Safety**: No `Self` return/param (except receiver), no generic methods; safe: `Printable`, `Debug`, `Hashable`; unsafe: `Clone`, `Eq`, `Iterator`
 **Tests**: `@t tests @fn () -> void` | `tests _` floating | `tests @a tests @b` multi | `#skip("r")` | `#compile_fail("e")` | `#fail("e")`
 
@@ -157,7 +158,7 @@ Expression-based language with strict static typing, type inference, mandatory t
 **Module**: `use std.math { sqrt }` | `use std.net.http as http`
 **Private**: `use "./m" { ::internal }` | **Alias**: `{ add as plus }` | **Re-export**: `pub use`
 **Without default**: `use "m" { Trait without def }` — import trait without its `def impl`
-**Extensions**: `extension std.iter.extensions { Iterator.count }` | `extend Iterator { @count (self) = ... }`
+**Extensions**: `extension std.iter.extensions { Iterator.count }` — method-level granularity, no wildcards | `pub extension` for re-export
 
 ## FFI (Foreign Function Interface)
 
