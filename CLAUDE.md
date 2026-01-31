@@ -221,7 +221,7 @@ Expression-based language with strict static typing, type inference, mandatory t
 **Iterator methods**: `.map`, `.filter`, `.fold`, `.find`, `.collect`, `.count`, `.any`, `.all`, `.take`, `.skip`, `.enumerate`, `.zip`, `.chain`, `.flatten`, `.flat_map`, `.cycle`
 **DoubleEnded methods**: `.rev`, `.last`, `.rfind`, `.rfold`
 **Infinite iterators**: `repeat(value:)` → infinite; `(0..).iter()` → infinite range; bound with `.take(count:)` before `.collect()`
-**Into**: `trait<T> { @into (self) -> T }` — `str` impls `Into<Error>`
+**Into**: `trait<T> { @into (self) -> T }` — semantic lossless conversion; explicit `.into()` required (no implicit); standard: str→Error, int→float, Set<T>→[T]; no blanket identity; no auto-chaining
 **Traceable**: `trait { @with_trace (self, entry: TraceEntry) -> Self; @trace (self) -> str; @trace_entries (self) -> [TraceEntry]; @has_trace (self) -> bool }`
 **TraceEntry**: `type = { function: str, file: str, line: int, column: int }` — function includes `@` prefix; entries ordered most recent first
 **Drop**: `trait { @drop (self) -> void }` — custom destructor; runs when refcount reaches zero; cannot be async; panic during unwind aborts
