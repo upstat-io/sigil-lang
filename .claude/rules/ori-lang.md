@@ -1,6 +1,8 @@
 ---
-paths: **ori_lang**
+paths: **/docs/ori_lang/**
 ---
+
+**Fix issues encountered in code you touch. No "pre-existing" exceptions.**
 
 # Ori Documentation Rules
 

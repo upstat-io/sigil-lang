@@ -2,107 +2,67 @@
 
 **TDD for bugs**: Issue found + tests pass → write test for correct behavior (must fail) → fix code → test passes unchanged
 
+**Ori**: Statically-typed expression language. HM inference, ARC memory, capability effects, mandatory tests. Targets LLVM/WASM. Compiler in Rust (Salsa-based).
+
 ---
 
 ## Compiler Coding Guidelines
 
-**Architecture**
-- No upward crate deps (`ori_ir` → `oric` is wrong); direction: `oric` → `ori_typeck/eval` → `ori_parse` → `ori_lexer` → `ori_ir/diagnostic`
-- IO only in CLI (`oric`); core crates are pure
-- No phase bleeding (parser doesn't type-check, lexer doesn't parse)
+**Architecture**: Crate deps: `oric` → `ori_typeck/eval` → `ori_parse` → `ori_lexer` → `ori_ir/diagnostic` (no upward); IO only in CLI (`oric`); no phase bleeding
 
-**Memory**
-- Arena + ID for AST nodes (`ExprArena` + `ExprId`, not `Box<Expr>`)
-- Intern identifiers (`Name` type, not `String`)
-- Newtypes for IDs (`ExprId`, not `u32`; `MethodKey`, not `(String, String)`)
-- No `Arc` cloning in hot paths; `#[cold]` on error factories
+**Memory**: Arena + ID (`ExprArena`+`ExprId`, not `Box<Expr>`); intern identifiers (`Name`, not `String`); newtypes for IDs; no `Arc` cloning in hot paths; `#[cold]` on error factories
 
-**Salsa**
-- Query types: derive `Clone, Eq, PartialEq, Hash, Debug`
-- No `Arc<Mutex<T>>`, function pointers, or `dyn Trait` in queries
-- Queries must be deterministic (no random, time, IO)
-- Accumulate errors, don't bail early
+**Salsa**: Query types derive `Clone, Eq, PartialEq, Hash, Debug`; no `Arc<Mutex<T>>`, fn pointers, or `dyn Trait`; deterministic (no random/time/IO); accumulate errors
 
-**API Design**
-- >3-4 params → config struct
-- No boolean flag parameters
-- RAII guards for context save/restore
-- Return iterators, not `Vec`; push allocations to caller
-- Document all public items
+**API Design**: >3-4 params → config struct; no boolean flags; RAII guards for context; return iterators not `Vec`; document public items
 
-**Dispatch**
-- Enum for fixed sets (built-in patterns): exhaustiveness, static dispatch
-- `dyn Trait` only for user-extensible (user methods)
-- Cost: `&dyn` < `Box<dyn>` < `Arc<dyn>`
+**Dispatch**: Enum for fixed sets (exhaustiveness, static dispatch); `dyn Trait` only for user-extensible; cost: `&dyn` < `Box<dyn>` < `Arc<dyn>`
 
-**Diagnostics**
-- All errors have source spans
-- Imperative suggestions ("try using X" not "Did you mean X?")
-- Verb phrase fixes ("Replace X with Y" not "the replacement")
-- No `panic!` on user errors; accumulate, don't bail
+**Diagnostics**: All errors have spans; imperative suggestions ("try using X"); verb phrase fixes ("Replace X with Y"); no `panic!` on user errors; accumulate
 
-**Testing**
-- Tests verify behavior, not implementation
-- Public functions have tests; edge cases covered
-- Inline tests < 200 lines; longer → separate files
-- TDD for bugs: failing test first
+**Testing**: Verify behavior not implementation; public functions tested with edge cases; inline < 200 lines; TDD for bugs
 
-**Performance**
-- Flag O(n²) in hot paths → O(n) or O(n log n)
-- Hash lookups instead of linear scans
-- No allocation in hot loops
-- Iterators over indexing (eliminates bounds checks)
+**Performance**: O(n²) → O(n) or O(n log n); hash lookups not linear scans; no allocation in hot loops; iterators over indexing
 
-**Style**
-- No `#[allow(clippy)]` without justification comment
-- Functions < 50 lines (target < 30); files have single clear purpose
-- No dead code, commented-out code, or banner comments (`// ====`)
-- Use `//!` module docs and `///` item docs
+**Style**: No `#[allow(clippy)]` without justification; functions < 50 lines (target < 30); no dead/commented code or banners; `//!`/`///` docs
 
-**Match Extraction**
-- No match with 20+ arms in single file
-- Group related arms (calls, collections, wrappers)
-- 3+ similar arms → extract to helper or module
+**Match Extraction**: No 20+ arm match in single file; group related arms; 3+ similar → extract helper
+
+**Continuous Improvement**: Fix issues in code you touch; address dead code, unclear names, duplicated logic, style violations; refactor when patterns emerge; scope to files you're modifying
 
 ---
 
 # Ori — Code That Proves Itself
 
-Expression-based language with strict static typing, type inference, mandatory testing. If it compiles, it has tests; if it has tests, they pass.
+Expression-based, strict static typing, type inference, mandatory testing. Compiles → has tests; has tests → they pass.
 
 ## Commands
 
-**Primary** (includes LLVM): `./test-all`, `./clippy-all`, `./fmt-all`, `./build-all`
+**Primary**: `./test-all`, `./clippy-all`, `./fmt-all`, `./build-all` (includes LLVM)
 **Tests**: `cargo t` (Rust), `cargo st` (Ori), `cargo st tests/spec/path/` (specific), `./llvm-test`
-**Build**: `cargo c` (check), `cargo cl` (clippy), `cargo b`, `cargo fmt`, `./llvm-build`, `./llvm-clippy`
-
+**Build**: `cargo c`/`cl`/`b`/`fmt`, `./llvm-build`, `./llvm-clippy`
 **Always run `./test-all` after compiler changes.**
 
 ## Key Paths
 
-- `compiler/oric/` — Rust compiler (lexer, parser, types, interpreter, LLVM)
-- `docs/ori_lang/0.1-alpha/spec/` — **Formal specification (authoritative)**
-- `docs/ori_lang/proposals/` — Proposals and rationale
-- `library/std/` — Standard library
-- `tests/spec/` — Spec conformance tests
-- `plans/roadmap/` — Compiler roadmap
+`compiler/oric/` — compiler | `docs/ori_lang/0.1-alpha/spec/` — **spec (authoritative)** | `docs/ori_lang/proposals/` — proposals | `library/std/` — stdlib | `tests/spec/` — conformance | `plans/roadmap/` — roadmap
 
 ## Design Pillars
 
-1. **Mandatory Verification**: Every function needs tests; contracts (`pre_check:`/`post_check:`)
-2. **Dependency-Aware Integrity**: Tests in dependency graph; change propagates to callers' tests
+1. **Mandatory Verification**: Functions need tests; contracts (`pre_check:`/`post_check:`)
+2. **Dependency-Aware Integrity**: Tests in dep graph; changes propagate
 3. **Explicit Effects**: Capabilities (`uses Http`); trivial mocking (`with Http = Mock in`)
-4. **ARC-Safe**: No GC/borrow checker; capture by value; no shared mutable refs; see `spec/15-memory-model.md`
+4. **ARC-Safe**: No GC/borrow checker; capture by value; no shared mutable refs
 
 ## Reference Repos (`~/lang_repos/`)
 
-- `rust/` — diagnostics: `rustc_errors/src/{lib,diagnostic,json}.rs`, `rustc_lint_defs/src/lib.rs`
-- `golang/` — errors: `cmd/compile/internal/base/print.go`, `go/types/errors.go`, `internal/types/errors/codes.go`; fixes: `cmd/vendor/.../analysis/{diagnostic,analysis}.go`, `cmd/fix/main.go`
-- `typescript/` — `compiler/{types.ts,diagnosticMessages.json}`, `services/{codeFixProvider,textChanges,types,services}.ts`, `services/codefixes/*.ts`
-- `zig/` — `src/{Compilation,Sema,Type,Value,InternPool,Zcu,main}.zig`
-- `gleam/` — `compiler-core/src/{error,diagnostic,warning,analyse,exhaustiveness}.rs`, `type_/{error,mod}.rs`
-- `elm/` — `compiler/src/Reporting/{Error,Suggest,Doc}.hs`, `Error/{Type,Syntax,Canonicalize}.hs`, `Type/Solve.hs`
-- `roc/` — `crates/reporting/src/{report,error/{type,canonicalize,parse}}.rs`, `compiler/{solve,types,can,constrain,problem}/src/`
+**rust** — `rustc_errors/src/{lib,diagnostic,json}.rs`, `rustc_lint_defs/src/lib.rs`
+**golang** — `cmd/compile/internal/base/print.go`, `go/types/errors.go`, `internal/types/errors/codes.go`, `cmd/vendor/.../analysis/{diagnostic,analysis}.go`
+**typescript** — `compiler/{types.ts,diagnosticMessages.json}`, `services/{codeFixProvider,textChanges,types,services}.ts`, `services/codefixes/*.ts`
+**zig** — `src/{Compilation,Sema,Type,Value,InternPool,Zcu,main}.zig`
+**gleam** — `compiler-core/src/{error,diagnostic,warning,analyse,exhaustiveness}.rs`, `type_/{error,mod}.rs`
+**elm** — `compiler/src/Reporting/{Error,Suggest,Doc}.hs`, `Error/{Type,Syntax,Canonicalize}.hs`, `Type/Solve.hs`
+**roc** — `crates/reporting/src/{report,error/{type,canonicalize,parse}}.rs`, `compiler/{solve,types,can,constrain,problem}/src/`
 
 ## CLI
 
@@ -110,17 +70,12 @@ Expression-based language with strict static typing, type inference, mandatory t
 
 ## Files & Tests
 
-- `.ori` source, `.test.ori` in `_test/` subdirectory
-- Attached: `@test tests @target () -> void = run(...)` — runs on target/caller changes
-- Floating: `@test tests _ () -> void = run(...)` — runs only via `ori test`
-- Private access via `::` prefix; every function (except `@main`) requires tests
-- Bug fix = failing test first (TDD): write test for correct behavior, verify failure, fix code, test passes unchanged
+`.ori` source, `.test.ori` in `_test/` | Attached: `@test tests @target () -> void` (runs on target/caller changes) | Floating: `tests _` (runs via `ori test`) | Private: `::` prefix | Every function (except `@main`) requires tests
 
 ## Entry Points
 
-- `@main () -> void` | `@main () -> int` | `@main (args: [str]) -> void` | `@main (args: [str]) -> int`
-- `args` excludes program name
-- `@panic (info: PanicInfo) -> void` — optional handler for logging/cleanup before panic termination; `print()` inside writes to stderr; first panic wins in concurrent context; re-panic = immediate termination
+`@main () -> void` | `() -> int` | `(args: [str]) -> void` | `(args: [str]) -> int` — `args` excludes program name
+`@panic (info: PanicInfo) -> void` — optional handler; `print()` → stderr; first panic wins; re-panic = immediate termination
 
 ---
 
@@ -133,81 +88,71 @@ Expression-based language with strict static typing, type inference, mandatory t
 **Functions**: `@name (p: T) -> R = expr` | `pub @name` | `@name<T>` | `@name<T: Trait>` | `@name<T: A + B>` | `where T: Clone` | `uses Capability` | `(x: int = 10)` defaults
 **Clauses**: `@f (0: int) -> int = 1` then `@f (n) = n * f(n-1)` | `if guard` | exhaustive, top-to-bottom
 **Constants**: `let $name = value` | `pub let $name` | module-level must be `$`
-**Const Functions**: `$name (p: T) -> R = expr` — pure, comptime with const args, limits: 1M steps/1000 depth/100MB/10s
+**Const Functions**: `$name (p: T) -> R = expr` — pure, comptime, limits: 1M steps/1000 depth/100MB/10s
 **Types**: `type N = { f: T }` struct | `A | B | C(f: T)` sum | `type N = Existing` newtype | `type N<T>` | `#derive(Eq)` | `pub type`
-**Newtypes**: `type UserId = int` | construct: `UserId(42)` | access underlying: `.inner` (always public) | no trait/method inheritance | `#derive(Eq, Clone)` required | zero runtime cost
-**Traits**: `trait N { @m (self) -> T }` | `@m (self) -> T = default` | `type Item` assoc | `type Output = Self` default assoc type | `trait C: P` inheritance | `@m () -> Self` assoc fn | `trait N<T = Self>` default type param (defaults must follow non-defaults)
+**Newtypes**: `type UserId = int` | construct: `UserId(42)` | `.inner` (always public) | no trait/method inheritance | `#derive(Eq, Clone)` required | zero cost
+**Traits**: `trait N { @m (self) -> T }` | `@m (self) -> T = default` | `type Item` assoc | `type Output = Self` default | `trait C: P` | `@m () -> Self` assoc fn | `trait N<T = Self>` default type param
 **Impls**: `impl T { @m }` inherent | `impl Trait for T` | `impl<T: B> Trait for C<T>` | `self`/`Self`
-**Associated Functions**: `impl T { @new () -> T = ... }` — methods without `self` | call: `Type.method()` | `Self` allowed in return | generics: `Option<int>.some(v:)`
-**Default Impls**: `pub def impl Trait { @m }` — stateless, one per trait/module, auto-bound on import, override with `with`
-**Extensions**: `extend Type { @m (self) -> T }` | `extend<T: Bound> [T]` | `extend T where T: Bound` | `pub extend` (block-level visibility) | no statics/fields/override
-**Resolution**: Diamond=single impl; Inherent>Trait>Extension; qualified: `Trait.method(v)`; `Type::Trait::Assoc`; extensions: `module.Type.method(v)`
+**Associated Functions**: `impl T { @new () -> T }` — no `self` | call: `Type.method()` | `Self` in return | generics: `Option<int>.some(v:)`
+**Default Impls**: `pub def impl Trait { @m }` — stateless, one per trait/module, auto-bound, override with `with`
+**Extensions**: `extend Type { @m (self) -> T }` | `extend<T: Bound> [T]` | `extend T where T: Bound` | `pub extend` | no statics/fields/override
+**Resolution**: Diamond=single impl; Inherent>Trait>Extension; qualified: `Trait.method(v)`, `Type::Trait::Assoc`; extensions: `module.Type.method(v)`
 **Object Safety**: No `Self` return/param (except receiver), no generic methods; safe: `Printable`, `Debug`, `Hashable`; unsafe: `Clone`, `Eq`, `Iterator`
 **Tests**: `@t tests @fn () -> void` | `tests _` floating | `tests @a tests @b` multi | `#skip("r")` | `#compile_fail("e")` | `#fail("e")`
 
 ## Conditional Compilation
 
-**Target**: `#target(os: "linux")` | `arch: "x86_64"` | `family: "unix"` | `any_os: [...]` | `not_os:` | file-level: `#!target(...)`
-**Config**: `#cfg(debug)` | `release` | `feature: "ssl"` | `any_feature:` | `not_debug` | `not_feature:`
+**Target**: `#target(os: "linux")` | `arch:` | `family:` | `any_os:` | `not_os:` | file-level: `#!target(...)`
+**Config**: `#cfg(debug)` | `release` | `feature:` | `any_feature:` | `not_debug` | `not_feature:`
 **Constants**: `$target_os`, `$target_arch`, `$target_family`, `$debug`, `$release` — false branch not type-checked
 
 ## Types
 
 **Primitives**: `int` (i64), `float` (f64), `bool`, `str` (UTF-8), `char`, `byte`, `void`, `Never`
-**Special**: `Duration` (`100ns`, `50us`, `100ms`, `30s`, `5m`, `2h`), `Size` (`100b`, `4kb`, `10mb`, `2gb`, `1tb`)
-**Collections**: `[T]` list, `[T, max N]` fixed-capacity list, `{K: V}` map, `Set<T>`
+**Special**: `Duration` (`100ns`/`us`/`ms`/`s`/`m`/`h`), `Size` (`100b`/`kb`/`mb`/`gb`/`tb`)
+**Collections**: `[T]` list, `[T, max N]` fixed-capacity, `{K: V}` map, `Set<T>`
 **Compound**: `(T, U)` tuple, `()` unit, `(T) -> U` fn, `Trait` object
 **Generic**: `Option<T>`, `Result<T, E>`, `Range<T>`, `Ordering`
-**Const Generics**: `$N: int` const param | `@f<T, $N: int>` | `type Buffer<$N: int>` | `$B: bool` | `where N > 0` | `where N > 0 && N <= 100` | `where A || B`
-**Const Bounds**: comparison (`==`, `!=`, `<`, `<=`, `>`, `>=`), logical (`&&`, `||`, `!`), arithmetic (`+`, `-`, `*`, `/`, `%`), bitwise (`&`, `|`, `^`, `<<`, `>>`) | multiple `where` = AND | caller must imply callee bounds
+**Const Generics**: `$N: int` | `@f<T, $N: int>` | `$B: bool` | `where N > 0` | `where N > 0 && N <= 100`
+**Const Bounds**: comparison (`==`/`!=`/`<`/`<=`/`>`/`>=`), logical (`&&`/`||`/`!`), arithmetic (`+`/`-`/`*`/`/`/`%`), bitwise (`&`/`|`/`^`/`<<`/`>>`) | multiple `where` = AND
 **Channels**: `Producer<T>`, `Consumer<T>`, `CloneableProducer<T>`, `CloneableConsumer<T>` (`T: Sendable`)
 **Concurrency**: `Nursery`, `NurseryErrorMode` (`CancelRemaining | CollectAll | FailFast`)
-**FFI**: `CPtr` (C opaque pointer), `JsValue` (JS object handle), `JsPromise<T>` (JS async)
-**Rules**: No implicit conversions; overflow panics; `str[i]` returns single-codepoint `str`
+**FFI**: `CPtr` (C opaque), `JsValue` (JS handle), `JsPromise<T>` (JS async)
+**Rules**: No implicit conversions; overflow panics; `str[i]` → single-codepoint `str`
 
-### Duration
+### Duration & Size
 
-64-bit nanoseconds; suffixes: `ns`, `us`, `ms`, `s`, `m`, `h`; no float prefix (`1500ms` not `1.5s`)
-**Arithmetic**: `+`, `-`, `*`, `/`, `%` (Duration % Duration → Duration), unary `-`; overflow panics
-**Methods**: `.nanoseconds()`, `.microseconds()`, `.milliseconds()`, `.seconds()`, `.minutes()`, `.hours()` → `int` (truncated)
-**Factory**: `Duration.from_nanoseconds(ns:)`, `.from_microseconds(us:)`, `.from_milliseconds(ms:)`, `.from_seconds(s:)`, `.from_minutes(m:)`, `.from_hours(h:)` → `Duration`
-**Traits**: `Eq`, `Comparable`, `Hashable`, `Clone`, `Debug`, `Printable`, `Default` (`0ns`), `Sendable`
-
-### Size
-
-64-bit bytes (non-negative); suffixes: `b`, `kb`, `mb`, `gb`, `tb`; binary units (1024-based)
-**Arithmetic**: `+`, `-`, `*`, `/`, `%` (Size % Size → Size); subtraction panics if negative; unary `-` is compile error
-**Methods**: `.bytes()`, `.kilobytes()`, `.megabytes()`, `.gigabytes()`, `.terabytes()` → `int` (truncated)
-**Factory**: `Size.from_bytes(b:)`, `.from_kilobytes(kb:)`, `.from_megabytes(mb:)`, `.from_gigabytes(gb:)`, `.from_terabytes(tb:)` → `Size`
-**Traits**: `Eq`, `Comparable`, `Hashable`, `Clone`, `Debug`, `Printable`, `Default` (`0b`), `Sendable`
+**Duration**: 64-bit nanoseconds; suffixes `ns`/`us`/`ms`/`s`/`m`/`h`; no float prefix (`1500ms` not `1.5s`)
+**Size**: 64-bit bytes (non-negative); suffixes `b`/`kb`/`mb`/`gb`/`tb`; binary units (1024-based)
+**Arithmetic**: `+`/`-`/`*`/`/`/`%`, unary `-` (Duration only; Size `-` panics if negative, unary `-` = compile error)
+**Methods**: `.nanoseconds()`/`.microseconds()`/`.milliseconds()`/`.seconds()`/`.minutes()`/`.hours()` | `.bytes()`/`.kilobytes()`/`.megabytes()`/`.gigabytes()`/`.terabytes()` → `int`
+**Factory**: `Duration.from_nanoseconds(ns:)`... | `Size.from_bytes(b:)`...
+**Traits**: `Eq`, `Comparable`, `Hashable`, `Clone`, `Debug`, `Printable`, `Default` (`0ns`/`0b`), `Sendable`
 
 ### Never
 
-Bottom type (uninhabited); represents computations that never complete normally.
-**Coercion**: `Never` coerces to any type `T`
+Bottom type (uninhabited); coerces to any `T`
 **Producers**: `panic(msg:)`, `todo()`, `unreachable()`, `break`, `continue`, `expr?` on Err/None, infinite `loop`
 **Generics**: `Result<Never, E>` = always Err | `Result<T, Never>` = always Ok | `Option<Never>` = always None
-**Restrictions**: Cannot be struct field; may be sum type variant payload (variant is unconstructable)
+**Restrictions**: Cannot be struct field; may be sum variant payload (unconstructable)
 
 ### Fixed-Capacity Lists
 
-`[T, max N]` — inline-allocated list with compile-time max capacity N, dynamic length 0 to N
-**Subtype**: `[T, max N] <: [T]` — can pass to functions expecting `[T]`; capacity limits retained
-**Methods**: `.capacity()`, `.is_full()`, `.remaining()`, `.push()` (panics if full), `.try_push()` → `bool`, `.push_or_drop()`, `.push_or_oldest()` (FIFO), `.to_dynamic()` → `[T]`
-**Conversion**: `list.to_fixed<$N: int>()` panics if too large | `list.try_to_fixed<$N: int>()` → `Option`
+`[T, max N]` — inline-allocated, compile-time max N, dynamic length 0..N | `[T, max N] <: [T]`
+**Methods**: `.capacity()`, `.is_full()`, `.remaining()`, `.push()` (panics), `.try_push()` → `bool`, `.push_or_drop()`, `.push_or_oldest()`, `.to_dynamic()`
+**Conversion**: `.to_fixed<$N>()` panics | `.try_to_fixed<$N>()` → `Option`
 
 ## Literals
 
-`42`, `1_000_000`, `0xFF` | `3.14`, `2.5e-8` | `"hello"` (escapes: `\\\"\n\t\r\0`) | `` `{name}` `` template | `'a'` char | `true`/`false` | `100ns`, `50us`, `100ms`, `30s`, `5m`, `2h` | `100b`, `4kb`, `10mb`, `2gb`, `1tb` | `[1, 2]`, `[...a, ...b]` | `{key: v}` or `{"key": v}` (literal str key), `{[expr]: v}` (computed key), `{...a, ...b}` | `Point { x, y }`, `{ ...p, x: 10 }`
+`42`, `1_000_000`, `0xFF` | `3.14`, `2.5e-8` | `"hello"` (escapes: `\\\"\n\t\r\0`) | `` `{name}` `` | `'a'` | `true`/`false` | duration/size literals | `[1, 2]`, `[...a, ...b]` | `{key: v}`, `{"key": v}`, `{[expr]: v}`, `{...a, ...b}` | `Point { x, y }`, `{ ...p, x: 10 }`
 
 ## Operators (precedence high→low)
 
 1. `.` `[]` `()` `?` — 2. `!` `-` `~` — 3. `*` `/` `%` `div` — 4. `+` `-` — 5. `<<` `>>` — 6. `..` `..=` `by` — 7. `<` `>` `<=` `>=` — 8. `==` `!=` — 9. `&` — 10. `^` — 11. `|` — 12. `&&` — 13. `||` — 14. `??`
 
-**Unary**: `!` (bool only), `-` (int/float/Duration, not Size), `~` (int/byte)
-**Bitwise**: `&` `|` `^` work on int or byte (not mixed); `<<` `>>` take int or byte on left, int shift count
-**Shift overflow**: negative count panics; count ≥ bit width panics; `1 << 63` panics (result doesn't fit signed int)
-**No operator overloading**: operators have fixed meanings for built-in types only; user types use methods
+**Unary**: `!` (Not), `-` (Neg), `~` (BitNot) | **Bitwise**: `&`/`|`/`^` (BitAnd/Or/Xor), `<<`/`>>` (Shl/Shr)
+**Shift overflow**: negative count panics; count ≥ bit width panics; `1 << 63` panics
+**Operator traits**: desugar to trait methods; user types implement for operator support
 
 ## Expressions
 
@@ -216,97 +161,89 @@ Bottom type (uninhabited); represents computations that never complete normally.
 **Indexing**: `list[0]`, `list[# - 1]` (`#`=length, panics OOB) | `map["k"]` → `Option<V>`
 **Access**: `v.field`, `v.method(arg: v)` — named args required except: fn variables, single-param with inline lambda
 **Lambdas**: `x -> x + 1` | `(a, b) -> a + b` | `() -> 42` | `(x: int) -> int = x * 2` — capture by value
-**Ranges**: `0..10` excl | `0..=10` incl | `0..10 by 2` step | descending: `10..0 by -1` | infinite: `0..` (ascending), `0.. by -1` (descending) | int only
-**Loops**: `for i in items do e` | `for x in items yield x * 2` | `for x in items if g yield x` | `for x in xs for y in ys yield (x, y)` nested | `loop(e)` + `break`/`continue` | `break value` | `continue value`
-**Yield control**: in `for...yield`: `continue` skips | `continue value` substitutes | `break` stops | `break value` adds final | `{K: V}` collects from `(K, V)` tuples
-**Labels**: `loop:name(...)` | `for:name` | `break:name` | `continue:name` | no shadowing | `continue:name value` in yield contributes to outer (inner discarded) | `continue:name value` in do = error
+**Ranges**: `0..10` excl | `0..=10` incl | `0..10 by 2` | descending: `10..0 by -1` | infinite: `0..`, `0.. by -1` | int only
+**Loops**: `for i in items do e` | `for x in items yield x * 2` | `for x in items if g yield x` | nested `for` | `loop(e)` + `break`/`continue` | `break value` | `continue value`
+**Yield control**: `continue` skips | `continue value` substitutes | `break` stops | `break value` adds final | `{K: V}` from `(K, V)` tuples
+**Labels**: `loop:name` | `for:name` | `break:name` | `continue:name` | no shadowing | `continue:name value` in yield → outer
 **Spread**: `[...a, ...b]` | `{...a, ...b}` | `P { ...orig, x: 10 }` — later wins, literal contexts only
 
 ## Patterns (compiler constructs)
 
-**function_seq**: `run(let x = a, result)` | `run(pre_check: c, body, post_check: r -> c)` | `try(let x = f()?, Ok(x))` | `match(v, P -> e, _ -> d)`
-**function_exp**: `recurse(condition:, base:, step: self(...), memo:, parallel:)` | `parallel(tasks:, max_concurrent:, timeout:)` → `[Result]` | `spawn(tasks:, max_concurrent:)` → `void` | `timeout(op:, after:)` | `cache(key:, op:, ttl:)` | `with(acquire:, use: r ->, release: r ->)` | `for(over:, match:, default:)` | `catch(expr:)` → `Result<T, str>` | `nursery(body: n ->, on_error:, timeout:)`
-**Channels**: `channel<T>(buffer:)` → `(Producer, Consumer)` | `channel_in` fan-in | `channel_out` fan-out | `channel_all` many-many
+**function_seq**: `run(let x = a, result)` | `run(pre_check:, body, post_check:)` | `try(let x = f()?, Ok(x))` | `match(v, P -> e, _ -> d)`
+**function_exp**: `recurse(condition:, base:, step:, memo:, parallel:)` | `parallel(tasks:, max_concurrent:, timeout:)` → `[Result]` | `spawn(tasks:, max_concurrent:)` → `void` | `timeout(op:, after:)` | `cache(key:, op:, ttl:)` | `with(acquire:, use:, release:)` | `for(over:, match:, default:)` | `catch(expr:)` → `Result<T, str>` | `nursery(body:, on_error:, timeout:)`
+**Channels**: `channel<T>(buffer:)` → `(Producer, Consumer)` | `channel_in` | `channel_out` | `channel_all`
 **Conversions**: `42 as float` infallible | `"42" as? int` fallible → `Option`
-**Match patterns**: literal | `x` binding | `_` | `Some(x)` | `{ x, y }` | `[a, ..rest]` | `1..10` | `A | B` | `x @ pat` | `x.match(guard)`
-**Exhaustiveness**: match must be exhaustive; guards require catch-all `_`; `let` binding patterns must be irrefutable
+**Match patterns**: literal | `x` | `_` | `Some(x)` | `{ x, y }` | `[a, ..rest]` | `1..10` | `A | B` | `x @ pat` | `x.match(guard)`
+**Exhaustiveness**: match exhaustive; guards need `_`; `let` patterns irrefutable
 
 ## Imports
 
 **Relative**: `use "./math" { add }` | `"../utils"` | `"./http/client"`
 **Module**: `use std.math { sqrt }` | `use std.net.http as http`
 **Private**: `use "./m" { ::internal }` | **Alias**: `{ add as plus }` | **Re-export**: `pub use`
-**Without default**: `use "m" { Trait without def }` — import trait without its `def impl`
-**Extensions**: `extension std.iter.extensions { Iterator.count }` — method-level granularity, no wildcards | `pub extension` for re-export
+**Without default**: `use "m" { Trait without def }` — import without `def impl`
+**Extensions**: `extension std.iter.extensions { Iterator.count }` — method-level, no wildcards | `pub extension`
 
-## FFI (Foreign Function Interface)
+## FFI
 
-**Native (C ABI)**: `extern "c" from "m" { @_sin (x: float) -> float as "sin" }` | `from "lib"` specifies library | `as "name"` maps C name
-**JavaScript (WASM)**: `extern "js" { @_sin (x: float) -> float as "Math.sin" }` | `extern "js" from "./utils.js"` for modules
-**FFI Types**: `CPtr` opaque pointer | `Option<CPtr>` nullable | `JsValue` JS object handle | `JsPromise<T>` async JS
-**C Types**: `c_char`, `c_short`, `c_int`, `c_long`, `c_longlong`, `c_float`, `c_double`, `c_size` — platform-specific sizes
-**Struct Layout**: `#repr("c") type T = { ... }` — C-compatible memory layout
-**Unsafe**: `unsafe { ptr_read(...) }` — operations Ori cannot verify
-**Capability**: `uses FFI` — required for all foreign function calls
-**Async WASM**: `JsPromise<T>` implicitly resolved at binding sites in async context (no `await` keyword)
-**Compile Error**: `compile_error("message")` — compile-time error for platform availability
+**Native (C)**: `extern "c" from "lib" { @_sin (x: float) -> float as "sin" }` | `from` specifies library | `as` maps name
+**JavaScript**: `extern "js" { @_sin (x: float) -> float as "Math.sin" }` | `extern "js" from "./utils.js"`
+**Types**: `CPtr` opaque | `Option<CPtr>` nullable | `JsValue` handle | `JsPromise<T>` async
+**C Types**: `c_char`, `c_short`, `c_int`, `c_long`, `c_longlong`, `c_float`, `c_double`, `c_size`
+**Layout**: `#repr("c") type T = { ... }` | **Unsafe**: `unsafe { ptr_read(...) }` | **Capability**: `uses FFI`
+**Async WASM**: `JsPromise<T>` implicitly resolved at binding sites | **Compile Error**: `compile_error("msg")`
 
 ## Capabilities
 
 **Declare**: `@f (...) -> T uses Http = ...` | `uses FileSystem, Suspend`
 **Provide**: `with Http = RealHttp { } in expr` | `with Http = mock, Cache = mock in expr`
 **Resolution**: with...in > imported `def impl` > module-local `def impl`
-**Suspend**: `uses Suspend` = may suspend; no `uses` = sync; no `.await`; concurrency via `parallel(...)`
-**Standard**: `Http`, `FileSystem`, `Clock`, `Random`, `Crypto`, `Cache`, `Print` (has default), `Logger`, `Env`, `Intrinsics`, `Suspend`, `FFI`
-**Intrinsics**: `uses Intrinsics` for SIMD/bit ops; `Intrinsics.simd_add_f32x4(a:, b:)`, `count_ones(value:)`, `cpu_has_feature(feature:)`
+**Suspend**: `uses Suspend` = may suspend; no `uses` = sync; concurrency via `parallel(...)`
+**Standard**: `Http`, `FileSystem`, `Clock`, `Random`, `Crypto`, `Cache`, `Print` (default), `Logger`, `Env`, `Intrinsics`, `Suspend`, `FFI`
+**Intrinsics**: SIMD/bit ops; `Intrinsics.simd_add_f32x4(a:, b:)`, `count_ones(value:)`, `cpu_has_feature(feature:)`
 
 ## Comments
 
-`// comment` — own line only, no inline | Doc: `// Desc` | `// * name:` | `// ! Error:` | `// > expr -> result`
+`// comment` — own line only | Doc: `// Desc` | `// * name:` | `// ! Error:` | `// > expr -> result`
 
-## Formatting (enforced)
+## Formatting
 
-- 4 spaces, 100 char limit, trailing commas on multi-line only
-- Space around: binary ops, arrows, after colons/commas, after `pub`, inside struct braces `{ }`, around `as`/`by`/`|`, around `=` in default type params (`<T = Self>`)
-- No space: inside parens/brackets, around `.`/`..`/`?`, empty delimiters
-- Width-based breaking: inline ≤100, else break; `run`/`try`/`match`/`recurse`/`parallel`/`spawn`/`nursery` always stacked
-- Breaking: params/args/generics/where/fields/variants one-per-line; lists wrap (simple) or one-per-line (complex); chains break each `.method()`; binary break before op; conditionals: `if...then` together, `else` newline
+4 spaces, 100 char limit, trailing commas multi-line only | Space around: binary ops, arrows, colons/commas, `pub`, struct braces, `as`/`by`/`|`, `=` in `<T = Self>` | No space: parens/brackets, `.`/`..`/`?`, empty delimiters | Break at 100; `run`/`try`/`match`/`recurse`/`parallel`/`spawn`/`nursery` always stacked | Params/args/generics/where/fields/variants one-per-line; chains break at `.method()`; binary break before op; `if...then` together, `else` newline
 
 ## Keywords
 
 **Reserved**: `break continue def do else extern false for if impl in let loop match pub self Self suspend then trait true type unsafe use uses void where with yield`
 **Context-sensitive**: `by cache catch for max parallel recurse run spawn timeout try with without`
-**Built-in names** (call position only): `int float str byte len is_empty is_some is_none is_ok is_err assert assert_eq assert_ne assert_some assert_none assert_ok assert_err assert_panics assert_panics_with compare min max print panic todo unreachable dbg compile_error`
+**Built-in names**: `int float str byte len is_empty is_some is_none is_ok is_err assert assert_eq assert_ne assert_some assert_none assert_ok assert_err assert_panics assert_panics_with compare min max print panic todo unreachable dbg compile_error`
 
 ## Prelude
 
 **Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `TraceEntry`, `Ordering`, `PanicInfo`, `CancellationError`, `CancellationReason`, `FormatSpec`, `Alignment`, `Sign`, `FormatType`
 **Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Formattable`, `Debug`, `Clone`, `Default`, `Drop`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`, `Index`
 
-**Built-ins**: `print(msg:)`, `len(collection:)`, `is_empty(collection:)`, `is_some/is_none(option:)`, `is_ok/is_err(result:)`, `assert(condition:)`, `assert_eq(actual:, expected:)`, `assert_ne(actual:, unexpected:)`, `assert_some/none/ok/err(...)`, `assert_panics(f:)`, `assert_panics_with(f:, msg:)`, `panic(msg:)` → `Never`, `todo()`, `todo(reason:)` → `Never`, `unreachable()`, `unreachable(reason:)` → `Never`, `dbg(value:)`, `dbg(value:, label:)` → `T`, `compare(left:, right:)` → `Ordering`, `min/max(left:, right:)`, `hash_combine(seed:, value:)` → `int`, `repeat(value:)` → infinite iter, `is_cancelled()` → `bool`, `compile_error(msg:)` → compile-time error, `drop_early(value:)` → `void`
+**Built-ins**: `print(msg:)`, `len(collection:)`, `is_empty(collection:)`, `is_some/is_none(option:)`, `is_ok/is_err(result:)`, `assert(condition:)`, `assert_eq(actual:, expected:)`, `assert_ne(actual:, unexpected:)`, `assert_some/none/ok/err(...)`, `assert_panics(f:)`, `assert_panics_with(f:, msg:)`, `panic(msg:)`→`Never`, `todo()`/`todo(reason:)`→`Never`, `unreachable()`/`unreachable(reason:)`→`Never`, `dbg(value:)`/`dbg(value:, label:)`→`T`, `compare(left:, right:)`→`Ordering`, `min/max(left:, right:)`, `hash_combine(seed:, value:)`→`int`, `repeat(value:)`→iter, `is_cancelled()`→`bool`, `compile_error(msg:)`, `drop_early(value:)`
 
 **Option**: `.map(transform:)`, `.unwrap_or(default:)`, `.ok_or(error:)`, `.and_then(transform:)`, `.filter(predicate:)`
-**Result**: `.map(transform:)`, `.map_err(transform:)`, `.unwrap_or(default:)`, `.ok()`, `.err()`, `.and_then(transform:)`, `.context(msg:)`, `.trace()` → `str`, `.trace_entries()` → `[TraceEntry]`, `.has_trace()` → `bool`
-**Error**: `.trace()` → `str`, `.trace_entries()` → `[TraceEntry]`, `.has_trace()` → `bool`
-**Ordering**: `type = Less | Equal | Greater` — `.is_less()`, `.is_equal()`, `.is_greater()`, `.is_less_or_equal()`, `.is_greater_or_equal()`, `.reverse()`, `.then(other:)`, `.then_with(f:)`; default `Equal`; order `Less < Equal < Greater`; implements Eq, Comparable, Clone, Debug, Printable, Hashable, Default
+**Result**: `.map(transform:)`, `.map_err(transform:)`, `.unwrap_or(default:)`, `.ok()`, `.err()`, `.and_then(transform:)`, `.context(msg:)`, `.trace()`→`str`, `.trace_entries()`→`[TraceEntry]`, `.has_trace()`
+**Error**: `.trace()`, `.trace_entries()`, `.has_trace()`
+**Ordering**: `Less | Equal | Greater` — `.is_less/equal/greater()`, `.is_less_or_equal/greater_or_equal()`, `.reverse()`, `.then(other:)`, `.then_with(f:)`; default `Equal`; order `Less < Equal < Greater`; impls Eq, Comparable, Clone, Debug, Printable, Hashable, Default
 
-**Printable**: `trait { @to_str (self) -> str }` — required for `` `{x}` ``; all primitives impl
-**Formattable**: `trait { @format (self, spec: FormatSpec) -> str }` — blanket impl for Printable; spec: `[[fill]align][sign][#][0][width][.precision][type]`; align: `<>^`; sign: `+ - ` (space); types: `bxXoeEf%`; `#` adds 0b/0o/0x prefix; `0` zero-pads
-**Debug**: `trait { @debug (self) -> str }` — shows escaped strings, derivable, internal structure
-**Clone**: `trait { @clone (self) -> Self }` — all primitives/collections impl when elements do, derivable
-**Iterator**: `trait { type Item; @next (self) -> (Option<Self.Item>, Self) }` — fused guarantee; copy elision when rebound; lazy evaluation
+**Printable**: `@to_str (self) -> str` — required for `` `{x}` ``; all primitives impl
+**Formattable**: `@format (self, spec: FormatSpec) -> str` — blanket for Printable; spec: `[[fill]align][sign][#][0][width][.precision][type]`; align `<>^`; sign `+ - `; types `bxXoeEf%`; `#` prefix; `0` pads
+**Debug**: `@debug (self) -> str` — escaped strings, derivable | **Clone**: `@clone (self) -> Self` — all primitives/collections, derivable
+**Iterator**: `type Item; @next (self) -> (Option<Self.Item>, Self)` — fused, copy elision, lazy
 **DoubleEndedIterator**: `trait: Iterator { @next_back (self) -> (Option<Self.Item>, Self) }`
-**Iterable**: `trait { type Item; @iter (self) -> impl Iterator }`
-**Collect**: `trait<T> { @from_iter (iter: impl Iterator) -> Self }`
+**Iterable**: `type Item; @iter (self) -> impl Iterator` | **Collect**: `@from_iter (iter: impl Iterator) -> Self`
 **Iterator methods**: `.map`, `.filter`, `.fold`, `.find`, `.collect`, `.count`, `.any`, `.all`, `.take`, `.skip`, `.enumerate`, `.zip`, `.chain`, `.flatten`, `.flat_map`, `.cycle`
 **DoubleEnded methods**: `.rev`, `.last`, `.rfind`, `.rfold`
-**Infinite iterators**: `repeat(value:)` → infinite; `(0..).iter()` → infinite range; bound with `.take(count:)` before `.collect()`
-**Into**: `trait<T> { @into (self) -> T }` — semantic lossless conversion; explicit `.into()` required (no implicit); standard: str→Error, int→float, Set<T>→[T]; no blanket identity; no auto-chaining
-**Traceable**: `trait { @with_trace (self, entry: TraceEntry) -> Self; @trace (self) -> str; @trace_entries (self) -> [TraceEntry]; @has_trace (self) -> bool }`
-**TraceEntry**: `type = { function: str, file: str, line: int, column: int }` — function includes `@` prefix; entries ordered most recent first
-**PanicInfo**: `type = { message: str, location: TraceEntry, stack_trace: [TraceEntry], thread_id: Option<int> }` — used by `@panic` handler
-**Drop**: `trait { @drop (self) -> void }` — custom destructor; runs when refcount reaches zero; cannot be async; panic during unwind aborts
-**Index**: `trait<Key, Value> { @index (self, key: Key) -> Value }` — `x[k]` → `x.index(key: k)`; return `T` (panics), `Option<T>`, or `Result<T, E>`; `#` shorthand built-in only
-**Eq**: `trait { @equals (self, other: Self) -> bool }` — reflexive, symmetric, transitive; derives `==`/`!=` operators; all primitives impl
-**Comparable**: `trait: Eq { @compare (self, other: Self) -> Ordering }` — total ordering; derives `<`/`<=`/`>`/`>=` operators; IEEE 754 for floats (NaN > all); `None < Some`; `Ok < Err`
-**Hashable**: `trait: Eq { @hash (self) -> int }` — if `a == b` then `a.hash() == b.hash()`; all primitives impl; +0.0/-0.0 same hash; use `hash_combine` for custom impls
+**Infinite**: `repeat(value:)`, `(0..).iter()` — bound with `.take(count:)` before `.collect()`
+**Into**: `@into (self) -> T` — lossless, explicit `.into()`, standard: str→Error, int→float, Set<T>→[T]; no identity/chaining
+**Traceable**: `@with_trace`, `@trace`→`str`, `@trace_entries`→`[TraceEntry]`, `@has_trace`
+**TraceEntry**: `{ function, file, line, column: int }` — `@` prefix; most recent first
+**PanicInfo**: `{ message, location: TraceEntry, stack_trace: [TraceEntry], thread_id: Option<int> }`
+**Drop**: `@drop (self) -> void` — refcount zero; not async; panic during unwind aborts
+**Index**: `@index (self, key: Key) -> Value` — `x[k]`→`x.index(key: k)`; return `T`/`Option<T>`/`Result<T, E>`; `#` built-in only
+**Eq**: `@equals (self, other: Self) -> bool` — reflexive/symmetric/transitive; derives `==`/`!=`
+**Comparable**: `trait: Eq { @compare (self, other: Self) -> Ordering }` — total order; derives `<`/`<=`/`>`/`>=`; NaN > all; `None < Some`; `Ok < Err`
+**Hashable**: `trait: Eq { @hash (self) -> int }` — `a == b` ⇒ same hash; +0.0/-0.0 same; use `hash_combine`
+**Operator traits**: `Add`/`Sub`/`Mul`/`Div`/`FloorDiv`/`Rem<Rhs = Self>` — binary; `Neg`/`Not`/`BitNot` — unary; `BitAnd`/`BitOr`/`BitXor<Rhs = Self>`, `Shl`/`Shr<Rhs = int>` — bitwise; all default `type Output = Self`

@@ -1,6 +1,8 @@
 ---
-paths: **ori_ir
+paths: **/ori_ir/**
 ---
+
+**Fix issues encountered in code you touch. No "pre-existing" exceptions.**
 
 # IR (AST)
 

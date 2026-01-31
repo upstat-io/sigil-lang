@@ -1,6 +1,8 @@
 ---
-paths: **patterns
+paths: **/patterns/**
 ---
+
+**Fix issues encountered in code you touch. No "pre-existing" exceptions.**
 
 # Pattern System
 

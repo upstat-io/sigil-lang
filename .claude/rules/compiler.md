@@ -1,6 +1,8 @@
 ---
-paths: **compiler**
+paths: **/compiler/**
 ---
+
+**Fix issues encountered in code you touch. No "pre-existing" exceptions.**
 
 # Compiler Development
 

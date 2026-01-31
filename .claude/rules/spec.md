@@ -1,6 +1,8 @@
 ---
-paths: **spec**
+paths: **/spec/**
 ---
+
+**Fix issues encountered in code you touch. No "pre-existing" exceptions.**
 
 # Ori Language Specification
 

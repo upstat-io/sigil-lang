@@ -1,6 +1,8 @@
 ---
-paths: **eval
+paths: **/eval/**
 ---
+
+**Fix issues encountered in code you touch. No "pre-existing" exceptions.**
 
 # Interpreter
 

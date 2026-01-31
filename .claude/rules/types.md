@@ -1,6 +1,8 @@
 ---
-paths: **ori_types
+paths: **/ori_types/**
 ---
+
+**Fix issues encountered in code you touch. No "pre-existing" exceptions.**
 
 # Type System
 

@@ -1,6 +1,8 @@
 ---
-paths: **typeck
+paths: **/typeck/**
 ---
+
+**Fix issues encountered in code you touch. No "pre-existing" exceptions.**
 
 # Type Checking
 

@@ -1,6 +1,8 @@
 ---
-paths: **tests**
+paths: **/tests/**
 ---
+
+**Fix issues encountered in code you touch. No "pre-existing" exceptions.**
 
 # Specification Tests
 

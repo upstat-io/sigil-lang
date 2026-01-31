@@ -1,6 +1,8 @@
 ---
-paths: **llvm**
+paths: **/llvm/**
 ---
+
+**Fix issues encountered in code you touch. No "pre-existing" exceptions.**
 
 # LLVM Development
 
