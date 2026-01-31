@@ -74,7 +74,7 @@ Expression-based language with strict static typing, type inference, mandatory t
 **Const Functions**: `$name (p: T) -> R = expr` — pure, comptime with const args, limits: 1M steps/1000 depth/100MB/10s
 **Types**: `type N = { f: T }` struct | `A | B | C(f: T)` sum | `type N = Existing` newtype | `type N<T>` | `#derive(Eq)` | `pub type`
 **Newtypes**: `type UserId = int` | construct: `UserId(42)` | access underlying: `.inner` (always public) | no trait/method inheritance | `#derive(Eq, Clone)` required | zero runtime cost
-**Traits**: `trait N { @m (self) -> T }` | `@m (self) -> T = default` | `type Item` assoc | `trait C: P` inheritance | `@m () -> Self` assoc fn | `trait N<T = Self>` default type param (defaults must follow non-defaults)
+**Traits**: `trait N { @m (self) -> T }` | `@m (self) -> T = default` | `type Item` assoc | `type Output = Self` default assoc type | `trait C: P` inheritance | `@m () -> Self` assoc fn | `trait N<T = Self>` default type param (defaults must follow non-defaults)
 **Impls**: `impl T { @m }` inherent | `impl Trait for T` | `impl<T: B> Trait for C<T>` | `self`/`Self`
 **Associated Functions**: `impl T { @new () -> T = ... }` — methods without `self` | call: `Type.method()` | `Self` allowed in return | generics: `Option<int>.some(v:)`
 **Default Impls**: `pub def impl Trait { @m }` — stateless, one per trait/module, auto-bound on import, override with `with`
@@ -205,7 +205,7 @@ Bottom type (uninhabited); represents computations that never complete normally.
 ## Formatting (enforced)
 
 - 4 spaces, 100 char limit, trailing commas on multi-line only
-- Space around: binary ops, arrows, after colons/commas, after `pub`, inside struct braces `{ }`, around `as`/`by`/`|`
+- Space around: binary ops, arrows, after colons/commas, after `pub`, inside struct braces `{ }`, around `as`/`by`/`|`, around `=` in default type params (`<T = Self>`)
 - No space: inside parens/brackets, around `.`/`..`/`?`, empty delimiters
 - Width-based breaking: inline ≤100, else break; `run`/`try`/`match`/`recurse`/`parallel`/`spawn`/`nursery` always stacked
 - Breaking: params/args/generics/where/fields/variants one-per-line; lists wrap (simple) or one-per-line (complex); chains break each `.method()`; binary break before op; conditionals: `if...then` together, `else` newline

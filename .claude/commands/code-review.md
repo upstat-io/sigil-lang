@@ -268,19 +268,42 @@ Task(
 - Duplicate error for same underlying issue
 - Warning that should be error (or vice versa)
 
+### Message Phrasing (from Rust, Elm, Gleam, Zig, Go)
+
+**CRITICAL**
+- Question phrasing for suggestions ("Did you mean X?") instead of imperative ("try using X" or "a similar name exists: X")
+- Fix description is noun phrase ("the fix") instead of verb phrase ("Replace X with Y", "Remove the surplus argument")
+
+**HIGH**
+- Missing "declared here" note when error references a user-defined type
+- Type comparison shows full types instead of highlighting only the differing parts
+- Suggestion doesn't indicate confidence level:
+  - **Auto-applicable**: Definitely correct, tools can apply automatically
+  - **Maybe incorrect**: Valid code but uncertain if intended
+  - **Has placeholders**: Contains `...` or `/* fields */` requiring user input
+
+**MEDIUM**
+- Error message doesn't follow three-part structure: problem statement → source context → actionable guidance
+- Missing "called from here" trace for errors that propagate through function calls
+- Suggestion message ends in punctuation (Rust: suggestion text should not end in `:` or `.`)
+
 ### Principles
 
 - **User-first messages**: Write for the person seeing the error, not the compiler author
-- **Context + cause + fix**: What happened, why, how to fix
+- **Three-part structure**: Problem statement → source context → actionable guidance (Elm/Roc pattern)
 - **Accumulate errors**: Don't stop at first error; show all problems
-- **Suggestions**: "Did you mean X?" when edit distance is small
+- **Imperative suggestions**: "try using X" not "Did you mean X?" (Rust pattern)
+- **Verb phrase fixes**: "Replace X with Y" not "the replacement" (Go pattern)
+- **Confidence levels**: Mark suggestions as auto-applicable, uncertain, or has-placeholders (Rust applicability)
 
 ### Checklist
 
 - [ ] All errors have source spans
-- [ ] Error messages are actionable
+- [ ] Error messages follow three-part structure
 - [ ] Errors accumulate, not early bailout
-- [ ] Typo suggestions implemented
+- [ ] Suggestions use imperative phrasing
+- [ ] Type errors include "declared here" notes
+- [ ] Suggestions indicate applicability confidence
 - [ ] No `panic!` on user errors
 
 ---
@@ -527,6 +550,11 @@ Group by severity, then by category. Identify patterns (same issue in multiple p
 ## References
 
 - Ori guidelines: `.claude/rules/compiler.md`
-- rust-analyzer style: `~/lang_repos/rust/src/tools/rust-analyzer/docs/`
-- Gleam compiler: `~/lang_repos/gleam/compiler-core/`
-- Roc compiler: `~/lang_repos/roc/crates/`
+
+**Diagnostic patterns by repo:**
+- **Rust** (`~/lang_repos/rust/compiler/rustc_errors/`): Applicability levels (MachineApplicable, MaybeIncorrect, HasPlaceholders), imperative suggestion phrasing, multi-part suggestions
+- **Go** (`~/lang_repos/golang/src/go/types/errors.go`): Verb phrase fix descriptions, error code organization (adjective + noun naming)
+- **Elm** (`~/lang_repos/elm/compiler/src/Reporting/`): Three-part error structure, type comparison highlighting, problem-specific hints
+- **Zig** (`~/lang_repos/zig/src/Sema.zig`): "declared here" notes, "consider..." suggestions, reference traces, note deduplication
+- **Gleam** (`~/lang_repos/gleam/compiler-core/src/error.rs`): Edit distance with substring support, extra labels for related locations
+- **Roc** (`~/lang_repos/roc/crates/reporting/src/`): Semantic annotation types, progressive disclosure, output target abstraction

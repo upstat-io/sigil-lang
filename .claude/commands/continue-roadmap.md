@@ -85,8 +85,12 @@ Based on user choice, either start implementation, show details, pick a differen
 ### After Writing Code
 
 1. **Run tests** — `./test-all` to verify everything passes
-2. **Update tracking file** — Mark items complete in `priority-and-tracking.md`
-3. **Commit with clear message** — Reference the phase and task
+2. **Check formatting impact** — If syntax was added or changed:
+   - Does the formatter handle the new syntax? Check `compiler/ori_fmt/`
+   - Are formatting tests needed? Check/update `tests/spec/formatting/`
+   - Run `./fmt-all` to ensure formatter still works
+3. **Update tracking file** — Mark items complete in `priority-and-tracking.md`
+4. **Commit with clear message** — Reference the phase and task
 
 ---
 
@@ -148,6 +152,9 @@ When completing a roadmap item:
 - [ ] Add Ori spec tests
 - [ ] Add Rust unit tests (if applicable)
 - [ ] Run `./test-all` — all tests pass
+- [ ] Check if formatting needs updates (if syntax changed):
+  - [ ] Formatter handles new syntax (`compiler/ori_fmt/`)
+  - [ ] Formatting tests cover new syntax (`tests/spec/formatting/`)
 - [ ] Update phase file checkboxes
 - [ ] Update `priority-and-tracking.md` if phase status changes
 - [ ] Commit with phase reference in message

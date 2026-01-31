@@ -25,6 +25,7 @@ Review a draft proposal, analyze implications, and (if approved) integrate into 
 7. Walk through recommendations one-by-one
 8. Confirm approval
 9. Execute approval workflow
+10. Verify documentation formatting (final step)
 
 ---
 
@@ -259,7 +260,52 @@ If proposal introduces new syntax/types/semantics:
 - [ ] Update `CLAUDE.md` if syntax/types/patterns affected
 - [ ] Follow rules in `.claude/rules/ori-lang.md`
 
-### Step 16: Commit and Push
+### Step 16: Verify Documentation Formatting
+
+**Before committing**, verify all modified documentation follows formatting rules.
+
+**Check spec files against `.claude/rules/spec.md`:**
+- [ ] Uses formal, declarative language (not "you can..." or tutorial tone)
+- [ ] Technical terms in _italics_ on first use
+- [ ] Syntax in `backticks`
+- [ ] Normative keywords used correctly (must, shall, may, error)
+- [ ] Informative sections marked with `> **Note:**`
+- [ ] No inline EBNF (references grammar.ebnf instead)
+- [ ] Examples follow `// Valid` / `// Invalid - reason` format
+
+**Check CLAUDE.md and proposal files against `.claude/rules/ori-lang.md`:**
+- [ ] Consistent with spec (no contradictions)
+- [ ] Syntax/types/patterns synchronized across all docs
+
+**If formatting issues are found**, present the problem and ask for resolution:
+
+```
+### Formatting Issue: [Location]
+**Current text:**
+> [problematic text]
+
+**Issue:** [what rule is violated]
+
+**Option A (Recommended):** [formal/correct version]
+**Option B:** [alternative if applicable]
+
+Examples of correct format:
+- Spec style: "An associated type default applies when the impl omits the type."
+- Tutorial style (AVOID): "You can omit the associated type if you want to use the default."
+```
+
+Use `AskUserQuestion` to resolve each formatting issue before proceeding.
+
+**Common formatting scenarios:**
+
+| Wrong | Right |
+|-------|-------|
+| "You can use `Self` to..." | "`Self` refers to..." |
+| "This is useful for..." | "This enables..." |
+| "When you write `type T = Self`..." | "The syntax `type T = Self`..." |
+| "Don't forget to..." | "It is an error if..." |
+
+### Step 17: Commit and Push
 
 Invoke: `Skill(skill: "commit-push")`
 
@@ -304,6 +350,13 @@ Proposal: docs/ori_lang/proposals/approved/<name>-proposal.md
 - [ ] Spec updated (if affects semantics)
 - [ ] `grammar.ebnf` updated (if affects syntax)
 - [ ] `CLAUDE.md` updated (if affects syntax/types/patterns)
+
+**Formatting Verification (final step):**
+- [ ] Spec files use formal/declarative language (no tutorial tone)
+- [ ] Technical terms in italics, syntax in backticks
+- [ ] Informative sections marked with `> **Note:**`
+- [ ] All docs synchronized (no contradictions between spec/CLAUDE.md/proposal)
+- [ ] Formatting issues resolved with user via `AskUserQuestion`
 - [ ] Committed and pushed via `/commit-push`
 
 ---
