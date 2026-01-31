@@ -89,7 +89,7 @@ Phases with `status: "complete"` are:
 
 ## Part 2: Changelog Sync
 
-Update the changelog JSON file (`website/public/changelog.json`) with all commits from git history.
+Update the changelog JSON file (`website/public/changelog.json`) with new commits since the last sync.
 
 ### Data File
 
@@ -97,19 +97,21 @@ The changelog data is stored as a static JSON file at `website/public/changelog.
 
 ### Process
 
-1. Run `git log --pretty=format:"%h|%ad|%s" --date=short` to get ALL commits
-2. Filter out:
+1. Read `website/public/changelog.json` to find the most recent commit hash
+2. Run `git log --pretty=format:"%h|%ad|%s" --date=short <hash>..HEAD` to get only NEW commits since the last sync
+   - If changelog is empty or hash not found, use `git log --pretty=format:"%h|%ad|%s" --date=short -50` to get the 50 most recent commits
+3. Filter out:
    - Merge commits (starts with "Merge")
    - WIP commits
    - Fixup/squash commits
    - Empty or trivial messages
-3. Parse conventional commit format when present (type(scope): message)
-4. Clean messages:
+4. Parse conventional commit format when present (type(scope): message)
+5. Clean messages:
    - Remove conventional commit prefix (feat:, fix:, etc.)
    - Remove issue references like (#123)
    - Capitalize first letter
    - Remove trailing periods for consistency
-5. Write to `website/public/changelog.json`
+6. Prepend new entries to the existing changelog and write to `website/public/changelog.json`
 
 ### Commit Type Detection
 
@@ -156,4 +158,4 @@ cd website && bun run build
 
 Report what changed:
 - Roadmap: Which phases changed status, updated test counts, any new tasks added
-- Changelog: Number of new entries added, date range covered
+- Changelog: Number of new entries added (if any)

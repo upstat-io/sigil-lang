@@ -224,6 +224,7 @@ Bottom type (uninhabited); represents computations that never complete normally.
 **Option**: `.map(transform:)`, `.unwrap_or(default:)`, `.ok_or(error:)`, `.and_then(transform:)`, `.filter(predicate:)`
 **Result**: `.map(transform:)`, `.map_err(transform:)`, `.unwrap_or(default:)`, `.ok()`, `.err()`, `.and_then(transform:)`, `.context(msg:)`, `.trace()` → `str`, `.trace_entries()` → `[TraceEntry]`, `.has_trace()` → `bool`
 **Error**: `.trace()` → `str`, `.trace_entries()` → `[TraceEntry]`, `.has_trace()` → `bool`
+**Ordering**: `type = Less | Equal | Greater` — `.is_less()`, `.is_equal()`, `.is_greater()`, `.is_less_or_equal()`, `.is_greater_or_equal()`, `.reverse()`, `.then(other:)`, `.then_with(f:)`; default `Equal`; order `Less < Equal < Greater`; implements Eq, Comparable, Clone, Debug, Printable, Hashable, Default
 
 **Printable**: `trait { @to_str (self) -> str }` — required for `` `{x}` ``; all primitives impl
 **Formattable**: `trait { @format (self, spec: FormatSpec) -> str }` — blanket impl for Printable; spec: `[[fill]align][sign][#][0][width][.precision][type]`; align: `<>^`; sign: `+ - ` (space); types: `bxXoeEf%`; `#` adds 0b/0o/0x prefix; `0` zero-pads
