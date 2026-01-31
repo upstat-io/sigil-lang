@@ -1,18 +1,44 @@
-# Approve Proposal Command
+# Review Draft Proposal Command
 
 Review a draft proposal, analyze its implications, and (if approved) integrate it into the roadmap.
 
 ## Usage
 
 ```
-/approve-proposal <proposal-name>
+/review-draft-proposal [proposal-name]
 ```
 
-Example: `/approve-proposal as-conversion` (reviews and potentially approves `as-conversion-proposal.md`)
+**With argument:** `/review-draft-proposal as-conversion` reviews `as-conversion-proposal.md`
+
+**Without argument:** `/review-draft-proposal` automatically selects the best draft to review
 
 ---
 
 ## Workflow
+
+### Step 0: Select Proposal (if no argument provided)
+
+If no proposal name was provided as an argument:
+
+1. **List all drafts** in `docs/ori_lang/proposals/drafts/`
+2. **Evaluate each draft** based on:
+   - **Completeness**: Does it have Summary, Problem Statement, and Design sections?
+   - **Dependencies**: Are its dependencies (other proposals) already approved?
+   - **Impact**: Does it unblock other work or fill a spec gap?
+   - **Simplicity**: Simpler proposals are easier to review first
+3. **Select the best candidate** — prefer proposals that are:
+   - Complete and well-specified
+   - Have no unmet dependencies
+   - Fill gaps in the current spec
+4. **Present the selection** to the user:
+   ```
+   Found N draft proposals. Recommending: **<proposal-name>**
+
+   Reason: [brief explanation]
+
+   Other drafts available: [list]
+   ```
+5. **Confirm with user** using AskUserQuestion before proceeding
 
 ### Step 1: Locate and Read the Draft
 
