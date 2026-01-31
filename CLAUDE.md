@@ -113,7 +113,7 @@ Expression-based, strict static typing, type inference, mandatory testing. Compi
 **Primitives**: `int` (i64), `float` (f64), `bool`, `str` (UTF-8), `char`, `byte`, `void`, `Never`
 **Special**: `Duration` (`100ns`/`us`/`ms`/`s`/`m`/`h`), `Size` (`100b`/`kb`/`mb`/`gb`/`tb`)
 **Collections**: `[T]` list, `[T, max N]` fixed-capacity, `{K: V}` map, `Set<T>`
-**Compound**: `(T, U)` tuple, `()` unit, `(T) -> U` fn, `Trait` object
+**Compound**: `(T, U)` tuple, `()` unit, `(T) -> U` fn, `Trait` object, `impl Trait` existential
 **Generic**: `Option<T>`, `Result<T, E>`, `Range<T>`, `Ordering`
 **Const Generics**: `$N: int` | `@f<T, $N: int>` | `$B: bool` | `where N > 0` | `where N > 0 && N <= 100`
 **Const Bounds**: comparison (`==`/`!=`/`<`/`<=`/`>`/`>=`), logical (`&&`/`||`/`!`), arithmetic (`+`/`-`/`*`/`/`/`%`), bitwise (`&`/`|`/`^`/`<<`/`>>`) | multiple `where` = AND
@@ -143,6 +143,16 @@ Bottom type (uninhabited); coerces to any `T`
 `[T, max N]` — inline-allocated, compile-time max N, dynamic length 0..N | `[T, max N] <: [T]`
 **Methods**: `.capacity()`, `.is_full()`, `.remaining()`, `.push()` (panics), `.try_push()` → `bool`, `.push_or_drop()`, `.push_or_oldest()`, `.to_dynamic()`
 **Conversion**: `.to_fixed<$N>()` panics | `.try_to_fixed<$N>()` → `Option`
+
+### Existential Types (`impl Trait`)
+
+`impl Trait where Assoc == Type` — opaque return type; concrete type hidden from callers
+**Position**: return only | argument position: use generics instead
+**Syntax**: `@f () -> impl Iterator where Item == int` | `impl A + B` multi-trait
+**Where clause**: type-local (constraints on associated types, not type params)
+**Dispatch**: static (monomorphized) — no vtable overhead
+**Rules**: all return paths must yield same concrete type
+**vs Trait objects**: `impl Trait` (static/single type) vs `Trait` (dynamic/any type at runtime)
 
 ## Literals
 
@@ -236,7 +246,7 @@ Bottom type (uninhabited); coerces to any `T`
 **Iterator**: `type Item; @next (self) -> (Option<Self.Item>, Self)` — fused, copy elision, lazy
 **DoubleEndedIterator**: `trait: Iterator { @next_back (self) -> (Option<Self.Item>, Self) }`
 **Iterable**: `type Item; @iter (self) -> impl Iterator` | **Collect**: `@from_iter (iter: impl Iterator) -> Self`
-**Iterator methods**: `.map`, `.filter`, `.fold`, `.find`, `.collect`, `.count`, `.any`, `.all`, `.take`, `.skip`, `.enumerate`, `.zip`, `.chain`, `.flatten`, `.flat_map`, `.cycle`
+**Iterator methods**: `.map`, `.filter`, `.fold`, `.find`, `.for_each`, `.collect`, `.count`, `.any`, `.all`, `.take`, `.skip`, `.enumerate`, `.zip`, `.chain`, `.flatten`, `.flat_map`, `.cycle`
 **DoubleEnded methods**: `.rev`, `.last`, `.rfind`, `.rfold`
 **Infinite**: `repeat(value:)`, `(0..).iter()` — bound with `.take(count:)` before `.collect()`
 **Into**: `@into (self) -> T` — lossless, explicit `.into()`, standard: str→Error, int→float, Set<T>→[T]; no identity/chaining
