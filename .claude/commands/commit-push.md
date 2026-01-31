@@ -12,9 +12,9 @@ Stage, commit, and push all changes to the remote repository using conventional 
 
 ## Workflow
 
-### Step 1: Sync Website
+### Step 1: Sync Website (Pre-commit)
 
-Run `/sync-webpage` to ensure website content is up to date with the spec and codebase.
+Run `/sync-webpage` to ensure website roadmap is up to date with the spec and codebase before committing.
 
 ### Step 2: Check Status
 
@@ -59,12 +59,23 @@ Show the user:
 2. The proposed commit message
 3. Ask for confirmation before committing
 
-### Step 6: Commit and Push
+### Step 6: Commit
 
 If user confirms:
 1. Stage all changes: `git add -A`
 2. Commit with the message (use HEREDOC for proper formatting)
-3. Push to remote: `git push`
+
+### Step 7: Sync Website After Commit
+
+Run `/sync-webpage` to update the changelog with the new commit just made.
+
+If sync-webpage made changes:
+1. Stage the website changes: `git add website/`
+2. Amend the commit: `git commit --amend --no-edit`
+
+### Step 8: Push
+
+Push to remote: `git push`
 
 Report success or any errors.
 
