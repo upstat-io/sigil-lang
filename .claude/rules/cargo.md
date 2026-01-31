@@ -2,13 +2,11 @@
 paths: **Cargo.toml**
 ---
 
-# Cargo Configuration Protection
+# Cargo Configuration
 
-**Do NOT edit any Cargo.toml files without explicit user permission.**
+**Do NOT edit Cargo.toml files without explicit user permission.**
 
-The workspace and crate Cargo.toml files contain carefully configured:
-- Workspace members and dependencies
-- Lint configurations (strict by design)
-- Build settings
-
-Always ask the user before making any changes to Cargo configuration.
+- Workspace members and dependencies carefully configured
+- Lint configurations strict by design
+- Build settings optimized for workspace
+- Always ask before modifying

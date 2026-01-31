@@ -4,6 +4,68 @@
 
 ---
 
+## Compiler Coding Guidelines
+
+**Architecture**
+- No upward crate deps (`ori_ir` → `oric` is wrong); direction: `oric` → `ori_typeck/eval` → `ori_parse` → `ori_lexer` → `ori_ir/diagnostic`
+- IO only in CLI (`oric`); core crates are pure
+- No phase bleeding (parser doesn't type-check, lexer doesn't parse)
+
+**Memory**
+- Arena + ID for AST nodes (`ExprArena` + `ExprId`, not `Box<Expr>`)
+- Intern identifiers (`Name` type, not `String`)
+- Newtypes for IDs (`ExprId`, not `u32`; `MethodKey`, not `(String, String)`)
+- No `Arc` cloning in hot paths; `#[cold]` on error factories
+
+**Salsa**
+- Query types: derive `Clone, Eq, PartialEq, Hash, Debug`
+- No `Arc<Mutex<T>>`, function pointers, or `dyn Trait` in queries
+- Queries must be deterministic (no random, time, IO)
+- Accumulate errors, don't bail early
+
+**API Design**
+- >3-4 params → config struct
+- No boolean flag parameters
+- RAII guards for context save/restore
+- Return iterators, not `Vec`; push allocations to caller
+- Document all public items
+
+**Dispatch**
+- Enum for fixed sets (built-in patterns): exhaustiveness, static dispatch
+- `dyn Trait` only for user-extensible (user methods)
+- Cost: `&dyn` < `Box<dyn>` < `Arc<dyn>`
+
+**Diagnostics**
+- All errors have source spans
+- Imperative suggestions ("try using X" not "Did you mean X?")
+- Verb phrase fixes ("Replace X with Y" not "the replacement")
+- No `panic!` on user errors; accumulate, don't bail
+
+**Testing**
+- Tests verify behavior, not implementation
+- Public functions have tests; edge cases covered
+- Inline tests < 200 lines; longer → separate files
+- TDD for bugs: failing test first
+
+**Performance**
+- Flag O(n²) in hot paths → O(n) or O(n log n)
+- Hash lookups instead of linear scans
+- No allocation in hot loops
+- Iterators over indexing (eliminates bounds checks)
+
+**Style**
+- No `#[allow(clippy)]` without justification comment
+- Functions < 50 lines (target < 30); files have single clear purpose
+- No dead code, commented-out code, or banner comments (`// ====`)
+- Use `//!` module docs and `///` item docs
+
+**Match Extraction**
+- No match with 20+ arms in single file
+- Group related arms (calls, collections, wrappers)
+- 3+ similar arms → extract to helper or module
+
+---
+
 # Ori — Code That Proves Itself
 
 Expression-based language with strict static typing, type inference, mandatory testing. If it compiles, it has tests; if it has tests, they pass.
