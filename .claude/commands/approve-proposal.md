@@ -25,7 +25,45 @@ Example: `/approve-proposal as-conversion` (reviews and potentially approves `as
    - Any dependencies on other proposals or phases
 3. Read related spec files to understand how the proposal fits with existing language features
 
-### Step 2: Present Initial Analysis
+### Step 2: Check for Conflicts with Approved Proposals
+
+Before analyzing the proposal, check for conflicts with already-approved proposals:
+
+1. **Scan for known conflict patterns** by grepping the draft proposal for:
+   - Accessor patterns: `.0`, `.1`, `.value`, `.inner` (newtypes should use `.inner`)
+   - Capability naming: `uses Async` (should be `uses Suspend` per rename-async-to-suspend-proposal)
+   - Any syntax or naming that might conflict with approved proposals
+
+2. **Cross-reference with approved proposals** by:
+   - Searching `docs/ori_lang/proposals/approved/` for related topics
+   - Checking if any approved proposal covers the same feature or syntax
+   - Looking for contradictory design decisions
+
+3. **If conflicts are found**, present them to the user using AskUserQuestion:
+
+For each conflict:
+```markdown
+### Conflict: [Topic]
+
+**This proposal says:**
+```ori
+[code from draft]
+```
+
+**Approved proposal `<name>` says:**
+```ori
+[conflicting code from approved proposal]
+```
+
+**Options:**
+1. Update draft to match approved design (Recommended)
+2. Keep draft as-is and update approved proposal
+3. Neither — needs discussion
+```
+
+Ask the user to resolve each conflict before proceeding. Update the draft proposal with resolved conflicts.
+
+### Step 3: Present Initial Analysis
 
 Present a structured analysis to the user (do NOT give a recommendation yet):
 
@@ -48,7 +86,7 @@ Raise any issues found, including but not limited to:
 - **Breaking changes**: Does it break existing code?
 - **Spec completeness**: Are grammar, semantics, and examples complete?
 
-### Step 3: Ask Clarifying Questions
+### Step 4: Ask Clarifying Questions
 
 **Before giving any recommendation**, use AskUserQuestion to resolve any ambiguities or design decisions in the proposal. Ask questions about:
 
@@ -61,9 +99,9 @@ For each question:
 - **List your recommended option first** with "(Recommended)" appended to its label
 - Provide meaningful descriptions for each option explaining the trade-offs
 
-Only proceed to Step 4 after all clarifying questions are resolved.
+Only proceed to Step 5 after all clarifying questions are resolved.
 
-### Step 4: Present Recommendation
+### Step 5: Present Recommendation
 
 After questions are answered, provide a clear recommendation:
 - **APPROVE**: Ready for implementation as-is
@@ -71,7 +109,7 @@ After questions are answered, provide a clear recommendation:
 - **DEFER**: Needs more work before approval (explain what)
 - **REJECT**: Fundamentally flawed or conflicts with language goals (explain why)
 
-### Step 5: Interactive Change Review
+### Step 6: Interactive Change Review
 
 **If recommending changes**, walk through each recommendation one by one:
 
@@ -111,7 +149,7 @@ Example format for each recommendation:
 
 Continue until all recommendations have been addressed.
 
-### Step 6: Summarize Decisions
+### Step 7: Summarize Decisions
 
 After all recommendations are reviewed, present a summary table:
 
@@ -125,7 +163,7 @@ After all recommendations are reviewed, present a summary table:
 | ... | ... |
 ```
 
-### Step 7: Confirm Approval
+### Step 8: Confirm Approval
 
 Ask the user if they want to:
 1. **Approve** — Proceed with approval workflow using the decided changes
@@ -133,15 +171,15 @@ Ask the user if they want to:
 3. **Defer** — Leave in drafts for further consideration
 4. **Reject** — Move to rejected with rationale
 
-If the user chooses to defer or reject, stop here. Only proceed to Step 8+ if approving.
+If the user chooses to defer or reject, stop here. Only proceed to Step 9+ if approving.
 
 ---
 
-## Approval Workflow (Steps 8-14)
+## Approval Workflow (Steps 9-15)
 
 Only proceed with these steps after user confirms approval.
 
-### Step 8: Update and Move Proposal
+### Step 9: Update and Move Proposal
 
 1. Update the proposal file with all approved changes
 2. Update the **Status** field from `Draft` to `Approved`
@@ -151,7 +189,7 @@ Only proceed with these steps after user confirms approval.
    git mv docs/ori_lang/proposals/drafts/<name>-proposal.md docs/ori_lang/proposals/approved/
    ```
 
-### Step 9: Determine Target Phase
+### Step 10: Determine Target Phase
 
 Map the proposal to the appropriate roadmap phase based on what it affects:
 
@@ -168,7 +206,7 @@ Map the proposal to the appropriate roadmap phase based on what it affects:
 
 Some proposals affect multiple phases. Add entries to each affected phase.
 
-### Step 10: Add to Phase File
+### Step 11: Add to Phase File
 
 Add a new section to the appropriate `plans/roadmap/phase-XX-*.md` file:
 
@@ -198,14 +236,14 @@ Brief description of what this implements.
 
 Follow the existing format in the phase file. Break down the proposal's implementation section into discrete, checkable tasks.
 
-### Step 11: Update plan.md
+### Step 12: Update plan.md
 
 If the proposal is referenced in `plans/roadmap/plan.md` (under "Draft Proposals Pending Review" or similar sections):
 
 1. Remove it from the drafts section
 2. Add a note that it's been approved and which phase it's in
 
-### Step 12: Update priority-and-tracking.md
+### Step 13: Update priority-and-tracking.md
 
 Add the approved proposal to the "Approved Proposals" section in `plans/roadmap/priority-and-tracking.md`:
 
@@ -217,7 +255,7 @@ Add the approved proposal to the "Approved Proposals" section in `plans/roadmap/
 - Blocked on: [dependencies, or "None"]
 ```
 
-### Step 13: Update Spec and CLAUDE.md
+### Step 14: Update Spec and CLAUDE.md
 
 If the proposal introduces new syntax, types, or semantics:
 
@@ -226,7 +264,7 @@ If the proposal introduces new syntax, types, or semantics:
 3. Update `CLAUDE.md` if syntax/types/patterns are affected
 4. Follow the rules in `.claude/rules/ori-lang.md`
 
-### Step 14: Commit
+### Step 15: Commit
 
 Create a commit with:
 ```
@@ -254,6 +292,7 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 
 Before completing, verify:
 
+- [ ] Conflicts with approved proposals checked and resolved
 - [ ] Proposal analyzed (summary, strengths, concerns)
 - [ ] Clarifying questions asked BEFORE recommendation
 - [ ] Recommendation given after questions resolved
