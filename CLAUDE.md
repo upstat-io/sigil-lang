@@ -175,11 +175,11 @@ Expression-based language with strict static typing, type inference, mandatory t
 
 ## Capabilities
 
-**Declare**: `@f (...) -> T uses Http = ...` | `uses FileSystem, Async`
+**Declare**: `@f (...) -> T uses Http = ...` | `uses FileSystem, Suspend`
 **Provide**: `with Http = RealHttp { } in expr` | `with Http = mock, Cache = mock in expr`
 **Resolution**: with...in > imported `def impl` > module-local `def impl`
-**Async**: `uses Async` = may suspend; no `uses` = sync; no `.await`; concurrency via `parallel(...)`
-**Standard**: `Http`, `FileSystem`, `Clock`, `Random`, `Crypto`, `Cache`, `Print` (has default), `Logger`, `Env`, `Intrinsics`, `Async`, `FFI`
+**Suspend**: `uses Suspend` = may suspend; no `uses` = sync; no `.await`; concurrency via `parallel(...)`
+**Standard**: `Http`, `FileSystem`, `Clock`, `Random`, `Crypto`, `Cache`, `Print` (has default), `Logger`, `Env`, `Intrinsics`, `Suspend`, `FFI`
 **Intrinsics**: `uses Intrinsics` for SIMD/bit ops; `Intrinsics.simd_add_f32x4(a:, b:)`, `count_ones(value:)`, `cpu_has_feature(feature:)`
 
 ## Comments
@@ -196,7 +196,7 @@ Expression-based language with strict static typing, type inference, mandatory t
 
 ## Keywords
 
-**Reserved**: `async break continue def do else extern false for if impl in let loop match pub self Self then trait true type unsafe use uses void where with yield`
+**Reserved**: `break continue def do else extern false for if impl in let loop match pub self Self suspend then trait true type unsafe use uses void where with yield`
 **Context-sensitive**: `by cache catch for max parallel recurse run spawn timeout try with without`
 **Built-in names** (call position only): `int float str byte len is_empty is_some is_none is_ok is_err assert assert_eq assert_ne assert_some assert_none assert_ok assert_err assert_panics assert_panics_with compare min max print panic todo unreachable dbg compile_error`
 
