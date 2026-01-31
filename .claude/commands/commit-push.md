@@ -126,8 +126,6 @@ perf(typeck): optimize line lookup and hash map usage
 - Switch to FxHashMap/FxHashSet in type checker components
 - Add index for O(1) associated type lookups
 - Optimize diagnostic queue sorting
-
-Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 ```
 
 ---
@@ -140,4 +138,4 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 - Changelog commit is automatic (no confirmation needed)
 - Never force push or use destructive git operations
 - Keep the first line of commit message under 72 characters
-- Include `Co-Authored-By` line when Claude contributed
+- Do NOT include `Co-Authored-By` lines in commit messages
