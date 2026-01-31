@@ -264,9 +264,18 @@ If the proposal introduces new syntax, types, or semantics:
 3. Update `CLAUDE.md` if syntax/types/patterns are affected
 4. Follow the rules in `.claude/rules/ori-lang.md`
 
-### Step 15: Commit
+### Step 15: Commit and Push
 
-Create a commit with:
+Use the `/commit-push` command to commit and push all changes.
+
+**ACTION:** Invoke the commit-push skill:
+
+```
+Skill(skill: "commit-push")
+```
+
+The commit message should follow this format:
+
 ```
 docs(proposal): approve <proposal-name>
 
@@ -282,9 +291,9 @@ Key design decisions:
 - [etc.]
 
 Proposal: docs/ori_lang/proposals/approved/<name>-proposal.md
-
-Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 ```
+
+The `/commit-push` command will handle staging, committing, and pushing.
 
 ---
 
@@ -309,7 +318,7 @@ Before completing, verify:
 - [ ] Spec updated (if proposal affects language semantics)
 - [ ] `grammar.ebnf` updated (if proposal affects syntax)
 - [ ] `CLAUDE.md` updated (if proposal affects syntax/types/patterns)
-- [ ] Changes committed with design decisions in commit message
+- [ ] Changes committed and pushed via `/commit-push`
 
 ---
 
