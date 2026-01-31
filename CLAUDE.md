@@ -179,7 +179,8 @@ Expression-based language with strict static typing, type inference, mandatory t
 **Provide**: `with Http = RealHttp { } in expr` | `with Http = mock, Cache = mock in expr`
 **Resolution**: with...in > imported `def impl` > module-local `def impl`
 **Async**: `uses Async` = may suspend; no `uses` = sync; no `.await`; concurrency via `parallel(...)`
-**Standard**: `Http`, `FileSystem`, `Clock`, `Random`, `Crypto`, `Cache`, `Print` (has default), `Logger`, `Env`, `Async`, `FFI`
+**Standard**: `Http`, `FileSystem`, `Clock`, `Random`, `Crypto`, `Cache`, `Print` (has default), `Logger`, `Env`, `Intrinsics`, `Async`, `FFI`
+**Intrinsics**: `uses Intrinsics` for SIMD/bit ops; `Intrinsics.simd_add_f32x4(a:, b:)`, `count_ones(value:)`, `cpu_has_feature(feature:)`
 
 ## Comments
 
