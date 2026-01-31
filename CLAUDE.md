@@ -140,6 +140,11 @@ Bottom type (uninhabited); represents computations that never complete normally.
 
 1. `.` `[]` `()` `?` — 2. `!` `-` `~` — 3. `*` `/` `%` `div` — 4. `+` `-` — 5. `<<` `>>` — 6. `..` `..=` `by` — 7. `<` `>` `<=` `>=` — 8. `==` `!=` — 9. `&` — 10. `^` — 11. `|` — 12. `&&` — 13. `||` — 14. `??`
 
+**Unary**: `!` (bool only), `-` (int/float/Duration, not Size), `~` (int/byte)
+**Bitwise**: `&` `|` `^` work on int or byte (not mixed); `<<` `>>` take int or byte on left, int shift count
+**Shift overflow**: negative count panics; count ≥ bit width panics; `1 << 63` panics (result doesn't fit signed int)
+**No operator overloading**: operators have fixed meanings for built-in types only; user types use methods
+
 ## Expressions
 
 **Conditionals**: `if c then e else e` | `if c then e` (void)
