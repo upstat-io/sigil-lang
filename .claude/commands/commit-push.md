@@ -12,24 +12,32 @@ Stage, commit, and push all changes to the remote repository using conventional 
 
 ## Workflow
 
-### Step 1: Sync Website (Pre-commit)
+**IMPORTANT:** Execute each step in order. Do not skip steps.
 
-Run `/sync-webpage` to ensure website roadmap is up to date with the spec and codebase before committing.
+### Step 1: Run /sync-webpage (MANDATORY)
 
-### Step 2: Check Status
+**ACTION:** Use the Skill tool to invoke `sync-webpage` BEFORE doing anything else.
 
-Run `git status` and `git diff --stat` to understand what changes will be committed.
+```
+Skill(skill: "sync-webpage")
+```
 
-### Step 3: Analyze Changes
+This ensures the website roadmap is synchronized with the spec before committing.
 
-Review the changes to determine:
-- The primary type of change (feat, fix, refactor, perf, docs, test, chore, etc.)
-- An optional scope (e.g., typeck, diagnostic, parser)
-- A concise description of what changed
+Wait for sync-webpage to complete before proceeding.
 
-### Step 4: Draft Commit Message
+### Step 2: Check Git Status
 
-Create a commit message following conventional commit format:
+**ACTION:** Run these commands to see what will be committed:
+
+```bash
+git status
+git diff --stat
+```
+
+### Step 3: Analyze and Draft Commit Message
+
+Review the changes and create a commit message following conventional commit format:
 
 ```
 <type>(<scope>): <description>
@@ -38,52 +46,68 @@ Create a commit message following conventional commit format:
 ```
 
 **Valid types:**
-- `feat`: A new feature
-- `fix`: A bug fix
-- `docs`: Documentation only changes
-- `style`: Code style changes (formatting, semicolons, etc)
-- `refactor`: Code change that neither fixes a bug nor adds a feature
-- `perf`: Performance improvement
-- `test`: Adding or correcting tests
-- `build`: Changes to build system or dependencies
-- `ci`: Changes to CI configuration
-- `chore`: Other changes that don't modify src or test files
-- `revert`: Reverts a previous commit
+| Type | Description |
+|------|-------------|
+| `feat` | A new feature |
+| `fix` | A bug fix |
+| `docs` | Documentation only changes |
+| `style` | Code style changes (formatting, etc) |
+| `refactor` | Code change that neither fixes a bug nor adds a feature |
+| `perf` | Performance improvement |
+| `test` | Adding or correcting tests |
+| `build` | Changes to build system or dependencies |
+| `ci` | Changes to CI configuration |
+| `chore` | Other changes that don't modify src or test files |
+| `revert` | Reverts a previous commit |
 
-**Scope** is optional but recommended. Use the primary module/crate affected (e.g., `typeck`, `diagnostic`, `parser`, `eval`, `llvm`).
+**Scope** is optional. Use the primary module affected (e.g., `typeck`, `parser`, `llvm`).
 
-### Step 5: Present to User
+### Step 4: Present to User and Get Confirmation
 
 Show the user:
 1. Summary of files changed
 2. The proposed commit message
-3. Ask for confirmation before committing
 
-### Step 6: Commit
+Ask: "Shall I proceed with this commit?"
 
-If user confirms:
-1. Stage all changes: `git add -A`
-2. Commit with the message (use HEREDOC for proper formatting)
+**Do NOT commit until user confirms.**
 
-### Step 7: Sync Website After Commit
+### Step 5: Commit
 
-Run `/sync-webpage` to update the changelog with the new commit just made.
+After user confirms:
 
-If sync-webpage made changes:
-1. Stage the website changes: `git add website/`
-2. Amend the commit: `git commit --amend --no-edit`
+```bash
+git add -A
+git commit -m "$(cat <<'EOF'
+<commit message here>
+EOF
+)"
+```
 
-### Step 8: Push
+### Step 6: Push
 
-Push to remote: `git push`
+```bash
+git push
+```
 
 Report success or any errors.
 
 ---
 
-## Example
+## Checklist
 
-For performance improvements to the type checker:
+Before completing, verify:
+
+- [ ] `/sync-webpage` was run FIRST (Step 1)
+- [ ] `git status` was checked (Step 2)
+- [ ] Commit message follows conventional format (Step 3)
+- [ ] User confirmed before committing (Step 4)
+- [ ] Changes committed (Step 5)
+- [ ] Changes pushed (Step 6)
+
+---
+
+## Example Commit Message
 
 ```
 perf(typeck): optimize line lookup and hash map usage
@@ -92,13 +116,17 @@ perf(typeck): optimize line lookup and hash map usage
 - Switch to FxHashMap/FxHashSet in type checker components
 - Add index for O(1) associated type lookups
 - Optimize diagnostic queue sorting
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 ```
 
 ---
 
-## Notes
+## Rules
 
-- Always run `git status` first to see what will be committed
+- Always run `/sync-webpage` first — this is not optional
+- Always run `git status` before committing
+- Always get user confirmation before committing
 - Never force push or use destructive git operations
-- The commit message body should summarize key changes
-- Keep the first line under 72 characters
+- Keep the first line of commit message under 72 characters
+- Include `Co-Authored-By` line when Claude contributed
