@@ -72,6 +72,7 @@ Expression-based language with strict static typing, type inference, mandatory t
 **Constants**: `let $name = value` | `pub let $name` | module-level must be `$`
 **Const Functions**: `$name (p: T) -> R = expr` — pure, comptime with const args, limits: 1M steps/1000 depth/100MB/10s
 **Types**: `type N = { f: T }` struct | `A | B | C(f: T)` sum | `type N = Existing` newtype | `type N<T>` | `#derive(Eq)` | `pub type`
+**Newtypes**: `type UserId = int` | construct: `UserId(42)` | access underlying: `.inner` (always public) | no trait/method inheritance | `#derive(Eq, Clone)` required | zero runtime cost
 **Traits**: `trait N { @m (self) -> T }` | `@m (self) -> T = default` | `type Item` assoc | `trait C: P` inheritance
 **Impls**: `impl T { @m }` inherent | `impl Trait for T` | `impl<T: B> Trait for C<T>` | `self`/`Self`
 **Default Impls**: `pub def impl Trait { @m }` — stateless, one per trait/module, auto-bound on import, override with `with`
