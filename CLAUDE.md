@@ -58,6 +58,7 @@ Expression-based language with strict static typing, type inference, mandatory t
 
 - `@main () -> void` | `@main () -> int` | `@main (args: [str]) -> void` | `@main (args: [str]) -> int`
 - `args` excludes program name
+- `@panic (info: PanicInfo) -> void` — optional handler for logging/cleanup before panic termination; `print()` inside writes to stderr; first panic wins in concurrent context; re-panic = immediate termination
 
 ---
 
@@ -240,6 +241,7 @@ Bottom type (uninhabited); represents computations that never complete normally.
 **Into**: `trait<T> { @into (self) -> T }` — semantic lossless conversion; explicit `.into()` required (no implicit); standard: str→Error, int→float, Set<T>→[T]; no blanket identity; no auto-chaining
 **Traceable**: `trait { @with_trace (self, entry: TraceEntry) -> Self; @trace (self) -> str; @trace_entries (self) -> [TraceEntry]; @has_trace (self) -> bool }`
 **TraceEntry**: `type = { function: str, file: str, line: int, column: int }` — function includes `@` prefix; entries ordered most recent first
+**PanicInfo**: `type = { message: str, location: TraceEntry, stack_trace: [TraceEntry], thread_id: Option<int> }` — used by `@panic` handler
 **Drop**: `trait { @drop (self) -> void }` — custom destructor; runs when refcount reaches zero; cannot be async; panic during unwind aborts
 **Index**: `trait<Key, Value> { @index (self, key: Key) -> Value }` — `x[k]` → `x.index(key: k)`; return `T` (panics), `Option<T>`, or `Result<T, E>`; `#` shorthand built-in only
 **Eq**: `trait { @equals (self, other: Self) -> bool }` — reflexive, symmetric, transitive; derives `==`/`!=` operators; all primitives impl

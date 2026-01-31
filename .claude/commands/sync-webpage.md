@@ -148,13 +148,7 @@ The changelog page (`website/src/pages/changelog.astro`) provides:
 
 ---
 
-## Verification
-
-After updating, verify the build succeeds:
-
-```bash
-cd website && bun run build
-```
+## Report
 
 Report what changed:
 - Roadmap: Which phases changed status, updated test counts, any new tasks added
