@@ -1,414 +1,336 @@
 # Review Draft Proposal Command
 
-Review a draft proposal, analyze its implications, and (if approved) integrate it into the roadmap.
+Review a draft proposal, analyze implications, and (if approved) integrate into the roadmap.
 
-## Usage
-
-```
-/review-draft-proposal [proposal-name]
-```
-
-**With argument:** `/review-draft-proposal as-conversion` reviews `as-conversion-proposal.md`
-
-**Without argument:** `/review-draft-proposal` automatically selects the best draft to review
+**Usage:** `/review-draft-proposal [proposal-name]`
+- With argument: `/review-draft-proposal as-conversion` reviews `as-conversion-proposal.md`
+- Without argument: Auto-selects best draft to review
 
 ---
 
-## Workflow
+## Core Principle
 
-### Step 0: Select Proposal (if no argument provided)
+> **Lean core, rich libraries** — Compiler implements only constructs requiring special syntax or static analysis. Everything else belongs in stdlib.
 
-If no proposal name was provided as an argument:
+---
 
-1. **List all drafts** in `docs/ori_lang/proposals/drafts/`
-2. **Evaluate each draft** based on:
-   - **Completeness**: Does it have Summary, Problem Statement, and Design sections?
-   - **Dependencies**: Are its dependencies (other proposals) already approved?
-   - **Impact**: Does it unblock other work or fill a spec gap?
-   - **Simplicity**: Simpler proposals are easier to review first
-3. **Select the best candidate** — prefer proposals that are:
-   - Complete and well-specified
-   - Have no unmet dependencies
-   - Fill gaps in the current spec
-4. **Present the selection** to the user:
-   ```
-   Found N draft proposals. Recommending: **<proposal-name>**
+## Workflow Overview
 
-   Reason: [brief explanation]
+1. Select proposal (if no argument)
+2. Read and understand
+3. Language purity analysis
+4. Dependency analysis
+5. Conflict check with approved proposals
+6. Present analysis and ask questions
+7. Walk through recommendations one-by-one
+8. Confirm approval
+9. Execute approval workflow
 
-   Other drafts available: [list]
-   ```
-5. **Confirm with user** using AskUserQuestion before proceeding
+---
 
-### Step 1: Locate and Read the Draft
+## Phase 1: Selection & Reading
 
-1. Find the proposal in `docs/ori_lang/proposals/drafts/`
-2. Read the entire proposal carefully to understand:
-   - What it changes (syntax, types, patterns, stdlib, etc.)
-   - The motivation and problem being solved
-   - The proposed solution and alternatives considered
-   - Which compiler phases it affects
-   - Any dependencies on other proposals or phases
-3. Read related spec files to understand how the proposal fits with existing language features
+### Step 1: Select Proposal (if no argument)
 
-### Step 2: Check for Conflicts with Approved Proposals
+List drafts in `docs/ori_lang/proposals/drafts/` and evaluate:
+- **Completeness**: Has Summary, Problem Statement, Design sections?
+- **Dependencies**: Are blockers already approved?
+- **Impact**: Does it unblock other work?
+- **Simplicity**: Simpler = easier to review first
 
-Before analyzing the proposal, check for conflicts with already-approved proposals:
+Present selection and confirm with `AskUserQuestion` before proceeding.
 
-1. **Scan for known conflict patterns** by grepping the draft proposal for:
-   - Accessor patterns: `.0`, `.1`, `.value`, `.inner` (newtypes should use `.inner`)
-   - Capability naming: `uses Async` (should be `uses Suspend` per rename-async-to-suspend-proposal)
-   - Any syntax or naming that might conflict with approved proposals
+### Step 2: Read and Understand
 
-2. **Cross-reference with approved proposals** by:
-   - Searching `docs/ori_lang/proposals/approved/` for related topics
-   - Checking if any approved proposal covers the same feature or syntax
-   - Looking for contradictory design decisions
+Read the proposal and related spec files. Identify:
+- What changes (syntax, types, patterns, stdlib)
+- The problem being solved
+- Which compiler phases affected
+- Dependencies on other proposals
 
-3. **If conflicts are found**, present them to the user using AskUserQuestion:
+---
 
-For each conflict:
-```markdown
+## Phase 2: Analysis
+
+### Step 3: Language Purity Analysis
+
+**Classification:**
+| Category | Requires Compiler? |
+|----------|-------------------|
+| New syntax/keywords | YES |
+| Static analysis | YES |
+| Built-in type | MAYBE — could be library with operator traits? |
+| Built-in method | MAYBE — could be extension/impl? |
+| Stdlib addition | NO |
+
+**Ask for each feature:** "Can this be implemented in pure Ori using existing or planned language features?"
+- YES → Should be library, not compiler
+- NO → Identify missing language feature that would enable it
+
+**Present findings:**
+```
+## Purity Analysis
+**Can be pure Ori?** [YES/NO/PARTIALLY]
+**If not, why:** [reasons]
+**Missing features that would enable purity:** [list with status: exists/draft/missing]
+**Recommendation:** [Proceed/BLOCKED/Revise to library]
+```
+
+### Step 4: Dependency Analysis
+
+**Check explicit dependencies** (from proposal's `Depends On:` field):
+- ✅ Approved — in `proposals/approved/`
+- 📝 Draft — in `proposals/drafts/` (review that first)
+- ❌ Missing — BLOCKER
+
+**Check implicit dependencies:**
+- Uses syntax that doesn't exist?
+- Assumes undefined traits?
+- Requires unimplemented type features?
+
+**If blockers exist:** Cannot approve. Offer options via `AskUserQuestion`:
+1. "Draft blocking proposals" — create drafts, then return
+2. "Defer this proposal" — stop, work on dependencies first
+3. "Mark as blocked" — add BLOCKED status to proposal
+
+### Step 5: Check Conflicts with Approved Proposals
+
+Grep the draft for potential conflicts:
+- Accessor patterns: `.0`, `.1`, `.value`, `.inner`
+- Capability naming: `uses Async` (should be `uses Suspend`)
+- Any syntax that might overlap with approved proposals
+
+Search `docs/ori_lang/proposals/approved/` for related topics. If conflicts found, present each:
+```
 ### Conflict: [Topic]
-
-**This proposal says:**
-```ori
-[code from draft]
+**Draft says:** [code]
+**Approved `<name>` says:** [code]
 ```
+Ask user to resolve via `AskUserQuestion` before proceeding.
 
-**Approved proposal `<name>` says:**
-```ori
-[conflicting code from approved proposal]
-```
+---
 
-**Options:**
-1. Update draft to match approved design (Recommended)
-2. Keep draft as-is and update approved proposal
-3. Neither — needs discussion
-```
+## Phase 3: Recommendation
 
-Ask the user to resolve each conflict before proceeding. Update the draft proposal with resolved conflicts.
+### Step 6: Present Analysis
 
-### Step 3: Present Initial Analysis
+Present structured analysis (NO recommendation yet):
 
-Present a structured analysis to the user (do NOT give a recommendation yet):
+**Summary:** 2-3 sentences on what proposal does
 
-#### Summary
-- Brief (2-3 sentence) summary of what the proposal does
+**Purity Assessment:** Appropriately in compiler vs library?
 
-#### Strengths
-- What the proposal does well
-- How it aligns with Ori's design philosophy
-- Benefits to language users
+**Dependency Status:** All satisfied? Any blockers?
 
-#### Concerns
-Raise any issues found, including but not limited to:
-- **Consistency**: Does it fit with existing language patterns?
-- **Complexity**: Does it add unnecessary complexity?
-- **Edge cases**: Are there unhandled edge cases?
-- **Ambiguity**: Is the specification clear and complete?
-- **Implementation burden**: Is the implementation realistic?
-- **Alternatives**: Were better alternatives overlooked?
-- **Breaking changes**: Does it break existing code?
-- **Spec completeness**: Are grammar, semantics, and examples complete?
+**Strengths:**
+- Alignment with Ori design philosophy
+- Benefits to users
+- What it does well
 
-### Step 4: Ask Clarifying Questions
+**Concerns:** (any of these that apply)
+- Consistency with existing patterns
+- Unnecessary complexity
+- Unhandled edge cases
+- Ambiguous specification
+- Implementation burden
+- Overlooked alternatives
+- Breaking changes
+- Incomplete spec/grammar/examples
 
-**Before giving any recommendation**, use AskUserQuestion to resolve any ambiguities or design decisions in the proposal. Ask questions about:
+### Step 7: Ask Clarifying Questions
 
+**Before any recommendation**, use `AskUserQuestion` to resolve:
 - Unclear requirements or edge cases
-- Design trade-offs where multiple approaches are valid
-- Scope clarifications (what's in/out)
-- Priority or importance of optional features
+- Design trade-offs with multiple valid approaches
+- Scope clarifications
+- Purity trade-offs (library vs compiler)
 
-For each question:
-- **List your recommended option first** with "(Recommended)" appended to its label
-- Provide meaningful descriptions for each option explaining the trade-offs
+For each question: List recommended option first with "(Recommended)" suffix.
 
-Only proceed to Step 5 after all clarifying questions are resolved.
+### Step 8: Present Recommendation
 
-### Step 5: Present Recommendation
+**STOP if unresolved blockers exist.** Blocked proposals cannot be approved.
 
-After questions are answered, provide a clear recommendation:
-- **APPROVE**: Ready for implementation as-is
-- **APPROVE WITH CHANGES**: Good proposal but needs adjustments (list them)
-- **DEFER**: Needs more work before approval (explain what)
-- **REJECT**: Fundamentally flawed or conflicts with language goals (explain why)
+Recommendations:
+- **APPROVE** — Ready as-is
+- **APPROVE WITH CHANGES** — Good but needs adjustments (list them)
+- **BLOCKED** — Has unresolved dependencies
+- **DEFER** — Needs more work
+- **REJECT** — Fundamentally flawed
 
-### Step 6: Interactive Change Review
+### Step 9: Interactive Change Review
 
-**If recommending changes**, walk through each recommendation one by one:
-
-For each recommendation:
-
-1. **Show the current syntax** from the proposal
-2. **Show the recommended change** with concrete examples
-3. **Explain the rationale** — why this change improves the proposal
-4. **Present alternatives** if applicable
-5. **Ask for user decision** using AskUserQuestion with clear options
-   - **List your recommended option first** with "(Recommended)" appended to its label
-   - Provide meaningful descriptions for each option explaining the trade-offs
-
-Example format for each recommendation:
+For each recommended change, walk through one-by-one:
 
 ```
-### Recommendation N: [Topic]
-
-**Current proposal:**
-```ori
-[code from proposal]
+### Change N: [Topic]
+**Current:** [code from proposal]
+**Recommended:** [suggested change]
+**Rationale:** [why better]
+**Alternatives:** [if any]
 ```
 
-**Recommended:**
-```ori
-[suggested change]
+Use `AskUserQuestion` for each. Continue until all addressed.
+
+### Step 10: Summarize and Confirm
+
+Present decision summary:
 ```
-
-**Rationale:** [Why this is better — consistency with existing features, readability, etc.]
-
-**Alternatives considered:**
-- Option A: [description]
-- Option B: [description]
-
-[Use AskUserQuestion to get user's choice]
-```
-
-Continue until all recommendations have been addressed.
-
-### Step 7: Summarize Decisions
-
-After all recommendations are reviewed, present a summary table:
-
-```markdown
-## Summary of Decisions
-
+## Decisions
 | Aspect | Decision |
 |--------|----------|
-| [Topic 1] | [User's choice] |
-| [Topic 2] | [User's choice] |
-| ... | ... |
+| [Topic] | [Choice] |
+
+## Final Status
+**Dependencies:** [All satisfied / BLOCKED by X, Y]
+**Purity:** [Pure library / Justified compiler / Needs revision]
+**Recommendation:** [APPROVE / BLOCKED / DEFER / REJECT]
 ```
 
-### Step 8: Confirm Approval
+Ask user via `AskUserQuestion`:
+- If blocked: Draft blockers / Defer / Mark as blocked
+- If no blockers: Approve / Show updated proposal / Defer / Reject
 
-Ask the user if they want to:
-1. **Approve** — Proceed with approval workflow using the decided changes
-2. **Show updated proposal** — Display the full proposal with changes before approving
-3. **Defer** — Leave in drafts for further consideration
-4. **Reject** — Move to rejected with rationale
-
-If the user chooses to defer or reject, stop here. Only proceed to Step 9+ if approving.
+Only proceed to approval workflow if user confirms approval.
 
 ---
 
-## Approval Workflow (Steps 9-15)
+## Phase 4: Approval Workflow
 
-Only proceed with these steps after user confirms approval.
+Execute only after user confirms approval AND no blockers exist.
 
-### Step 9: Update and Move Proposal
+### Step 11: Update and Move Proposal
 
-1. Update the proposal file with all approved changes
-2. Update the **Status** field from `Draft` to `Approved`
-3. Add an **Approved** date field: `**Approved:** YYYY-MM-DD`
-4. Move the file from `drafts/` to `approved/`:
-   ```bash
-   git mv docs/ori_lang/proposals/drafts/<name>-proposal.md docs/ori_lang/proposals/approved/
-   ```
+- [ ] Apply all approved changes
+- [ ] Update `Status:` from `Draft` to `Approved`
+- [ ] Add `Approved: YYYY-MM-DD`
+- [ ] Remove any `## Blockers` section
+- [ ] `git mv docs/ori_lang/proposals/drafts/<name>-proposal.md docs/ori_lang/proposals/approved/`
 
-### Step 10: Determine Target Phase
+### Step 12: Determine Target Phase
 
-Map the proposal to the appropriate roadmap phase based on what it affects:
+| Proposal Type | Phase File |
+|---------------|------------|
+| Syntax changes | `phase-15-syntax-proposals.md` |
+| New traits (prelude) | `phase-03-traits.md` |
+| Stdlib additions | `phase-07-stdlib.md` |
+| Type system | `phase-01-type-system.md` or `phase-02-type-inference.md` |
+| Patterns | `phase-08-patterns.md` |
+| Capabilities | `phase-06-capabilities.md` |
+| Testing framework | `phase-14-testing.md` |
+| Tooling | `phase-22-tooling.md` |
 
-| Proposal Type | Target Phase | Phase File |
-|---------------|--------------|------------|
-| Syntax changes | Phase 15 | `phase-15-syntax-proposals.md` |
-| New traits (prelude) | Phase 3 | `phase-03-traits.md` |
-| Stdlib additions | Phase 7 | `phase-07-stdlib.md` |
-| Type system changes | Phase 1-2 | `phase-01-type-system.md` or `phase-02-type-inference.md` |
-| Pattern additions | Phase 8 | `phase-08-patterns.md` |
-| Capability changes | Phase 6 | `phase-06-capabilities.md` |
-| Testing framework | Phase 14 | `phase-14-testing.md` |
-| Tooling (formatter, LSP) | Phase 22 | `phase-22-tooling.md` |
+Some proposals affect multiple phases — add entries to each.
 
-Some proposals affect multiple phases. Add entries to each affected phase.
+### Step 13: Add to Phase File
 
-### Step 11: Add to Phase File
-
-Add a new section to the appropriate `plans/roadmap/phase-XX-*.md` file:
-
+Add section to `plans/roadmap/phase-XX-*.md`:
 ```markdown
 ## X.Y Proposal Name
-
 **Proposal**: `proposals/approved/<name>-proposal.md`
 
-Brief description of what this implements.
+Brief description.
 
 ### Implementation
-
-- [ ] **Implement**: [First task] — [spec reference if applicable]
-  - [ ] **Rust Tests**: `path/to/rust/tests`
+- [ ] **Implement**: [task] — [spec ref]
+  - [ ] **Rust Tests**: `path/to/tests`
   - [ ] **Ori Tests**: `tests/spec/category/file.ori`
-  - [ ] **LLVM Support**: LLVM codegen for [feature]
+  - [ ] **LLVM Support**: [feature]
   - [ ] **LLVM Rust Tests**: `ori_llvm/tests/feature_tests.rs`
-
-- [ ] **Implement**: [Second task]
-  - [ ] **Rust Tests**: ...
-  - [ ] **Ori Tests**: ...
-  - [ ] **LLVM Support**: ...
-  - [ ] **LLVM Rust Tests**: ...
-
-[Continue for all implementation tasks from the proposal]
 ```
 
-Follow the existing format in the phase file. Break down the proposal's implementation section into discrete, checkable tasks.
+### Step 14: Update Tracking Files
 
-### Step 12: Update plan.md
-
-If the proposal is referenced in `plans/roadmap/plan.md` (under "Draft Proposals Pending Review" or similar sections):
-
-1. Remove it from the drafts section
-2. Add a note that it's been approved and which phase it's in
-
-### Step 13: Update priority-and-tracking.md
-
-Add the approved proposal to the "Approved Proposals" section in `plans/roadmap/priority-and-tracking.md`:
-
+- [ ] Remove from drafts section in `plans/roadmap/plan.md` (if listed)
+- [ ] Add to `plans/roadmap/priority-and-tracking.md`:
 ```markdown
 **Proposal Name** — ✅ APPROVED YYYY-MM-DD
 - Proposal: `proposals/approved/<name>-proposal.md`
 - Implementation: Phase X.Y
-- [Brief description of key features]
-- Blocked on: [dependencies, or "None"]
+- [Key features]
+- Blocked on: [deps or "None"]
 ```
 
-### Step 14: Update Spec and CLAUDE.md
+### Step 15: Update Spec and CLAUDE.md
 
-If the proposal introduces new syntax, types, or semantics:
+If proposal introduces new syntax/types/semantics:
+- [ ] Update relevant spec file in `docs/ori_lang/0.1-alpha/spec/`
+- [ ] Update `grammar.ebnf` if syntax changes
+- [ ] Update `CLAUDE.md` if syntax/types/patterns affected
+- [ ] Follow rules in `.claude/rules/ori-lang.md`
 
-1. Update the relevant spec file in `docs/ori_lang/0.1-alpha/spec/`
-2. Update `grammar.ebnf` if syntax changes
-3. Update `CLAUDE.md` if syntax/types/patterns are affected
-4. Follow the rules in `.claude/rules/ori-lang.md`
+### Step 16: Commit and Push
 
-### Step 15: Commit and Push
+Invoke: `Skill(skill: "commit-push")`
 
-Use the `/commit-push` command to commit and push all changes.
-
-**ACTION:** Invoke the commit-push skill:
-
-```
-Skill(skill: "commit-push")
-```
-
-The commit message should follow this format:
-
+Commit message format:
 ```
 docs(proposal): approve <proposal-name>
 
 - Move from drafts/ to approved/
 - Add implementation plan to Phase X
 - Update roadmap tracking
-- Update spec ([list affected spec files])
-- Update CLAUDE.md with [feature] syntax
+- Update spec ([affected files])
+- Update CLAUDE.md with [feature]
 
-Key design decisions:
+Key decisions:
 - [Decision 1]
 - [Decision 2]
-- [etc.]
 
 Proposal: docs/ori_lang/proposals/approved/<name>-proposal.md
 ```
 
-The `/commit-push` command will handle staging, committing, and pushing.
-
 ---
 
-## Checklist
+## Final Checklist
 
-Before completing, verify:
-
+**Analysis Phase:**
+- [ ] Purity analysis completed — features pushed to library when possible
+- [ ] Dependency analysis completed — no unresolved blockers
 - [ ] Conflicts with approved proposals checked and resolved
-- [ ] Proposal analyzed (summary, strengths, concerns)
+- [ ] Strengths and concerns documented
 - [ ] Clarifying questions asked BEFORE recommendation
-- [ ] Recommendation given after questions resolved
-- [ ] Each proposed change reviewed one-by-one with user
-- [ ] User decisions summarized
+- [ ] Each change reviewed one-by-one with user
+- [ ] Decisions summarized
 - [ ] User confirmed approval
+
+**Approval Phase:**
 - [ ] Proposal updated with approved changes
-- [ ] Proposal moved from `drafts/` to `approved/`
-- [ ] Status field updated to `Approved`
-- [ ] Approved date added
-- [ ] Implementation tasks added to appropriate phase file(s)
-- [ ] `plan.md` updated (if proposal was listed there)
+- [ ] Moved from `drafts/` to `approved/`
+- [ ] Status updated to `Approved`, date added
+- [ ] Implementation tasks added to phase file(s)
+- [ ] `plan.md` updated (if applicable)
 - [ ] `priority-and-tracking.md` updated
-- [ ] Spec updated (if proposal affects language semantics)
-- [ ] `grammar.ebnf` updated (if proposal affects syntax)
-- [ ] `CLAUDE.md` updated (if proposal affects syntax/types/patterns)
-- [ ] Changes committed and pushed via `/commit-push`
+- [ ] Spec updated (if affects semantics)
+- [ ] `grammar.ebnf` updated (if affects syntax)
+- [ ] `CLAUDE.md` updated (if affects syntax/types/patterns)
+- [ ] Committed and pushed via `/commit-push`
 
 ---
 
-## Example: Recommendation Walkthrough
+## Quick Reference
 
-Here's how a typical recommendation review might look:
+### Blocker Resolution
 
----
+If blockers exist, offer three options:
+1. **Draft blockers** — Create missing proposals, then return to this review
+2. **Defer** — Leave in drafts, work on dependencies separately
+3. **Mark blocked** — Add BLOCKED status with dependency list
 
-### Recommendation 1: Guard Syntax
+### Proposal Status Lifecycle
 
-**Current proposal:**
-```ori
-@classify (n: int).match(n < 0) -> str = "negative"
-```
+`Draft` → `Blocked` (if deps missing) → `Approved` (after deps resolved) → `Implemented`
+`Draft` → `Rejected` (if fundamentally flawed)
 
-**Recommended:**
-```ori
-@classify (n: int) -> str if n < 0 = "negative"
-```
-
-**Rationale:** The `if` syntax mirrors existing `for x in items if cond` syntax in Ori. It reads more naturally: "classify n returning str if n < 0". The `.match()` on the parameter list is unusual and inconsistent with how guards work in match arms.
-
-[AskUserQuestion with options:
-- "Use `if` guard syntax (Recommended)" — Consistent with existing for/if syntax, reads naturally
-- "Keep `.match()` syntax" — As proposed, explicit method call style
-]
-
----
-
-### Recommendation 2: Type Annotation Rules
-
-**Question:** When can type annotations be omitted from clause parameters?
-
-**Option A — Required on first clause only:**
-```ori
-@factorial (0: int) -> int = 1      // type required
-@factorial (n) -> int = ...         // type optional
-```
-
-**Option B — Always required:**
-```ori
-@factorial (0: int) -> int = 1
-@factorial (n: int) -> int = ...
-```
-
-**Rationale for Option A:** Reduces repetition while maintaining clarity. The first clause establishes the contract; subsequent clauses focus on patterns.
-
-[AskUserQuestion with options:
-- "Required on first clause only (Recommended)" — Less repetition, first clause establishes contract
-- "Always required" — Maximum explicitness, no implicit type propagation
-]
-
----
-
-## Reference: Proposal Status Lifecycle
+### Purity Example
 
 ```
-Draft → Approved → Implemented
-  ↓
-Rejected (moved to rejected/)
-```
+Proposal: Duration factory methods as built-ins
 
-- **Draft**: Under consideration, may change
-- **Approved**: Accepted for implementation, spec is final
-- **Implemented**: Code complete, tests passing
-- **Rejected**: Not accepted (with rationale documented)
+Q: Can Duration.from_seconds(s:) be pure Ori?
+- Requires Type.method() → Associated functions ✅ (approved)
+- Requires Duration + Duration → Operator traits ❌ (missing)
+
+Conclusion: BLOCKED by operator-traits-proposal
+Duration should move to library once operator traits exist.
+```
