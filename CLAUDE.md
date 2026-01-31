@@ -1,5 +1,7 @@
 **Fix every issue encountered. No "unrelated" or "pre-existing" exceptions.**
 
+**Do it properly, not just simply. Correct architecture over quick hacks; no shortcuts or "good enough" solutions.**
+
 **TDD for bugs**: Issue found + tests pass → write test for correct behavior (must fail) → fix code → test passes unchanged
 
 **Ori**: Statically-typed expression language. HM inference, ARC memory, capability effects, mandatory tests. Targets LLVM/WASM. Compiler in Rust (Salsa-based).

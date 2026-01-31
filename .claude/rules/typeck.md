@@ -4,6 +4,8 @@ paths: **/typeck/**
 
 **Fix issues encountered in code you touch. No "pre-existing" exceptions.**
 
+**Do it properly, not just simply. Correct architecture over quick hacks; no shortcuts or "good enough" solutions.**
+
 # Type Checking
 
 ## Architecture (5 Components)

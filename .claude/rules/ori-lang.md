@@ -4,6 +4,8 @@ paths: **/docs/ori_lang/**
 
 **Fix issues encountered in code you touch. No "pre-existing" exceptions.**
 
+**Do it properly, not just simply. Correct architecture over quick hacks; no shortcuts or "good enough" solutions.**
+
 # Ori Documentation Rules
 
 **Note:** Design docs archived to `archived-design/`. Do not update them.

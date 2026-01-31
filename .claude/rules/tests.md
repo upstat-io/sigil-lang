@@ -4,6 +4,8 @@ paths: **/tests/**
 
 **Fix issues encountered in code you touch. No "pre-existing" exceptions.**
 
+**Do it properly, not just simply. Correct architecture over quick hacks; no shortcuts or "good enough" solutions.**
+
 # Specification Tests
 
 **Tests are the source of truth.** Read local README.md for details.
