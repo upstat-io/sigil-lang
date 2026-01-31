@@ -201,7 +201,7 @@ Expression-based language with strict static typing, type inference, mandatory t
 
 ## Prelude
 
-**Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `TraceEntry`, `Ordering`, `PanicInfo`, `CancellationError`, `CancellationReason`
+**Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `TraceEntry`, `Ordering`, `PanicInfo`, `CancellationError`, `CancellationReason`, `FormatSpec`, `Alignment`, `Sign`, `FormatType`
 **Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Formattable`, `Debug`, `Clone`, `Default`, `Drop`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`, `Index`
 
 **Built-ins**: `print(msg:)`, `len(collection:)`, `is_empty(collection:)`, `is_some/is_none(option:)`, `is_ok/is_err(result:)`, `assert(condition:)`, `assert_eq(actual:, expected:)`, `assert_ne(actual:, unexpected:)`, `assert_some/none/ok/err(...)`, `assert_panics(f:)`, `assert_panics_with(f:, msg:)`, `panic(msg:)` → `Never`, `todo()`, `todo(reason:)` → `Never`, `unreachable()`, `unreachable(reason:)` → `Never`, `dbg(value:)`, `dbg(value:, label:)` → `T`, `compare(left:, right:)` → `Ordering`, `min/max(left:, right:)`, `hash_combine(seed:, value:)` → `int`, `repeat(value:)` → infinite iter, `is_cancelled()` → `bool`, `compile_error(msg:)` → compile-time error, `drop_early(value:)` → `void`
@@ -211,7 +211,7 @@ Expression-based language with strict static typing, type inference, mandatory t
 **Error**: `.trace()` → `str`, `.trace_entries()` → `[TraceEntry]`, `.has_trace()` → `bool`
 
 **Printable**: `trait { @to_str (self) -> str }` — required for `` `{x}` ``; all primitives impl
-**Formattable**: `trait { @format (self, spec: FormatSpec) -> str }` — blanket impl for Printable; spec: `[[fill]align][width][.precision][type]`; align: `<>^`; types: `bxXoeE`
+**Formattable**: `trait { @format (self, spec: FormatSpec) -> str }` — blanket impl for Printable; spec: `[[fill]align][sign][#][0][width][.precision][type]`; align: `<>^`; sign: `+ - ` (space); types: `bxXoeEf%`; `#` adds 0b/0o/0x prefix; `0` zero-pads
 **Debug**: `trait { @debug (self) -> str }` — shows escaped strings, derivable, internal structure
 **Clone**: `trait { @clone (self) -> Self }` — all primitives/collections impl when elements do, derivable
 **Iterator**: `trait { type Item; @next (self) -> (Option<Self.Item>, Self) }` — fused guarantee; copy elision when rebound; lazy evaluation
