@@ -139,7 +139,8 @@ Expression-based language with strict static typing, type inference, mandatory t
 **Access**: `v.field`, `v.method(arg: v)` — named args required except: fn variables, single-param with inline lambda
 **Lambdas**: `x -> x + 1` | `(a, b) -> a + b` | `() -> 42` | `(x: int) -> int = x * 2` — capture by value
 **Ranges**: `0..10` excl | `0..=10` incl | `0..10 by 2` step | descending: `10..0 by -1` | infinite: `0..` (ascending), `0.. by -1` (descending) | int only
-**Loops**: `for i in items do e` | `for x in items yield x * 2` | `for x in items if g yield x` | `loop(e)` + `break`/`continue` | `break value` | `continue value`
+**Loops**: `for i in items do e` | `for x in items yield x * 2` | `for x in items if g yield x` | `for x in xs for y in ys yield (x, y)` nested | `loop(e)` + `break`/`continue` | `break value` | `continue value`
+**Yield control**: in `for...yield`: `continue` skips | `continue value` substitutes | `break` stops | `break value` adds final | `{K: V}` collects from `(K, V)` tuples
 **Labels**: `loop:name(...)` | `for:name` | `break:name` | `continue:name`
 **Spread**: `[...a, ...b]` | `{...a, ...b}` | `P { ...orig, x: 10 }` — later wins, literal contexts only
 
