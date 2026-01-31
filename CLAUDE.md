@@ -116,6 +116,14 @@ Expression-based language with strict static typing, type inference, mandatory t
 **Factory**: `Size.from_bytes(b:)`, `.from_kilobytes(kb:)`, `.from_megabytes(mb:)`, `.from_gigabytes(gb:)`, `.from_terabytes(tb:)` → `Size`
 **Traits**: `Eq`, `Comparable`, `Hashable`, `Clone`, `Debug`, `Printable`, `Default` (`0b`), `Sendable`
 
+### Never
+
+Bottom type (uninhabited); represents computations that never complete normally.
+**Coercion**: `Never` coerces to any type `T`
+**Producers**: `panic(msg:)`, `todo()`, `unreachable()`, `break`, `continue`, `expr?` on Err/None, infinite `loop`
+**Generics**: `Result<Never, E>` = always Err | `Result<T, Never>` = always Ok | `Option<Never>` = always None
+**Restrictions**: Cannot be struct field; may be sum type variant payload (variant is unconstructable)
+
 ### Fixed-Capacity Lists
 
 `[T, max N]` — inline-allocated list with compile-time max capacity N, dynamic length 0 to N
