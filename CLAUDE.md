@@ -92,7 +92,8 @@ Expression-based language with strict static typing, type inference, mandatory t
 **Collections**: `[T]` list, `[T, max N]` fixed-capacity list, `{K: V}` map, `Set<T>`
 **Compound**: `(T, U)` tuple, `()` unit, `(T) -> U` fn, `Trait` object
 **Generic**: `Option<T>`, `Result<T, E>`, `Range<T>`, `Ordering`
-**Const Generics**: `$N: int` const param | `@f<T, $N: int>` | `type Buffer<$N: int>` | `where N > 0` bounds
+**Const Generics**: `$N: int` const param | `@f<T, $N: int>` | `type Buffer<$N: int>` | `$B: bool` | `where N > 0` | `where N > 0 && N <= 100` | `where A || B`
+**Const Bounds**: comparison (`==`, `!=`, `<`, `<=`, `>`, `>=`), logical (`&&`, `||`, `!`), arithmetic (`+`, `-`, `*`, `/`, `%`), bitwise (`&`, `|`, `^`, `<<`, `>>`) | multiple `where` = AND | caller must imply callee bounds
 **Channels**: `Producer<T>`, `Consumer<T>`, `CloneableProducer<T>`, `CloneableConsumer<T>` (`T: Sendable`)
 **Concurrency**: `Nursery`, `NurseryErrorMode` (`CancelRemaining | CollectAll | FailFast`)
 **FFI**: `CPtr` (C opaque pointer), `JsValue` (JS object handle), `JsPromise<T>` (JS async)
@@ -185,7 +186,7 @@ Expression-based language with strict static typing, type inference, mandatory t
 **Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `TraceEntry`, `Ordering`, `PanicInfo`, `CancellationError`, `CancellationReason`
 **Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Formattable`, `Debug`, `Clone`, `Default`, `Drop`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`, `Index`
 
-**Built-ins**: `print(msg:)`, `len(collection:)`, `is_empty(collection:)`, `is_some/is_none(option:)`, `is_ok/is_err(result:)`, `assert(condition:)`, `assert_eq(actual:, expected:)`, `assert_ne(actual:, unexpected:)`, `assert_some/none/ok/err(...)`, `assert_panics(f:)`, `assert_panics_with(f:, msg:)`, `panic(msg:)` → `Never`, `todo()`, `todo(reason:)` → `Never`, `unreachable()`, `unreachable(reason:)` → `Never`, `dbg(value:)`, `dbg(value:, label:)` → `T`, `compare(left:, right:)` → `Ordering`, `min/max(left:, right:)`, `repeat(value:)` → infinite iter, `is_cancelled()` → `bool`, `compile_error(msg:)` → compile-time error
+**Built-ins**: `print(msg:)`, `len(collection:)`, `is_empty(collection:)`, `is_some/is_none(option:)`, `is_ok/is_err(result:)`, `assert(condition:)`, `assert_eq(actual:, expected:)`, `assert_ne(actual:, unexpected:)`, `assert_some/none/ok/err(...)`, `assert_panics(f:)`, `assert_panics_with(f:, msg:)`, `panic(msg:)` → `Never`, `todo()`, `todo(reason:)` → `Never`, `unreachable()`, `unreachable(reason:)` → `Never`, `dbg(value:)`, `dbg(value:, label:)` → `T`, `compare(left:, right:)` → `Ordering`, `min/max(left:, right:)`, `hash_combine(seed:, value:)` → `int`, `repeat(value:)` → infinite iter, `is_cancelled()` → `bool`, `compile_error(msg:)` → compile-time error
 
 **Option**: `.map(transform:)`, `.unwrap_or(default:)`, `.ok_or(error:)`, `.and_then(transform:)`, `.filter(predicate:)`
 **Result**: `.map(transform:)`, `.map_err(transform:)`, `.unwrap_or(default:)`, `.ok()`, `.err()`, `.and_then(transform:)`, `.context(msg:)`, `.trace()` → `str`, `.trace_entries()` → `[TraceEntry]`, `.has_trace()` → `bool`
@@ -207,3 +208,6 @@ Expression-based language with strict static typing, type inference, mandatory t
 **TraceEntry**: `type = { function: str, file: str, line: int, column: int }` — function includes `@` prefix; entries ordered most recent first
 **Drop**: `trait { @drop (self) -> void }` — custom destructor; runs when refcount reaches zero; cannot be async; panic during unwind aborts
 **Index**: `trait<Key, Value> { @index (self, key: Key) -> Value }` — `x[k]` → `x.index(key: k)`; return `T` (panics), `Option<T>`, or `Result<T, E>`; `#` shorthand built-in only
+**Eq**: `trait { @equals (self, other: Self) -> bool }` — reflexive, symmetric, transitive; derives `==`/`!=` operators; all primitives impl
+**Comparable**: `trait: Eq { @compare (self, other: Self) -> Ordering }` — total ordering; derives `<`/`<=`/`>`/`>=` operators; IEEE 754 for floats (NaN > all); `None < Some`; `Ok < Err`
+**Hashable**: `trait: Eq { @hash (self) -> int }` — if `a == b` then `a.hash() == b.hash()`; all primitives impl; +0.0/-0.0 same hash; use `hash_combine` for custom impls
