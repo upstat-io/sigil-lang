@@ -88,7 +88,7 @@ Expression-based language with strict static typing, type inference, mandatory t
 ## Types
 
 **Primitives**: `int` (i64), `float` (f64), `bool`, `str` (UTF-8), `char`, `byte`, `void`, `Never`
-**Special**: `Duration` (`30s`, `100ms`), `Size` (`4kb`, `10mb`)
+**Special**: `Duration` (`100ns`, `50us`, `100ms`, `30s`, `5m`, `2h`), `Size` (`100b`, `4kb`, `10mb`, `2gb`, `1tb`)
 **Collections**: `[T]` list, `[T, max N]` fixed-capacity list, `{K: V}` map, `Set<T>`
 **Compound**: `(T, U)` tuple, `()` unit, `(T) -> U` fn, `Trait` object
 **Generic**: `Option<T>`, `Result<T, E>`, `Range<T>`, `Ordering`
@@ -99,6 +99,22 @@ Expression-based language with strict static typing, type inference, mandatory t
 **FFI**: `CPtr` (C opaque pointer), `JsValue` (JS object handle), `JsPromise<T>` (JS async)
 **Rules**: No implicit conversions; overflow panics; `str[i]` returns single-codepoint `str`
 
+### Duration
+
+64-bit nanoseconds; suffixes: `ns`, `us`, `ms`, `s`, `m`, `h`; no float prefix (`1500ms` not `1.5s`)
+**Arithmetic**: `+`, `-`, `*`, `/`, `%` (Duration % Duration → Duration), unary `-`; overflow panics
+**Methods**: `.nanoseconds()`, `.microseconds()`, `.milliseconds()`, `.seconds()`, `.minutes()`, `.hours()` → `int` (truncated)
+**Factory**: `Duration.from_nanoseconds(ns:)`, `.from_microseconds(us:)`, `.from_milliseconds(ms:)`, `.from_seconds(s:)`, `.from_minutes(m:)`, `.from_hours(h:)` → `Duration`
+**Traits**: `Eq`, `Comparable`, `Hashable`, `Clone`, `Debug`, `Printable`, `Default` (`0ns`), `Sendable`
+
+### Size
+
+64-bit bytes (non-negative); suffixes: `b`, `kb`, `mb`, `gb`, `tb`; binary units (1024-based)
+**Arithmetic**: `+`, `-`, `*`, `/`, `%` (Size % Size → Size); subtraction panics if negative; unary `-` is compile error
+**Methods**: `.bytes()`, `.kilobytes()`, `.megabytes()`, `.gigabytes()`, `.terabytes()` → `int` (truncated)
+**Factory**: `Size.from_bytes(b:)`, `.from_kilobytes(kb:)`, `.from_megabytes(mb:)`, `.from_gigabytes(gb:)`, `.from_terabytes(tb:)` → `Size`
+**Traits**: `Eq`, `Comparable`, `Hashable`, `Clone`, `Debug`, `Printable`, `Default` (`0b`), `Sendable`
+
 ### Fixed-Capacity Lists
 
 `[T, max N]` — inline-allocated list with compile-time max capacity N, dynamic length 0 to N
@@ -108,7 +124,7 @@ Expression-based language with strict static typing, type inference, mandatory t
 
 ## Literals
 
-`42`, `1_000_000`, `0xFF` | `3.14`, `2.5e-8` | `"hello"` (escapes: `\\\"\n\t\r\0`) | `` `{name}` `` template | `'a'` char | `true`/`false` | `100ms`, `30s`, `5m`, `2h` | `4kb`, `10mb` | `[1, 2]`, `[...a, ...b]` | `{key: v}` or `{"key": v}` (literal str key), `{[expr]: v}` (computed key), `{...a, ...b}` | `Point { x, y }`, `{ ...p, x: 10 }`
+`42`, `1_000_000`, `0xFF` | `3.14`, `2.5e-8` | `"hello"` (escapes: `\\\"\n\t\r\0`) | `` `{name}` `` template | `'a'` char | `true`/`false` | `100ns`, `50us`, `100ms`, `30s`, `5m`, `2h` | `100b`, `4kb`, `10mb`, `2gb`, `1tb` | `[1, 2]`, `[...a, ...b]` | `{key: v}` or `{"key": v}` (literal str key), `{[expr]: v}` (computed key), `{...a, ...b}` | `Point { x, y }`, `{ ...p, x: 10 }`
 
 ## Operators (precedence high→low)
 
