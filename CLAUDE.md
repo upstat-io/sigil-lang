@@ -203,7 +203,7 @@ Expression-based language with strict static typing, type inference, mandatory t
 **DoubleEnded methods**: `.rev`, `.last`, `.rfind`, `.rfold`
 **Infinite iterators**: `repeat(value:)` → infinite; `(0..).iter()` → infinite range; bound with `.take(count:)` before `.collect()`
 **Into**: `trait<T> { @into (self) -> T }` — `str` impls `Into<Error>`
-**Traceable**: `trait { @with_trace (self, trace:) -> Self; @trace (self) -> [TraceEntry] }`
+**Traceable**: `trait { @with_trace (self, entry: TraceEntry) -> Self; @trace (self) -> str; @trace_entries (self) -> [TraceEntry]; @has_trace (self) -> bool }`
 **TraceEntry**: `type = { function: str, file: str, line: int, column: int }` — function includes `@` prefix; entries ordered most recent first
 **Drop**: `trait { @drop (self) -> void }` — custom destructor; runs when refcount reaches zero; cannot be async; panic during unwind aborts
 **Index**: `trait<Key, Value> { @index (self, key: Key) -> Value }` — `x[k]` → `x.index(key: k)`; return `T` (panics), `Option<T>`, or `Result<T, E>`; `#` shorthand built-in only
