@@ -57,3 +57,20 @@ ori test tests/spec/expressions/ # another category
 2. Create file in appropriate directory
 3. Add comment: `// Spec: 03-lexical-elements.md § Literals`
 4. Write tests validating spec, not current behavior
+
+## Test Coverage
+
+Use `cargo tarpaulin` for Rust code coverage.
+
+```bash
+# Standard crates (no LLVM)
+cargo tarpaulin -p ori_parse --lib --out Stdout
+
+# LLVM crate - MUST use docker
+./docker/llvm/run.sh "cargo tarpaulin --manifest-path compiler/ori_llvm/Cargo.toml --lib --out Stdout"
+
+# Filter to specific module
+./docker/llvm/run.sh "cargo tarpaulin --manifest-path compiler/ori_llvm/Cargo.toml --lib --out Stdout -- linker"
+```
+
+**Target: 60-80% coverage** for new modules.
