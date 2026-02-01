@@ -1,237 +1,212 @@
 # Sync Website Pages
 
-Update the website pages with the latest data from the source files.
+**FULL VERIFICATION**: This command performs a complete audit of the website against source files. It does NOT just add new items—it verifies and corrects EVERYTHING.
 
 ## Part 1: Roadmap Sync
 
-Update the website roadmap page (`website/src/pages/roadmap.astro`) with the latest data from the compiler roadmap plan.
+Perform a **full audit** of `website/src/pages/roadmap.astro` against the phase files.
 
-### Source Files (Priority Order)
+### Source of Truth
 
-**Primary source of truth for status:** `plans/roadmap/priority-and-tracking.md`
+The phase files in `plans/roadmap/phase-XX-*.md` are the **ONLY** source of truth. The website must match them exactly.
 
-1. `plans/roadmap/priority-and-tracking.md` - **AUTHORITATIVE** for phase status, notes, and test results
-2. `plans/roadmap/00-overview.md` - Phase overview, tiers, milestones, dependency graph
-3. `plans/roadmap/phase-XX-*.md` - Individual phase files with detailed task checklists
+---
 
-### Step 1: Extract Phase Status from Tracking File
+## Phase 1: Extract Data Using External Agents
 
-Read `priority-and-tracking.md` and parse each tier's status table. Tables have this format:
+**IMPORTANT**: Use the Task tool with `subagent_type: "general-purpose"` to read and extract data from phase files. This prevents context overflow.
 
-```
-| Phase | Name | Status | Notes |
-|-------|------|--------|-------|
-| 1 | Type System Foundation | 🔶 Partial | Core complete; ... pending |
-```
+### 1.1 Spawn Agents to Process Phase Files
 
-**For each row, extract:**
-- Phase number (may include letters like "7A", "21A")
-- Phase name
-- Status emoji at the START of the Status column
-- Notes text
+Launch **multiple agents in parallel** (in batches of 5-6) to extract data from phase files. Each agent should:
 
-**Status emoji mapping (match the EMOJI, not the text):**
-| Emoji | Website Status |
-|-------|----------------|
-| ✅ | `"complete"` |
-| 🔶 | `"partial"` |
-| ⏳ | `"not-started"` |
+1. Read the assigned phase file
+2. Extract and return a JSON object with this structure:
 
-**IMPORTANT:** A phase is ONLY `"complete"` if it has the ✅ emoji. Phrases like "Core complete" or "X tests pass" in the Notes do NOT mean the phase is complete—check the Status column emoji.
-
-### Step 2: Update Phase Status in roadmap.astro
-
-In `website/src/pages/roadmap.astro`, find the `const tiers: Tier[]` array (around line 128).
-
-For each phase in each tier:
-1. Find the matching phase by number
-2. Update `status:` to match the tracking file
-3. Update `note:` with the Notes text from tracking
-
-**Example change:**
-```typescript
-// Before (wrong - showing complete when tracking says partial)
+```json
 {
-  num: 1,
-  name: "Type System Foundation",
-  status: "complete",  // ❌ Wrong
-  ...
-}
-
-// After (correct - matches tracking file)
-{
-  num: 1,
-  name: "Type System Foundation",
-  status: "partial",  // ✅ Matches 🔶 in tracking
-  note: "Core complete; 1.1A Duration/Size traits, 1.1B Never semantics pending",
-  ...
-}
-```
-
-### Step 3: Update Hero Stats
-
-The hero section has hardcoded stats that MUST be recalculated:
-
-```astro
-<div class="stats">
-  <div class="stat">
-    <span class="stat-value">6</span>  <!-- UPDATE THIS -->
-    <span class="stat-label">Completed</span>
-  </div>
-  <div class="stat">
-    <span class="stat-value">9</span>  <!-- UPDATE THIS -->
-    <span class="stat-label">In Progress</span>
-  </div>
-  <div class="stat">
-    <span class="stat-value">14</span>  <!-- UPDATE THIS -->
-    <span class="stat-label">Planned</span>
-  </div>
-</div>
-```
-
-**Count from the updated tiers array:**
-- Completed = phases with `status: "complete"`
-- In Progress = phases with `status: "partial"`
-- Planned = phases with `status: "not-started"`
-
-### Step 4: Update Tier Status
-
-After updating phases, recalculate each tier's status:
-
-```typescript
-// In the tier object
-status: "complete" | "partial" | "in-progress" | "planned" | "future"
-```
-
-**Logic:**
-- `"complete"` - ALL phases in tier have `status: "complete"`
-- `"partial"` or `"in-progress"` - At least one phase is `"partial"`
-- `"planned"` - All phases are `"not-started"` but dependencies met
-- `"future"` - All phases are `"not-started"` and blocked by earlier tiers
-
-### Step 5: Sync Sections and Tasks from Phase Files
-
-**CRITICAL**: The website sections and tasks MUST match the actual phase files. This is where most sync errors occur.
-
-For each phase, read its corresponding file (`plans/roadmap/phase-XX-*.md`) and extract sections and tasks:
-
-#### 5.1 Parse Phase File Structure
-
-Phase files have this structure:
-```markdown
-## X.Y Section Name
-
-- [x] **Implement**: Task description — spec reference
-  - [x] **Rust Tests**: ...
-  - [x] **Ori Tests**: ...
-  - [ ] **LLVM Support**: ...  ← unchecked = not done
-
-- [ ] **Implement**: Another task — spec reference
-  - [ ] **Rust Tests**: ...
-```
-
-**Parsing rules:**
-1. **Sections** are `## X.Y Name` or `## X.YZ Name` (e.g., `## 1.1A Duration and Size Types`)
-2. **Tasks** are top-level `- [x]` or `- [ ]` lines under each section
-3. A task is **done** ONLY if its main checkbox AND all sub-checkboxes are `[x]`
-4. Sub-items (nested checkboxes) are NOT separate tasks—they're part of the parent task
-5. Ignore "Phase Completion Checklist" sections
-
-#### 5.2 Create Website Sections Array
-
-For each section in the phase file, create:
-
-```typescript
-{
-  name: "Section Name",  // Without the X.Y prefix
-  tasks: [
-    { name: "Brief task description", done: true/false },
-    ...
+  "num": "1",
+  "name": "Type System Foundation",
+  "done": 48,
+  "total": 48,
+  "status": "complete",
+  "sections": [
+    {
+      "name": "Primitive Types",
+      "tasks": [
+        { "name": "int type", "done": true },
+        { "name": "float type", "done": true }
+      ]
+    }
   ]
 }
 ```
 
-**Task naming rules:**
-- Remove "**Implement**:" prefix
-- Remove spec references (everything after "—")
-- Keep it brief (under 50 chars ideally)
-- Example: `- [x] **Implement**: \`int\` type — spec/06-types.md` → `{ name: "int type", done: true }`
+### 1.2 Agent Prompt Template
 
-#### 5.3 Consistency Check
+Use this prompt for each agent (replace FILE_PATH and PHASE_NUM):
 
-**IMPORTANT**: After updating sections, verify consistency:
-- If ALL tasks across ALL sections are `done: true` → phase `status` MUST be `"complete"`
-- If ANY task is `done: false` → phase `status` MUST be `"partial"` or `"not-started"`
+```
+Read the file FILE_PATH and extract roadmap data.
 
-A phase showing "9/9 tasks done" but `status: "partial"` is a SYNC ERROR. Fix by:
-1. Adding missing sections/tasks from the phase file, OR
-2. Updating the status to match task completion
+Count checkboxes:
+- done = count of "- [x]" lines
+- total = count of "- [x]" + "- [ ]" lines
 
-#### 5.4 Example: Phase 1 Sync
+Derive status:
+- done == total → "complete"
+- done == 0 → "not-started"
+- Otherwise → "partial"
 
-Reading `phase-01-type-system.md`:
-- Section 1.1 "Primitive Types" → all checked → all `done: true`
-- Section 1.1A "Duration and Size Types" → some unchecked → some `done: false`
-- Section 1.1B "Never Type Semantics" → some unchecked → some `done: false`
-- Section 1.2 "Parameter Type Annotations" → all checked → all `done: true`
-- ...
+Extract the phase name from the first line (after "# Phase X: ").
 
-Website should include ALL sections, not just 1.1-1.4:
+Parse sections (## X.Y Section Name headers) and their tasks:
+- Top-level "- [x]" or "- [ ]" items are tasks
+- Extract task name from the bold text after checkbox (e.g., "**Implement**: X" → "X")
+- A task is done: true only if its checkbox AND all nested sub-checkboxes are [x]
+- IGNORE "Phase Completion Checklist" sections
 
-```typescript
-sections: [
-  { name: "Primitive Types", tasks: [...] },
-  { name: "Duration and Size Types", tasks: [...] },  // ← MUST INCLUDE
-  { name: "Never Type Semantics", tasks: [...] },     // ← MUST INCLUDE
-  { name: "Parameter Type Annotations", tasks: [...] },
-  ...
-]
+Return ONLY a JSON object (no markdown, no explanation):
+{"num": "PHASE_NUM", "name": "...", "done": N, "total": N, "status": "...", "sections": [...]}
 ```
 
-### Step 6: Update Test Results Section
+### 1.3 Phase File List
 
-Find the "Test Results" section and update with counts from `priority-and-tracking.md`:
+Process these files in parallel batches:
 
+**Batch 1:**
+- plans/roadmap/phase-01-type-system.md (num: "1")
+- plans/roadmap/phase-02-type-inference.md (num: "2")
+- plans/roadmap/phase-03-traits.md (num: "3")
+- plans/roadmap/phase-04-modules.md (num: "4")
+- plans/roadmap/phase-05-type-declarations.md (num: "5")
+- plans/roadmap/phase-06-capabilities.md (num: "6")
+
+**Batch 2:**
+- plans/roadmap/phase-07A-core-builtins.md (num: "7A")
+- plans/roadmap/phase-07B-option-result.md (num: "7B")
+- plans/roadmap/phase-07C-collections.md (num: "7C")
+- plans/roadmap/phase-07D-stdlib-modules.md (num: "7D")
+- plans/roadmap/phase-08-patterns.md (num: "8")
+- plans/roadmap/phase-09-match.md (num: "9")
+
+**Batch 3:**
+- plans/roadmap/phase-10-control-flow.md (num: "10")
+- plans/roadmap/phase-11-ffi.md (num: "11")
+- plans/roadmap/phase-12-variadic-functions.md (num: "12")
+- plans/roadmap/phase-13-conditional-compilation.md (num: "13")
+- plans/roadmap/phase-14-testing.md (num: "14")
+- plans/roadmap/phase-15A-attributes-comments.md (num: "15A")
+
+**Batch 4:**
+- plans/roadmap/phase-15B-function-syntax.md (num: "15B")
+- plans/roadmap/phase-15C-literals-operators.md (num: "15C")
+- plans/roadmap/phase-15D-bindings-types.md (num: "15D")
+- plans/roadmap/phase-16-async.md (num: "16")
+- plans/roadmap/phase-17-concurrency.md (num: "17")
+- plans/roadmap/phase-18-const-generics.md (num: "18")
+
+**Batch 5:**
+- plans/roadmap/phase-19-existential-types.md (num: "19")
+- plans/roadmap/phase-20-reflection.md (num: "20")
+- plans/roadmap/phase-21A-llvm.md (num: "21A")
+- plans/roadmap/phase-21B-aot.md (num: "21B")
+- plans/roadmap/phase-22-tooling.md (num: "22")
+
+### 1.4 Aggregate Results
+
+After all agents complete, collect their JSON outputs and build:
+- `completedCount` = phases where `status == "complete"`
+- `partialCount` = phases where `status == "partial"`
+- `notStartedCount` = phases where `status == "not-started"`
+
+Verify: `completedCount + partialCount + notStartedCount == 29`
+
+---
+
+## Phase 2: Audit and Correct the Website
+
+Now read `website/src/pages/roadmap.astro` and **compare every field** against the extracted data.
+
+### 2.1 Audit Each Phase
+
+For EVERY phase in the website's `tiers` array:
+
+| Field | Check | Fix if wrong |
+|-------|-------|--------------|
+| `num` | Matches phase number | Update |
+| `name` | Matches phase title | Update |
+| `status` | Matches derived status from checkboxes | **UPDATE** |
+| `sections` | Contains ALL sections from phase file | **ADD missing, REMOVE extras** |
+| `sections[].tasks` | Contains ALL tasks with correct `done` values | **ADD/REMOVE/UPDATE** |
+
+**CRITICAL**: Don't just check if values exist—verify they are CORRECT. A phase showing `status: "partial"` when all checkboxes are done is WRONG and must be fixed to `"complete"`.
+
+### 2.2 Audit Hero Stats
+
+Find the hero stats section:
 ```astro
-<div class="result-card">
-  <span class="result-value">1286</span>  <!-- Rust unit tests -->
-  ...
-</div>
+<span class="stat-value">X</span>
+<span class="stat-label">Completed</span>
 ```
 
-Look for the "Current Test Results" section in the tracking file.
+**Compare against your calculated counts. Fix if different.**
 
-### Status Mapping Reference
+### 2.3 Audit Tier Status
 
-| Tracking Symbol | Website Status | Tier Status |
-|-----------------|----------------|-------------|
-| ✅ Complete | `"complete"` | counts toward tier complete |
-| 🔶 Partial | `"partial"` | tier becomes partial/in-progress |
-| ⏳ Not started | `"not-started"` | tier is planned or future |
+For each tier, recalculate status based on its phases:
+- ALL phases complete → tier `"complete"`
+- ANY phase partial → tier `"partial"` or `"in-progress"`
+- ALL phases not-started (blocked) → tier `"future"`
+- ALL phases not-started (unblocked) → tier `"planned"`
 
-### Validation Checklist
+### 2.4 Audit Sections and Tasks
 
-Before finishing, verify:
-- [ ] Every phase status matches the emoji in tracking file
-- [ ] Hero stats sum equals total phase count (29 phases)
-- [ ] Tier statuses are recalculated based on phase updates
-- [ ] Test result numbers match tracking file
-- [ ] Notes are copied from tracking file for phases with notes
-- [ ] **CRITICAL**: Task completion is CONSISTENT with phase status:
-  - If a phase shows X/X tasks done (100%), it MUST have `status: "complete"`
-  - If a phase shows N/M tasks done (N < M), it MUST have `status: "partial"`
-  - If this is violated, you have missing sections/tasks—go back to Step 5
-- [ ] All sections from the phase file are represented (check for missing sections like 1.1A, 1.1B)
+For EACH phase, compare website sections against phase file:
+
+**Check for:**
+1. **Missing sections** - Section in phase file but not on website → ADD IT
+2. **Extra sections** - Section on website but not in phase file → REMOVE IT
+3. **Wrong section names** - Name doesn't match → FIX IT
+4. **Missing tasks** - Task in phase file but not on website → ADD IT
+5. **Extra tasks** - Task on website but not in phase file → REMOVE IT
+6. **Wrong task status** - `done` value doesn't match checkbox → FIX IT
+
+---
+
+## Phase 3: Report All Discrepancies
+
+List EVERY discrepancy found and fixed:
+
+```
+## Roadmap Audit Report
+
+### Discrepancies Found and Fixed
+
+**Phase 1: Type System Foundation**
+- Status: partial → complete (was wrong, 48/48 checkboxes done)
+- Added section: "Duration and Size Types" (was missing)
+- Added section: "Never Type Semantics" (was missing)
+- Task "Ordering type" done: false → true
+
+**Phase 3: Traits**
+- Status: complete → partial (was wrong, 87/92 checkboxes done)
+- Removed task: "Old deprecated task" (not in phase file)
+
+**Hero Stats**
+- Completed: 6 → 8
+- In Progress: 9 → 7
+- Planned: 14 → 14
+
+**Tier 1**
+- Status: partial → complete (all phases now complete)
+```
 
 ---
 
 ## Part 2: Changelog Sync
 
 Update the changelog JSON file (`website/public/changelog.json`) with new commits since the last sync.
-
-### Data File
-
-The changelog data is stored as a static JSON file at `website/public/changelog.json`, loaded client-side with pagination. This keeps the page load fast even with hundreds of entries.
 
 ### Process
 
@@ -276,50 +251,15 @@ The changelog data is stored as a static JSON file at `website/public/changelog.
 ]
 ```
 
-### Page Features
-
-The changelog page (`website/src/pages/changelog.astro`) provides:
-- **Pagination**: 30 entries per page with prev/next navigation
-- **Filtering**: Filter by type (All, Features, Fixes, Docs, Refactor)
-- **Stats**: Total count, features count, fixes count
-- **Grouping**: Entries grouped by date within each page
-
 ---
 
-## Report
+## Execution Order
 
-Report what changed with specific details:
+1. **Spawn agents to extract phase data** - Process in parallel batches
+2. **Aggregate agent results** - Collect all JSON outputs
+3. **Read website file** - Get current state
+4. **Compare field by field** - Find ALL discrepancies
+5. **Fix ALL discrepancies** - Update website to match phase files exactly
+6. **Report what changed** - List every fix made
 
-### Roadmap Changes
-- **Status changes**: List each phase that changed status (e.g., "Phase 1: complete → partial")
-- **Stats update**: Old vs new hero stats (e.g., "Completed: 6 → 2")
-- **Tier changes**: Any tier status changes
-- **Test results**: Updated test counts if changed
-- **Task updates**: New tasks added or task done status changed
-
-### Changelog Changes
-- Number of new entries added
-- Date range of new commits
-
-### Example Report Format
-```
-## Roadmap Sync Complete
-
-### Phase Status Changes
-- Phase 1: complete → partial (pending: Duration/Size traits, Never semantics)
-- Phase 3: complete → partial (pending: 3.7-3.18, operator LLVM)
-- Phase 4: complete → partial (pending: tooling, extension methods)
-- Phase 5: complete → partial (pending: .inner, associated functions)
-
-### Hero Stats Updated
-- Completed: 6 → 2 (Phase 2, Phase 6)
-- In Progress: 9 → 13
-- Planned: 14 → 14
-
-### Test Results
-- Rust unit tests: 1286 (unchanged)
-- Ori spec tests: 920 (unchanged)
-
-### Changelog
-- Added 5 new entries (2026-01-30 to 2026-01-31)
-```
+**DO NOT** just spot-check a few phases. **DO NOT** assume the website is mostly correct. Verify EVERYTHING.

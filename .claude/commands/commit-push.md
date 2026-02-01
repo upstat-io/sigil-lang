@@ -72,28 +72,7 @@ EOF
 )"
 ```
 
-### Step 5: Run /sync-webpage
-
-**ACTION:** Use the Skill tool to invoke `sync-webpage` AFTER the main commit.
-
-```
-Skill(skill: "sync-webpage")
-```
-
-This syncs the website changelog to include the commit we just made.
-
-### Step 6: Commit Changelog Update
-
-If sync-webpage made changes, commit them automatically (no user confirmation needed):
-
-```bash
-git add website/public/changelog.json website/src/pages/roadmap.astro
-git commit -m "chore(website): sync changelog and roadmap"
-```
-
-Skip this step if there are no changes to commit.
-
-### Step 7: Push
+### Step 5: Push
 
 ```bash
 git push
@@ -111,9 +90,7 @@ Before completing, verify:
 - [ ] Commit message follows conventional format (Step 2)
 - [ ] User confirmed before committing (Step 3)
 - [ ] Main changes committed (Step 4)
-- [ ] `/sync-webpage` was run AFTER main commit (Step 5)
-- [ ] Changelog update committed if needed (Step 6)
-- [ ] Changes pushed (Step 7)
+- [ ] Changes pushed (Step 5)
 
 ---
 
@@ -134,8 +111,6 @@ perf(typeck): optimize line lookup and hash map usage
 
 - Always run `git status` before committing
 - Always get user confirmation before the main commit
-- Run `/sync-webpage` AFTER the main commit so the changelog includes it
-- Changelog commit is automatic (no confirmation needed)
 - Never force push or use destructive git operations
 - Keep the first line of commit message under 72 characters
 - Do NOT include `Co-Authored-By` lines in commit messages
