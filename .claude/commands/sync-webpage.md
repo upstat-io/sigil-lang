@@ -109,16 +109,82 @@ status: "complete" | "partial" | "in-progress" | "planned" | "future"
 - `"planned"` - All phases are `"not-started"` but dependencies met
 - `"future"` - All phases are `"not-started"` and blocked by earlier tiers
 
-### Step 5: Update Task Bullet Points (if needed)
+### Step 5: Sync Sections and Tasks from Phase Files
 
-Each phase has `sections` with `tasks`. Review individual phase files (`phase-XX-*.md`) for detailed status:
+**CRITICAL**: The website sections and tasks MUST match the actual phase files. This is where most sync errors occur.
+
+For each phase, read its corresponding file (`plans/roadmap/phase-XX-*.md`) and extract sections and tasks:
+
+#### 5.1 Parse Phase File Structure
+
+Phase files have this structure:
+```markdown
+## X.Y Section Name
+
+- [x] **Implement**: Task description — spec reference
+  - [x] **Rust Tests**: ...
+  - [x] **Ori Tests**: ...
+  - [ ] **LLVM Support**: ...  ← unchecked = not done
+
+- [ ] **Implement**: Another task — spec reference
+  - [ ] **Rust Tests**: ...
+```
+
+**Parsing rules:**
+1. **Sections** are `## X.Y Name` or `## X.YZ Name` (e.g., `## 1.1A Duration and Size Types`)
+2. **Tasks** are top-level `- [x]` or `- [ ]` lines under each section
+3. A task is **done** ONLY if its main checkbox AND all sub-checkboxes are `[x]`
+4. Sub-items (nested checkboxes) are NOT separate tasks—they're part of the parent task
+5. Ignore "Phase Completion Checklist" sections
+
+#### 5.2 Create Website Sections Array
+
+For each section in the phase file, create:
+
+```typescript
+{
+  name: "Section Name",  // Without the X.Y prefix
+  tasks: [
+    { name: "Brief task description", done: true/false },
+    ...
+  ]
+}
+```
+
+**Task naming rules:**
+- Remove "**Implement**:" prefix
+- Remove spec references (everything after "—")
+- Keep it brief (under 50 chars ideally)
+- Example: `- [x] **Implement**: \`int\` type — spec/06-types.md` → `{ name: "int type", done: true }`
+
+#### 5.3 Consistency Check
+
+**IMPORTANT**: After updating sections, verify consistency:
+- If ALL tasks across ALL sections are `done: true` → phase `status` MUST be `"complete"`
+- If ANY task is `done: false` → phase `status` MUST be `"partial"` or `"not-started"`
+
+A phase showing "9/9 tasks done" but `status: "partial"` is a SYNC ERROR. Fix by:
+1. Adding missing sections/tasks from the phase file, OR
+2. Updating the status to match task completion
+
+#### 5.4 Example: Phase 1 Sync
+
+Reading `phase-01-type-system.md`:
+- Section 1.1 "Primitive Types" → all checked → all `done: true`
+- Section 1.1A "Duration and Size Types" → some unchecked → some `done: false`
+- Section 1.1B "Never Type Semantics" → some unchecked → some `done: false`
+- Section 1.2 "Parameter Type Annotations" → all checked → all `done: true`
+- ...
+
+Website should include ALL sections, not just 1.1-1.4:
 
 ```typescript
 sections: [
-  { name: "Section Name", tasks: [
-    { name: "Task description", done: true },  // [x] in phase file
-    { name: "Another task", done: false },     // [ ] in phase file
-  ]},
+  { name: "Primitive Types", tasks: [...] },
+  { name: "Duration and Size Types", tasks: [...] },  // ← MUST INCLUDE
+  { name: "Never Type Semantics", tasks: [...] },     // ← MUST INCLUDE
+  { name: "Parameter Type Annotations", tasks: [...] },
+  ...
 ]
 ```
 
@@ -151,6 +217,11 @@ Before finishing, verify:
 - [ ] Tier statuses are recalculated based on phase updates
 - [ ] Test result numbers match tracking file
 - [ ] Notes are copied from tracking file for phases with notes
+- [ ] **CRITICAL**: Task completion is CONSISTENT with phase status:
+  - If a phase shows X/X tasks done (100%), it MUST have `status: "complete"`
+  - If a phase shows N/M tasks done (N < M), it MUST have `status: "partial"`
+  - If this is violated, you have missing sections/tasks—go back to Step 5
+- [ ] All sections from the phase file are represented (check for missing sections like 1.1A, 1.1B)
 
 ---
 
