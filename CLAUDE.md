@@ -88,6 +88,7 @@ Expression-based, strict static typing, type inference, mandatory testing. Compi
 ## Declarations
 
 **Functions**: `@name (p: T) -> R = expr` | `pub @name` | `@name<T>` | `@name<T: Trait>` | `@name<T: A + B>` | `where T: Clone` | `uses Capability` | `(x: int = 10)` defaults
+**Variadics**: `@sum (nums: ...int) -> int` | receives as `[T]` | call: `sum(1, 2, 3)` | spread: `sum(...list)` | trait objects: `...Printable` | empty calls need explicit type for generics
 **Clauses**: `@f (0: int) -> int = 1` then `@f (n) = n * f(n-1)` | `if guard` | exhaustive, top-to-bottom
 **Constants**: `let $name = value` | `pub let $name` | module-level must be `$`
 **Const Functions**: `$name (p: T) -> R = expr` — pure, comptime, limits: 1M steps/1000 depth/100MB/10s
@@ -174,10 +175,11 @@ Bottom type (uninhabited); coerces to any `T`
 **Access**: `v.field`, `v.method(arg: v)` — named args required except: fn variables, single-param with inline lambda
 **Lambdas**: `x -> x + 1` | `(a, b) -> a + b` | `() -> 42` | `(x: int) -> int = x * 2` — capture by value
 **Ranges**: `0..10` excl | `0..=10` incl | `0..10 by 2` | descending: `10..0 by -1` | infinite: `0..`, `0.. by -1` | int only
-**Loops**: `for i in items do e` | `for x in items yield x * 2` | `for x in items if g yield x` | nested `for` | `loop(e)` + `break`/`continue` | `break value` | `continue value`
+**Loops**: `for i in items do e` | `for x in items yield x * 2` | `for x in items if g yield x` | nested `for` | `loop(body)` + `break`/`continue` | `break value` | `continue value`
+**Loop body**: single expression; `loop(run(...))` for sequences | type: `void` (break no value), inferred (break value), `Never` (no break) | `continue value` error (E0861)
 **Yield control**: `continue` skips | `continue value` substitutes | `break` stops | `break value` adds final | `{K: V}` from `(K, V)` tuples
 **Labels**: `loop:name` | `for:name` | `break:name` | `continue:name` | no shadowing | `continue:name value` in yield → outer
-**Spread**: `[...a, ...b]` | `{...a, ...b}` | `P { ...orig, x: 10 }` — later wins, literal contexts only
+**Spread**: `[...a, ...b]` | `{...a, ...b}` | `P { ...orig, x: 10 }` — later wins, literal contexts only | `fn(...list)` into variadic only
 
 ## Patterns (compiler constructs)
 
@@ -200,6 +202,7 @@ Bottom type (uninhabited); coerces to any `T`
 
 **Native (C)**: `extern "c" from "lib" { @_sin (x: float) -> float as "sin" }` | `from` specifies library | `as` maps name
 **JavaScript**: `extern "js" { @_sin (x: float) -> float as "Math.sin" }` | `extern "js" from "./utils.js"`
+**C Variadics**: `extern "c" { @printf (fmt: CPtr, ...) -> c_int }` — untyped, requires `unsafe`, platform va_list ABI
 **Types**: `CPtr` opaque | `Option<CPtr>` nullable | `JsValue` handle | `JsPromise<T>` async
 **C Types**: `c_char`, `c_short`, `c_int`, `c_long`, `c_longlong`, `c_float`, `c_double`, `c_size`
 **Layout**: `#repr("c") type T = { ... }` | **Unsafe**: `unsafe { ptr_read(...) }` | **Capability**: `uses FFI`
