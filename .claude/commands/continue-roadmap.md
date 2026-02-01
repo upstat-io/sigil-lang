@@ -313,17 +313,7 @@ When completing a roadmap item:
 
 ---
 
-## Maintaining the Roadmap
-
-### Creating New Sections
-
-Use the template at `plans/_template/roadmap-section.md` when creating new roadmap sections. It includes:
-- YAML frontmatter structure
-- Subsection format with checkboxes
-- Status conventions and tier definitions
-- Instructions for updating the index
-
-### Updating the Index
+## Maintaining the Roadmap Index
 
 **IMPORTANT:** When adding new items to the roadmap, update `plans/roadmap/index.md`:
 

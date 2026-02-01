@@ -47,12 +47,6 @@ Analyze all commits since the last release tag and create release notes in this 
 
 ### Performance
 - Brief description of optimization
-
-### Documentation
-- Brief description of doc change
-
-### Internal
-- Brief description of refactor/chore
 ```
 
 **Guidelines for release notes:**
@@ -61,12 +55,13 @@ Analyze all commits since the last release tag and create release notes in this 
   - `feat` → Features
   - `fix` → Bug Fixes
   - `perf` → Performance
-  - `docs` → Documentation
-  - `refactor`, `chore`, `build`, `ci`, `test`, `style` → Internal (combine or omit if not user-facing)
+- **Exclude from release notes:**
+  - `docs` → Documentation changes (not user-facing)
+  - `refactor`, `chore`, `build`, `ci`, `test`, `style` → Internal changes
 - Write descriptions from the user's perspective (what they get, not what you changed)
 - Keep each bullet point to one line
-- Skip trivial changes (typos, minor internal cleanup) unless they're significant
-- Focus on what matters to someone reading the release
+- Skip trivial changes (typos, minor internal cleanup)
+- Focus on what matters to someone reading the release: features, fixes, and performance
 
 ### Step 3: Present Release Plan to User
 
@@ -159,7 +154,7 @@ jkl3456 docs: update installation guide
 mno7890 chore(ci): update LLVM version
 ```
 
-Generate:
+Generate (excluding docs/chore/ci commits):
 ```markdown
 ## What's New in v0.1.0-alpha.8
 
@@ -172,8 +167,6 @@ Generate:
 ### Performance
 - Optimize constant folding pass in LLVM backend
 ```
-
-(Documentation and CI changes omitted as they're not user-facing for this example)
 
 ---
 

@@ -208,24 +208,24 @@ Execute only after user confirms approval AND no blockers exist.
 - [ ] Remove any `## Blockers` section
 - [ ] `git mv docs/ori_lang/proposals/drafts/<name>-proposal.md docs/ori_lang/proposals/approved/`
 
-### Step 12: Determine Target Phase
+### Step 12: Determine Target Section
 
-| Proposal Type | Phase File |
-|---------------|------------|
-| Syntax changes | `phase-15-syntax-proposals.md` |
-| New traits (prelude) | `phase-03-traits.md` |
-| Stdlib additions | `phase-07-stdlib.md` |
-| Type system | `phase-01-type-system.md` or `phase-02-type-inference.md` |
-| Patterns | `phase-08-patterns.md` |
-| Capabilities | `phase-06-capabilities.md` |
-| Testing framework | `phase-14-testing.md` |
-| Tooling | `phase-22-tooling.md` |
+| Proposal Type | Section File |
+|---------------|--------------|
+| Syntax changes | `section-15A/B/C/D-*.md` |
+| New traits (prelude) | `section-03-traits.md` |
+| Stdlib additions | `section-07A/B/C/D-*.md` |
+| Type system | `section-01-type-system.md` or `section-02-type-inference.md` |
+| Patterns | `section-08-patterns.md` |
+| Capabilities | `section-06-capabilities.md` |
+| Testing framework | `section-14-testing.md` |
+| Tooling | `section-22-tooling.md` |
 
-Some proposals affect multiple phases — add entries to each.
+Some proposals affect multiple sections — add entries to each.
 
-### Step 13: Add to Phase File
+### Step 13: Add to Section File
 
-Add section to `plans/roadmap/phase-XX-*.md`:
+Add subsection to `plans/roadmap/section-XX-*.md`:
 ```markdown
 ## X.Y Proposal Name
 **Proposal**: `proposals/approved/<name>-proposal.md`
@@ -247,7 +247,7 @@ Brief description.
 ```markdown
 **Proposal Name** — ✅ APPROVED YYYY-MM-DD
 - Proposal: `proposals/approved/<name>-proposal.md`
-- Implementation: Phase X.Y
+- Implementation: Section X.Y
 - [Key features]
 - Blocked on: [deps or "None"]
 ```
@@ -314,7 +314,7 @@ Commit message format:
 docs(proposal): approve <proposal-name>
 
 - Move from drafts/ to approved/
-- Add implementation plan to Phase X
+- Add implementation plan to Section X
 - Update roadmap tracking
 - Update spec ([affected files])
 - Update CLAUDE.md with [feature]
@@ -344,7 +344,7 @@ Proposal: docs/ori_lang/proposals/approved/<name>-proposal.md
 - [ ] Proposal updated with approved changes
 - [ ] Moved from `drafts/` to `approved/`
 - [ ] Status updated to `Approved`, date added
-- [ ] Implementation tasks added to phase file(s)
+- [ ] Implementation tasks added to section file(s)
 - [ ] `plan.md` updated (if applicable)
 - [ ] `priority-and-tracking.md` updated
 - [ ] Spec updated (if affects semantics)
