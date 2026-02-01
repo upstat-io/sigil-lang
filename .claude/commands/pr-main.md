@@ -53,7 +53,6 @@ Create a PR title and summary based on the commits:
 
 **PR Summary:** Include:
 - `## Summary` - 1-3 bullet points of key changes
-- `## Test plan` - How to verify the changes
 
 ### Step 5: Present PR Details and Get Confirmation
 
@@ -74,9 +73,6 @@ After user confirms:
 gh pr create --base master --title "<title>" --body "$(cat <<'EOF'
 ## Summary
 <bullet points>
-
-## Test plan
-<verification steps>
 EOF
 )"
 ```
@@ -124,10 +120,6 @@ Before completing, verify:
 - Add exhaustiveness analysis for match patterns
 - Report missing variants with helpful suggestions
 - Handle guard clauses correctly
-
-## Test plan
-- [x] `./test-all` passes
-- [x] New tests in `tests/spec/typeck/exhaustiveness/`
 ```
 
 ---
