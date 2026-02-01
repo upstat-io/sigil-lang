@@ -431,11 +431,11 @@ Task(
 
 ---
 
-## 10. Extractable Patterns
+## 10. Extractable Patterns & Emergent Complexity
 
-> Match arm clustering, repetitive structures, module extraction opportunities
+> Match arm clustering, repetitive structures, module extraction, emergent abstractions, responsibility divergence
 
-This category specifically targets **large functions with clustered similar code** that should be extracted into separate modules. These are often missed by line-count heuristics because each individual arm is small, but groups of arms share structure.
+This category targets both **structural patterns** (large functions with clustered similar code) and **emergent patterns** (code that has organically evolved to the point where new abstractions should be extracted). Structural patterns are caught by line-count heuristics; emergent patterns require recognizing when complexity has crossed a threshold where the code is "asking" to be restructured.
 
 ### Detection Patterns
 
@@ -465,25 +465,54 @@ This category specifically targets **large functions with clustered similar code
   - All wrappers: `Ok`, `Err`, `Some`, `None`, `Try`, `Await`
   - All control flow: `If`, `For`, `Loop`, `Block`, `Return`, `Break`
 
+**Emergent Complexity (HIGH)**
+- **Responsibility divergence**: Module has 3+ distinct concerns that started as one
+  - Look for: logical sections separated by comments, unrelated import clusters, function groups that don't call each other
+  - Symptom: file has 3+ "sections" that could each be their own module
+- **Cross-file pattern crystallization**: Same pattern repeated in 4+ files
+  - Same error handling approach, same type transformation, same visitor structure
+  - If you can name the pattern, it deserves a module
+- **Type clustering**: Types that are always imported together or used together
+  - Suggests they belong in one module with a clear abstraction boundary
+- **Implicit submodule**: File has 100+ line section with its own helpers that don't interact with rest of file
+  - The section has become a module in all but name
+- **Scattered concept ownership**: A concept (e.g., "width calculation", "name resolution") spread across 3+ files with no clear home
+
 **MEDIUM**
 - **Missing abstraction**: Same 3-line pattern appears 5+ times (even with different variable names)
 - **Inline helpers**: Private functions that only serve one match arm but are defined at module level
 - **Scattered related code**: Functions operating on same concept spread across file instead of grouped
+- **Abstraction debt**: 3+ similar helpers with slight variations that could be unified
+- **Naming convergence**: Functions with common prefix/suffix across files (`width_*`, `*_visitor`, `resolve_*`) suggesting latent abstraction
 
 ### How to Detect
 
+**Structural patterns (within files):**
 1. **Count match arms**: Any `match` with 15+ arms is a candidate
 2. **Group by structure**: Identify arms with same operation sequence (ignoring specific fields/types)
 3. **Name the groups**: If you can name a group ("wrapper expressions", "binary operations"), it should be a module
 4. **Check delegation**: Arms that immediately delegate to a helper suggest the helper should be in its own file
 
+**Emergent patterns (across codebase):**
+1. **Trace concepts**: Follow a concept (e.g., "formatting") through the codebase - where does it live?
+2. **Check cohesion**: Do functions in a module call each other, or are they independent?
+3. **Look for import clusters**: Files that import the same 3+ items together suggest missing abstraction
+4. **Find naming patterns**: `width_of_*`, `resolve_*`, `visit_*` across files = latent module
+5. **Ask "where does X live?"**: If the answer is "spread across 3 files", that's a smell
+
 ### Extraction Indicators
 
-Extract when a group of arms:
-- Has 3+ members with identical structure
+**Structural (extract within file):**
+- Group of match arms has 3+ members with identical structure
 - Has a clear conceptual name (calls, collections, wrappers, control)
 - Would benefit from shared helper functions
-- Could have its own tests
+
+**Emergent (extract to new module):**
+- Concept has no clear home - lives in 3+ files partially
+- Functions with common naming pattern could share infrastructure
+- A "section" of a file has become self-contained (100+ lines, own helpers)
+- Types are always used together but defined separately
+- You keep adding to the same scattered set of functions
 
 ### Example Violation
 
@@ -528,11 +557,18 @@ fn calculate_width(&mut self, expr_id: ExprId) -> usize {
 
 ### Checklist
 
+**Structural:**
 - [ ] No match statements with 20+ arms in single file
 - [ ] Related match arms grouped together (not scattered)
 - [ ] Conceptually related arms extracted to modules (calls.rs, wrappers.rs, etc.)
 - [ ] Repetitive iteration patterns use shared helper (`accumulate_widths`)
-- [ ] Each extracted module has focused, testable responsibility
+
+**Emergent:**
+- [ ] Each concept has a clear home (not spread across 3+ files)
+- [ ] Modules have single responsibility (not 3+ unrelated concerns)
+- [ ] Functions with common naming patterns consolidated
+- [ ] Types that are always used together live together
+- [ ] No 100+ line "sections" that function as implicit submodules
 
 ---
 
