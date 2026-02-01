@@ -80,15 +80,17 @@ Tier 8 (Ecosystem):
 
 For each phase file in order:
 
-1. Read the phase file
-2. Find all checkboxes: `- [ ]` (incomplete) and `- [x]` (complete)
-3. Look for the **first** `- [ ]` checkbox (incomplete item)
-4. If found, this phase has incomplete work — use this phase
-5. If all checkboxes are `[x]`, continue to next phase
+1. Read the phase file's YAML frontmatter
+2. Check the phase `status` field:
+   - If `status: complete`, skip to next phase
+   - If `status: in-progress` or `status: not-started`, this phase has work — use it
+3. For the selected phase, find the first `- [ ]` checkbox in the body
 
 **Stop at the first phase with incomplete work.** This is the focus phase.
 
-If ALL phases are complete, report "Roadmap complete!"
+If ALL phases have `status: complete`, report "Roadmap complete!"
+
+> **Note:** The YAML frontmatter `status` field is the source of truth. It should always match the checkbox state in the body. If they're out of sync, trust the checkboxes and fix the frontmatter.
 
 ### Step 3: Load Phase Details
 
@@ -160,8 +162,84 @@ Based on user choice:
    - Does the formatter handle the new syntax? Check `compiler/ori_fmt/`
    - Are formatting tests needed? Check/update `tests/spec/formatting/`
    - Run `./fmt-all` to ensure formatter still works
-3. **Update phase file** — Check off completed items with `[x]`
-4. **Commit with clear message** — Reference the phase and task
+3. **Update phase file** — Check off completed items with `[x]}
+4. **Update YAML frontmatter** — See "Updating Phase File Frontmatter" below
+5. **Commit with clear message** — Reference the phase and task
+
+---
+
+## Updating Phase File Frontmatter
+
+Phase files use YAML frontmatter for machine-readable status tracking. **You must keep this in sync** when completing tasks.
+
+### Frontmatter Structure
+
+```yaml
+---
+phase: 1
+title: Type System Foundation
+status: in-progress          # Phase-level status
+tier: 1
+goal: Fix type checking...
+sections:
+  - id: "1.1"
+    title: Primitive Types
+    status: complete         # Section-level status
+  - id: "1.1B"
+    title: Never Type Semantics
+    status: in-progress
+---
+```
+
+### Status Values
+
+- `not-started` — No checkboxes completed in section/phase
+- `in-progress` — Some checkboxes completed, some pending
+- `complete` — All checkboxes completed
+
+### When to Update
+
+**After completing task checkboxes**, update the frontmatter:
+
+1. **Update section status** based on checkboxes under that `## X.Y` header:
+   - All `[x]` → `status: complete`
+   - Mix of `[x]` and `[ ]` → `status: in-progress`
+   - All `[ ]` → `status: not-started`
+
+2. **Update phase status** based on section statuses:
+   - All sections complete → `status: complete`
+   - Any section in-progress → `status: in-progress`
+   - All sections not-started → `status: not-started`
+
+### Example Update
+
+If you complete the last checkbox in section 1.1B:
+
+```yaml
+# Before
+  - id: "1.1B"
+    title: Never Type Semantics
+    status: in-progress
+
+# After
+  - id: "1.1B"
+    title: Never Type Semantics
+    status: complete
+```
+
+Then check if ALL sections are now complete. If so, update the phase status:
+
+```yaml
+# Before
+status: in-progress
+
+# After (only if ALL sections are complete)
+status: complete
+```
+
+### Why This Matters
+
+The website dynamically loads roadmap data from these YAML frontmatter blocks. Incorrect status values cause the roadmap page to show wrong progress information.
 
 ---
 
@@ -210,5 +288,8 @@ When completing a roadmap item:
 - [ ] Check if formatting needs updates (if syntax changed):
   - [ ] Formatter handles new syntax (`compiler/ori_fmt/`)
   - [ ] Formatting tests cover new syntax (`tests/spec/formatting/`)
-- [ ] Update phase file checkboxes (mark items `[x]`)
+- [ ] Update phase file:
+  - [ ] Check off completed items with `[x]`
+  - [ ] Update section `status` in YAML frontmatter if section is now complete
+  - [ ] Update phase `status` in YAML frontmatter if all sections are now complete
 - [ ] Commit with phase reference in message
