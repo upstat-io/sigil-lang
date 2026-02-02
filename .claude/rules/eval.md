@@ -8,6 +8,8 @@ paths: **/eval/**
 
 **Do it properly, not just simply. Correct architecture over quick hacks; no shortcuts or "good enough" solutions.**
 
+**⚠️ Ori is EXPRESSION-BASED — NO `return`**: Functions evaluate their body expression; the result IS the return value. No `ExprKind::Return` exists. Control flow: `?` (error propagation), `break` (loops), `panic`.
+
 # Interpreter
 
 ## Architecture

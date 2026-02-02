@@ -6,7 +6,9 @@
 
 **TDD for bugs**: Issue found + tests pass → write test for correct behavior (must fail) → fix code → test passes unchanged
 
-**Ori**: Statically-typed expression language. HM inference, ARC memory, capability effects, mandatory tests. Targets LLVM/WASM. Compiler in Rust (Salsa-based).
+**Ori**: Statically-typed **expression-based** language. HM inference, ARC memory, capability effects, mandatory tests. Targets LLVM/WASM. Compiler in Rust (Salsa-based).
+
+**⚠️ EXPRESSION-BASED — NO `return` KEYWORD**: Every block's value is its last expression. There is no `return` statement. Early exit uses `?` (propagate errors), `break` (exit loops), or `panic` (terminate). The `return` keyword is intentionally not part of Ori. Similar to: Rust (closest), Gleam, Roc, Ruby, Elixir, OCaml.
 
 ---
 
@@ -38,7 +40,7 @@
 
 # Ori — Code That Proves Itself
 
-Expression-based, strict static typing, type inference, mandatory testing. Compiles → has tests; has tests → they pass.
+**Expression-based** (no `return` — last expression is the value), strict static typing, type inference, mandatory testing. Compiles → has tests; has tests → they pass.
 
 ## Commands
 
@@ -56,10 +58,11 @@ Expression-based, strict static typing, type inference, mandatory testing. Compi
 
 ## Design Pillars
 
-1. **Mandatory Verification**: Functions need tests; contracts (`pre_check:`/`post_check:`)
-2. **Dependency-Aware Integrity**: Tests in dep graph; changes propagate
-3. **Explicit Effects**: Capabilities (`uses Http`); trivial mocking (`with Http = Mock in`)
-4. **ARC-Safe**: No GC/borrow checker; capture by value; no shared mutable refs
+1. **Expression-Based**: Everything is an expression; last expression is the block's value; no `return` keyword
+2. **Mandatory Verification**: Functions need tests; contracts (`pre_check:`/`post_check:`)
+3. **Dependency-Aware Integrity**: Tests in dep graph; changes propagate
+4. **Explicit Effects**: Capabilities (`uses Http`); trivial mocking (`with Http = Mock in`)
+5. **ARC-Safe**: No GC/borrow checker; capture by value; no shared mutable refs
 
 ## Reference Repos (`~/lang_repos/`)
 

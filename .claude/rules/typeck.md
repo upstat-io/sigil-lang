@@ -8,6 +8,8 @@ paths: **/typeck/**
 
 **Do it properly, not just simply. Correct architecture over quick hacks; no shortcuts or "good enough" solutions.**
 
+**⚠️ Ori is EXPRESSION-BASED — NO `return`**: Function body type IS the return type. No special return-type unification. Control flow: `?` (propagates via `EvalError`), `break` (loops), `panic` (Never).
+
 # Type Checking
 
 ## Architecture (5 Components)

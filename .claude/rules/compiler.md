@@ -8,6 +8,8 @@ paths: **/compiler/**
 
 **Do it properly, not just simply. Correct architecture over quick hacks; no shortcuts or "good enough" solutions.**
 
+**⚠️ Ori is EXPRESSION-BASED — NO `return` KEYWORD**: The last expression in any block IS its value. Early exit: `?` (error propagation), `break` (loops), `panic` (terminate). Never add `return` support.
+
 # Compiler Development
 
 ## Architecture
