@@ -43,7 +43,10 @@ Expression-based, strict static typing, type inference, mandatory testing. Compi
 **Primary**: `./test-all`, `./clippy-all`, `./fmt-all`, `./build-all` (includes LLVM)
 **Tests**: `cargo t` (Rust), `cargo st` (Ori), `cargo st tests/spec/path/` (specific), `./llvm-test`
 **Build**: `cargo c`/`cl`/`b`/`fmt`, `./llvm-build`, `./llvm-clippy`
+**LLVM/AOT**: `cargo bl` (debug), `cargo blr` (release) — builds oric + ori_rt with LLVM feature
 **Always run `./test-all` after compiler changes.**
+
+> **Note**: AOT compilation (`ori build`) requires `libori_rt.a`. Use `cargo bl`/`blr` to build both the compiler and runtime library together.
 
 ## Key Paths
 

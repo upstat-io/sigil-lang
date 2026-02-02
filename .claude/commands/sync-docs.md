@@ -123,6 +123,16 @@ Design docs explain **WHY** and **HOW**, not just what:
 - Include diagrams or ASCII art where helpful
 - Reference the spec (`docs/ori_lang/0.1-alpha/spec/`) for normative definitions
 
+### What to Exclude
+
+**DO NOT include:**
+- Unit test counts or numbers (e.g., "tested by 47 unit tests")
+- Test coverage percentages
+- Specific test file counts
+- Any metrics that change as tests are added/removed
+
+These are volatile implementation details, not design documentation. Design docs describe architecture and design decisions that remain stable — test counts belong in CI reports, not design documents.
+
 ## Example Updates
 
 ### Compiler: Multi-field variant patterns

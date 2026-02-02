@@ -36,11 +36,30 @@ paths: **/typeck/**
 - `with_infer_env_scope(|c| { ... })`
 - `with_infer_bindings(bindings, |c| { ... })`
 
+## Type Inference
+
+- Hindley-Milner with extensions
+- Bidirectional: check mode vs infer mode
+- `fresh_var()` for inference variables
+- Unification with occurs check
+- Generalization: free vars → quantified
+
+## Common Errors
+
+| Code | Description |
+|------|-------------|
+| E2001 | Type mismatch |
+| E2009 | Trait bound not satisfied |
+| E2010 | Coherence violation (duplicate impl) |
+| E2015 | Type param ordering |
+| E2016 | Missing type arguments |
+
 ## Key Files
 
 | File | Purpose |
 |------|---------|
 | `checker/components.rs` | TypeChecker struct, 5 components |
+| `checker/expressions/` | Expression type checking |
 | `registry/mod.rs` | TypeRegistry |
 | `registry/trait_registry.rs` | TraitRegistry, coherence |
 | `checker/trait_registration.rs` | Trait/impl validation |
