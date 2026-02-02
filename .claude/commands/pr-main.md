@@ -1,6 +1,6 @@
 # PR to Main
 
-Commit, push, create a PR to main/master, and auto-merge. Streamlines the dev → master workflow into a single command.
+Commit, push, create a PR to main/master, and enable auto-merge. The PR will automatically merge once CI passes. Streamlines the dev → master workflow into a single command.
 
 ## Usage
 
@@ -61,11 +61,11 @@ Show the user:
 2. Number of commits included
 3. PR title and summary
 
-Ask: "Shall I create and merge this PR?"
+Ask: "Shall I create this PR with auto-merge enabled?"
 
 **Do NOT create the PR until user confirms.**
 
-### Step 6: Create and Auto-Merge PR
+### Step 6: Create PR and Enable Auto-Merge
 
 After user confirms:
 
@@ -77,23 +77,15 @@ EOF
 )"
 ```
 
-Then immediately merge:
+Then enable auto-merge (PR will merge automatically when CI passes):
 
 ```bash
-gh pr merge --merge --delete-branch=false
+gh pr merge --auto --merge --delete-branch=false
 ```
 
-Note: `--delete-branch=false` keeps the dev branch for continued work.
+Note: `--auto` queues the PR to merge once CI passes. `--delete-branch=false` keeps the dev branch.
 
-### Step 7: Sync Local Master
-
-Update local master to match remote:
-
-```bash
-git fetch origin master:master
-```
-
-Report success with the merged PR URL.
+Report success with the PR URL and note that it will auto-merge when CI passes.
 
 ---
 
@@ -105,8 +97,7 @@ Before completing, verify:
 - [ ] Changes committed and pushed (Step 2)
 - [ ] PR title and summary drafted (Step 4)
 - [ ] User confirmed before creating PR (Step 5)
-- [ ] PR created and merged (Step 6)
-- [ ] Local master synced (Step 7)
+- [ ] PR created and auto-merge enabled (Step 6)
 
 ---
 
