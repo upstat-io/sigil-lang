@@ -229,7 +229,7 @@ Bottom type (uninhabited); coerces to any `T`
 
 ## Formatting
 
-4 spaces, 100 char limit, trailing commas multi-line only | Space around: binary ops, arrows, colons/commas, `pub`, struct braces, `as`/`by`/`|`, `=` in `<T = Self>` | No space: parens/brackets, `.`/`..`/`?`, empty delimiters | Break at 100; `run`/`try`/`match`/`recurse`/`parallel`/`spawn`/`nursery` always stacked | Params/args/generics/where/fields/variants one-per-line; chains break at `.method()`; binary break before op; `if...then` together, `else` newline
+4 spaces, 100 char limit, trailing commas multi-line only | Space around: binary ops, arrows, colons/commas, `pub`, struct braces, `as`/`by`/`|`, `=` in `<T = Self>` | No space: parens/brackets, `.`/`..`/`?`, empty delimiters | Break at 100; `run` width-based; `try`/`match`/`recurse`/`parallel`/`spawn`/`nursery` always stacked | Params/args/generics/where/fields/variants one-per-line; chains break at `.method()`; binary break before op; `if...then` together, `else` newline; chained `else if` each on own line | Parens preserved when semantically required: `(for x in items yield x).fold(...)`, `(x -> x * 2)(5)`, `for x in (inner) yield x`
 
 ## Keywords
 
