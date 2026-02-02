@@ -40,7 +40,7 @@ use inkwell::IntPredicate;
 use tracing::instrument;
 
 use ori_ir::ast::patterns::BindingPattern;
-use ori_ir::ast::ExprKind;
+use ori_ir::ast::{BinaryOp, ExprKind};
 use ori_ir::{ExprArena, ExprId, Name, TypeId};
 
 use crate::context::CodegenCx;
@@ -148,6 +148,16 @@ impl<'a, 'll, 'tcx> Builder<'a, 'll, 'tcx> {
         self.llbuilder
             .build_unreachable()
             .expect("build_unreachable");
+    }
+
+    /// Build a global string pointer (C-style null-terminated string).
+    ///
+    /// Returns a pointer to the string data that can be passed to C functions.
+    pub fn build_global_string_ptr(&self, value: &str, name: &str) -> PointerValue<'ll> {
+        self.llbuilder
+            .build_global_string_ptr(value, name)
+            .expect("build_global_string_ptr")
+            .as_pointer_value()
     }
 
     // -- Arithmetic --
@@ -720,6 +730,22 @@ impl<'a, 'll, 'tcx> Builder<'a, 'll, 'tcx> {
 
             // Binary operations
             ExprKind::Binary { op, left, right } => {
+                // Short-circuit evaluation for logical operators
+                match op {
+                    BinaryOp::And => {
+                        return self.compile_short_circuit_and(
+                            *left, *right, arena, expr_types, locals, function, loop_ctx,
+                        );
+                    }
+                    BinaryOp::Or => {
+                        return self.compile_short_circuit_or(
+                            *left, *right, arena, expr_types, locals, function, loop_ctx,
+                        );
+                    }
+                    _ => {}
+                }
+
+                // Non-short-circuit operators: evaluate both sides
                 let lhs =
                     self.compile_expr(*left, arena, expr_types, locals, function, loop_ctx)?;
                 let rhs =

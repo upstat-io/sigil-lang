@@ -78,11 +78,15 @@
 //! - `linker`: Platform-agnostic linker driver
 
 pub mod debug;
+pub mod incremental;
 pub mod linker;
 pub mod mangle;
 pub mod object;
 pub mod passes;
+pub mod runtime;
+pub mod syslib;
 pub mod target;
+pub mod wasm;
 
 // Re-export key types from target
 pub use target::{
@@ -112,4 +116,16 @@ pub use passes::{
 pub use linker::{
     GccLinker, LibraryKind, LinkInput, LinkLibrary, LinkOutput, LinkerDetection, LinkerDriver,
     LinkerError, LinkerFlavor, LinkerImpl, MsvcLinker, WasmLinker,
+};
+
+// Re-export key types from runtime
+pub use runtime::{RuntimeConfig, RuntimeNotFound};
+
+// Re-export key types from syslib
+pub use syslib::{find_library, library_exists, LibrarySearchOrder, SysLibConfig, SysLibError};
+
+// Re-export key types from wasm
+pub use wasm::{
+    JsBindingGenerator, WasiConfig, WasiPreopen, WasiVersion, WasmConfig, WasmError, WasmExport,
+    WasmMemoryConfig, WasmOptLevel, WasmOptRunner, WasmStackConfig, WasmType,
 };
