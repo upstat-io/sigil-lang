@@ -8,53 +8,59 @@ paths: **/llvm/**
 
 # LLVM Development
 
-The `ori_llvm` crate is excluded from main workspace to avoid LLVM linking overhead.
+The `ori_llvm` and `ori_rt` crates are part of the main workspace. LLVM 17 path is configured in `.cargo/config.toml`.
 
-## Docker Required For
+## Requirements
 
-- Running LLVM unit tests
-- Running clippy (needs LLVM headers)
-- Building with `llvm` feature
-- Test runs with `--backend=llvm`
+- **LLVM 17** installed at `/usr/lib/llvm-17` (Ubuntu/Debian: `apt install llvm-17-dev`)
+- Path configured via `LLVM_SYS_170_PREFIX` in `.cargo/config.toml`
 
 ## Commands
 
-| Command | Docker | Script |
-|---------|--------|--------|
-| Build | Yes | `./llvm-build` |
-| Clippy | Yes | `./llvm-clippy` |
-| Tests | Yes | `./llvm-test` |
-| Format | No | `cargo fmt --manifest-path compiler/ori_llvm/Cargo.toml` |
+| Command | Script |
+|---------|--------|
+| Build | `cargo build -p ori_llvm` |
+| Clippy | `cargo clippy -p ori_llvm` |
+| Tests | `./llvm-test` or `cargo test -p ori_llvm -p ori_rt` |
+| Format | `cargo fmt -p ori_llvm` |
+| All tests | `./test-all` |
 
-## First Time Setup
+## Building with LLVM Feature
+
+The `ori build` command requires the `llvm` feature:
 
 ```bash
-./docker/llvm/build.sh  # build container image (slow, once)
+cargo build -p oric --features llvm          # debug
+cargo build -p oric --features llvm --release # release
 ```
 
-## Resource Limits
+## Docker (Fallback)
+
+Docker is still available for environments without local LLVM:
 
 ```bash
-LLVM_MEMORY=8g ./llvm-test  # override memory (default 4GB)
-LLVM_CPUS=4 ./llvm-test     # override CPUs (default 2)
+./docker/llvm/build.sh                    # build container (once)
+./docker/llvm/run.sh cargo test           # run tests in container
+./docker/llvm/run.sh ori test --backend=llvm tests/  # Ori tests
 ```
 
 ## Test Coverage
 
-**Always use `./docker/llvm/run.sh` for coverage** - the crate requires LLVM to compile.
-
 ```bash
 # Full crate coverage
-./docker/llvm/run.sh "cargo tarpaulin --manifest-path compiler/ori_llvm/Cargo.toml --lib --out Stdout"
+cargo tarpaulin -p ori_llvm --lib --out Stdout
 
-# Coverage for specific module (filter tests by name)
-./docker/llvm/run.sh "cargo tarpaulin --manifest-path compiler/ori_llvm/Cargo.toml --lib --out Stdout -- linker"
+# Coverage for specific module
+cargo tarpaulin -p ori_llvm --lib --out Stdout -- linker
 
 # Coverage with HTML report
-./docker/llvm/run.sh "cargo tarpaulin --manifest-path compiler/ori_llvm/Cargo.toml --lib --out Html"
+cargo tarpaulin -p ori_llvm --lib --out Html
 ```
 
-**DO NOT**:
-- Try to install coverage tools inside docker (read-only cargo registry)
-- Run tarpaulin outside docker (ori_llvm requires LLVM headers)
-- Use cargo-llvm-cov (installation fails in container)
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `.cargo/config.toml` | LLVM path configuration |
+| `compiler/ori_llvm/` | LLVM backend crate |
+| `compiler/ori_rt/` | Runtime library for AOT |
