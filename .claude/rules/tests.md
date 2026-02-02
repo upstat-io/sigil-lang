@@ -1,6 +1,9 @@
 ---
-paths: **/tests/**
+paths:
+  - "**/tests/**"
 ---
+
+**Ori is under construction.** Rust tooling is trusted. Ori tooling (lexer, parser, type checker, evaluator, test runner) is NOT. When something fails, investigate Ori infrastructure first—the bug is often in the compiler/tooling, not user code or tests.
 
 **Fix issues encountered in code you touch. No "pre-existing" exceptions.**
 
@@ -17,6 +20,23 @@ paths: **/tests/**
 - Never modify tests to match broken behavior
 - Each test references spec section it validates
 - **TDD for bugs**: failing test first → fix → test passes unchanged
+
+## Anti-patterns (NEVER do these)
+
+- **Removing a test because it "doesn't work"** — investigate WHY first; the test runner, evaluator, or type checker may have the bug
+- **Changing expected output to match actual output** — understand the discrepancy first; if actual output is wrong, fix the compiler
+- **Assuming `#compile_fail` or `#fail` attributes are incorrect** — these are deliberate; if the test passes unexpectedly, the compiler may be too permissive
+- **Deleting tests that "seem redundant"** — they may cover edge cases in different compiler phases
+- **Marking tests `#skip` without investigating** — skipping hides bugs; find the root cause in Ori tooling
+
+## When Tests Fail — Investigation Order
+
+1. Is this syntax/feature fully implemented in the **lexer**?
+2. Is this syntax/feature fully implemented in the **parser**?
+3. Does the **type checker** handle this case correctly?
+4. Does the **evaluator** implement this behavior?
+5. Is the **test runner** correctly interpreting test attributes?
+6. ONLY THEN consider if the test itself is wrong
 
 ## Test References (Required)
 

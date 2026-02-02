@@ -111,7 +111,26 @@ let delay = 100ms
 let precise = 500us
 ```
 
-Floating-point prefixes are not supported. Use smaller units instead: `1500ms` not `1.5s`.
+Decimal notation is supported as compile-time sugar:
+
+```ori
+let half_second = 0.5s      // 500,000,000 nanoseconds
+let precise = 1.56s         // 1,560,000,000 nanoseconds
+let quarter_hour = 0.25h    // 15 minutes
+```
+
+The decimal portion is converted to an exact integer value using integer arithmetic—no floating-point operations are involved. The result must be a whole number of nanoseconds; otherwise, it is an error:
+
+```ori
+// Valid - results in whole nanoseconds
+1.5s           // 1,500,000,000 ns
+0.001s         // 1,000,000 ns (1ms)
+1.123456789s   // 1,123,456,789 ns
+
+// Invalid - sub-nanosecond precision
+1.5ns          // Error: 1.5 nanoseconds is not a whole number
+1.0000000001s  // Error: result has sub-nanosecond precision
+```
 
 **Arithmetic:**
 
@@ -161,17 +180,36 @@ Extraction methods truncate toward zero: `90s.minutes()` returns `1`.
 | Suffix | Unit | Bytes |
 |--------|------|-------|
 | `b` | bytes | 1 |
-| `kb` | kilobytes | 1,024 |
-| `mb` | megabytes | 1,048,576 |
-| `gb` | gigabytes | 1,073,741,824 |
-| `tb` | terabytes | 1,099,511,627,776 |
+| `kb` | kilobytes | 1,000 |
+| `mb` | megabytes | 1,000,000 |
+| `gb` | gigabytes | 1,000,000,000 |
+| `tb` | terabytes | 1,000,000,000,000 |
 
-Size uses binary units (powers of 1024), not decimal (powers of 1000).
+Size uses SI/decimal units (powers of 1000). Programs requiring exact powers of 1024 should use explicit byte counts: `1024b`, `1048576b`.
 
 ```ori
 let buffer = 64kb
 let limit = 10mb
 let heap = 2gb
+```
+
+Decimal notation is supported as compile-time sugar:
+
+```ori
+let half_kb = 0.5kb         // 500 bytes
+let one_and_half_mb = 1.5mb // 1,500,000 bytes
+let quarter_gb = 0.25gb     // 250,000,000 bytes
+```
+
+The decimal portion is converted to an exact integer value using integer arithmetic. The result must be a whole number of bytes; otherwise, it is an error:
+
+```ori
+// Valid - results in whole bytes
+1.5kb          // 1,500 bytes
+0.001mb        // 1,000 bytes (1kb)
+
+// Invalid - sub-byte precision
+0.5b           // Error: 0.5 bytes is not a whole number
 ```
 
 **Arithmetic:**
@@ -341,6 +379,109 @@ Const generic parameters can be used wherever a compile-time constant is expecte
     where N > 0
 = ...
 ```
+
+#### Default Values
+
+Const generics can have default values:
+
+```ori
+@buffer<$N: int = 64> () -> [byte, max N] = ...
+
+buffer()          // Uses N = 64
+buffer<128>()     // Overrides to N = 128
+
+type Vector<T, $N: int = 3> = [T, max N]
+
+Vector<float>         // 3D vector
+Vector<float, 4>      // 4D vector
+```
+
+Default const values must be:
+1. Compile-time constant expressions
+2. Valid for any bounds on the parameter
+
+```ori
+@sized<$N: int = 10> ()
+    where N > 0       // OK: 10 > 0
+= ...
+
+@bad<$N: int = 0> ()
+    where N > 0       // ERROR: default value 0 violates bound
+= ...
+```
+
+#### Parameter Ordering
+
+When mixing type and const generic parameters, either ordering is allowed:
+
+```ori
+@example<T, $N: int> (...)      // Type first (preferred)
+@example<$N: int, T> (...)      // Const first (allowed)
+@example<T, $N: int, U> (...)   // Interleaved (allowed)
+```
+
+**Style recommendation**: Place type parameters before const generics for consistency.
+
+#### Instantiation
+
+**Explicit instantiation:**
+
+```ori
+zeros<10>()                      // [int, max 10]
+replicate<str, 5>(value: "hi")   // [str, max 5]
+```
+
+**Inferred instantiation:**
+
+When possible, const generics are inferred from context:
+
+```ori
+let buffer: [int, max 100] = zeros()  // N = 100 inferred
+```
+
+**Partial inference:**
+
+Type parameters can be inferred while const generics are explicit:
+
+```ori
+let items = replicate<_, 5>(value: "hello")  // T = str inferred, N = 5 explicit
+```
+
+#### Monomorphization
+
+Each unique combination of const generic values produces a distinct monomorphized function or type:
+
+```ori
+zeros<5>()   // Generates zeros_5
+zeros<10>()  // Generates zeros_10
+
+// These are distinct types:
+let a: [int, max 5] = ...
+let b: [int, max 10] = a  // ERROR: type mismatch
+```
+
+The compiler may warn for excessive instantiations that impact compile time or binary size.
+
+#### Const Expressions in Types
+
+Const generics enable arithmetic in type positions:
+
+```ori
+@double_capacity<T, $N: int> (items: [T, max N]) -> [T, max N * 2] = ...
+
+@halve<T, $N: int> (items: [T, max N]) -> [T, max N / 2]
+    where N > 0
+    where N % 2 == 0
+= ...
+```
+
+Allowed arithmetic operations in type positions:
+- Addition: `N + M`, `N + 1`
+- Subtraction: `N - M`, `N - 1`
+- Multiplication: `N * M`, `N * 2`
+- Division: `N / M`, `N / 2` (truncating)
+- Modulo: `N % M`
+- Bitwise: `N & M`, `N | M`, `N ^ M`, `N << M`, `N >> M`
 
 ### Const Bounds
 
@@ -833,6 +974,251 @@ Derived implementation clones each field.
 Some types do not implement `Clone`:
 - Unique resources (file handles, network connections)
 - Types with identity where duplicates would be semantically wrong
+
+## Drop Trait
+
+The `Drop` trait enables custom cleanup when a value's reference count reaches zero:
+
+```ori
+trait Drop {
+    @drop (self) -> void
+}
+```
+
+### Execution Timing
+
+Drop is called when the ARC reference count reaches zero:
+
+```ori
+run(
+    let resource = acquire_resource(),  // refcount: 1
+    use_resource(resource),             // refcount may increase
+)                                       // refcount: 0, drop called
+```
+
+For values not shared, drop occurs at scope exit. Drop is also called on early exit (via `?`, `break`, or panic).
+
+### Drop Order
+
+Values are dropped in reverse declaration order (LIFO):
+
+```ori
+run(
+    let a = Resource { name: "a" },
+    let b = Resource { name: "b" },
+    let c = Resource { name: "c" },
+)
+// Drop order: c, b, a
+```
+
+**Struct fields:** Dropped in reverse declaration order, then the struct.
+
+**Collections:** Elements dropped in reverse order (back-to-front).
+
+### Constraints
+
+**No async operations:** Drop cannot perform suspending operations. Drop runs synchronously during stack unwinding. Async operations could deadlock.
+
+```ori
+impl Drop for Connection {
+    @drop (self) -> void uses Suspend = ...  // error E0980: Drop cannot be async
+}
+```
+
+**Must return void:** Drop must return `void`.
+
+**Panic during unwind:** If drop panics while another panic is unwinding, the program aborts immediately.
+
+### Not Derivable
+
+`Drop` cannot be derived. Drop behavior is specific to each type; automatic derivation would be either no-op or incorrect.
+
+### Explicit Drop
+
+The `drop_early` function forces drop before scope exit:
+
+```ori
+@drop_early<T> (value: T) -> void
+
+run(
+    let file = open_file(path),
+    let content = read_all(file),
+    drop_early(value: file),  // Close immediately
+    // ... continue processing content
+)
+```
+
+### Standard Implementations
+
+Most types do not need `Drop`:
+- Primitives: `int`, `float`, `bool`, `str`, `char`, `byte`
+- Collections: `[T]`, `{K: V}`, `Set<T>` (elements dropped automatically)
+- Options and Results: `Option<T>`, `Result<T, E>` (values dropped automatically)
+
+Types wrapping external resources typically implement Drop:
+
+```ori
+impl Drop for FileHandle {
+    @drop (self) -> void = close_file_descriptor(self.fd)
+}
+
+impl Drop for Lock {
+    @drop (self) -> void = release_lock(self.handle)
+}
+```
+
+### Error Handling in Drop
+
+Drop should handle its own errors. Drop cannot return errors; propagating would require panic, which is dangerous during unwinding:
+
+```ori
+impl Drop for Connection {
+    @drop (self) -> void = match(self.close(),
+        Ok(_) -> (),
+        Err(e) -> log(msg: `close failed: {e}`),  // Log, don't propagate
+    )
+}
+```
+
+## Conversion Traits
+
+Three traits formalize type conversions:
+
+### Into Trait
+
+The `Into` trait represents semantic, lossless type conversion:
+
+```ori
+trait Into<T> {
+    @into (self) -> T
+}
+```
+
+**Usage:**
+
+```ori
+let error: Error = "something went wrong".into()
+let f: float = 42.into()
+```
+
+Conversion requires explicit `.into()` method call. Ori does NOT perform implicit conversion.
+
+**Standard Implementations:**
+
+| From | To | Notes |
+|------|-----|-------|
+| `str` | `Error` | Creates Error with message |
+| `int` | `float` | Lossless widening |
+| `Set<T>` | `[T]` | Requires `T: Eq + Hashable` |
+
+**No Blanket Identity:**
+
+There is no blanket `impl<T> Into<T> for T`. Each conversion must be explicitly implemented.
+
+**No Automatic Chaining:**
+
+`Into` does not chain automatically. Given `A: Into<B>` and `B: Into<C>`, converting `A` to `C` requires `a.into().into()`.
+
+### As Trait
+
+The `As` trait defines infallible type conversion:
+
+```ori
+trait As<T> {
+    @as (self) -> T
+}
+```
+
+The `as` operator desugars to this trait:
+
+```ori
+42 as float
+// Desugars to:
+As<float>.as(self: 42)
+```
+
+**Standard Implementations:**
+
+| From | To | Notes |
+|------|-----|-------|
+| `int` | `float` | Widening |
+| `byte` | `int` | Widening |
+| `int` | `str` | Formatting |
+| `float` | `str` | Formatting |
+| `bool` | `str` | "true" or "false" |
+| `char` | `str` | Single character string |
+| `byte` | `str` | Formatting |
+| `char` | `int` | Codepoint value |
+
+### TryAs Trait
+
+The `TryAs` trait defines fallible type conversion:
+
+```ori
+trait TryAs<T> {
+    @try_as (self) -> Option<T>
+}
+```
+
+The `as?` operator desugars to this trait:
+
+```ori
+"42" as? int
+// Desugars to:
+TryAs<int>.try_as(self: "42")
+```
+
+**Standard Implementations:**
+
+| From | To | Notes |
+|------|-----|-------|
+| `str` | `int` | Parsing |
+| `str` | `float` | Parsing |
+| `str` | `bool` | "true"/"false" only |
+| `int` | `byte` | Range check (0-255) |
+| `char` | `byte` | ASCII check (0-127) |
+| `int` | `char` | Valid codepoint check |
+
+### Comparison
+
+| Mechanism | Fallible | Extensible | Use Case |
+|-----------|----------|------------|----------|
+| `as` | No | Yes | Infallible representation changes |
+| `as?` | Yes | Yes | Parsing, checked conversions |
+| `Into` | No | Yes | Semantic type conversions |
+
+### Lossy Conversions
+
+Lossy conversions (like `float -> int`) are not supported by `as` or `as?`. Use explicit methods that communicate intent:
+
+```ori
+3.7.truncate()   // 3 (toward zero)
+3.7.round()      // 4 (nearest)
+3.7.floor()      // 3 (toward negative infinity)
+3.7.ceil()       // 4 (toward positive infinity)
+```
+
+It is a compile-time error to use `as` for a lossy conversion.
+
+### User-Defined Conversions
+
+Types can implement conversion traits:
+
+```ori
+type UserId = int
+
+impl As<str> for UserId {
+    @as (self) -> str = "user_" + (self.inner as str)
+}
+
+impl TryAs<Username> for str {
+    @try_as (self) -> Option<Username> =
+        if self.is_empty() || self.len() > 32 then
+            None
+        else
+            Some(Username { value: self })
+}
+```
 
 ## Debug Trait
 

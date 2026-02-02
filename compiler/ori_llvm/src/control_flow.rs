@@ -299,9 +299,20 @@ impl<'ll> Builder<'_, 'll, '_> {
     /// Compile a continue expression.
     pub(crate) fn compile_continue(
         &self,
+        value: Option<ExprId>,
+        arena: &ExprArena,
+        expr_types: &[TypeId],
+        locals: &mut HashMap<Name, BasicValueEnum<'ll>>,
+        function: FunctionValue<'ll>,
         loop_ctx: Option<&LoopContext<'ll>>,
     ) -> Option<BasicValueEnum<'ll>> {
         let ctx = loop_ctx?;
+
+        // Compile continue value if present (for for...yield loops)
+        if let Some(val_id) = value {
+            let _val = self.compile_expr(val_id, arena, expr_types, locals, function, loop_ctx);
+            // TODO: add value to yield accumulator for for...yield loops
+        }
 
         // Jump back to header
         self.br(ctx.header);
@@ -530,26 +541,6 @@ impl<'ll> Builder<'_, 'll, '_> {
         } else {
             None
         }
-    }
-
-    /// Compile a return expression.
-    pub(crate) fn compile_return(
-        &self,
-        value: Option<ExprId>,
-        arena: &ExprArena,
-        expr_types: &[TypeId],
-        locals: &mut HashMap<Name, BasicValueEnum<'ll>>,
-        function: FunctionValue<'ll>,
-        loop_ctx: Option<&LoopContext<'ll>>,
-    ) -> Option<BasicValueEnum<'ll>> {
-        if let Some(val_id) = value {
-            let val = self.compile_expr(val_id, arena, expr_types, locals, function, loop_ctx)?;
-            self.ret(val);
-        } else {
-            self.ret_void();
-        }
-        // Return doesn't produce a value (it transfers control)
-        None
     }
 
     /// Compile an assignment expression.

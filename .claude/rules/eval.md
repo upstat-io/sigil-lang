@@ -1,10 +1,15 @@
 ---
-paths: **/eval/**
+paths:
+  - "**/eval/**"
 ---
+
+**Ori is under construction.** Rust tooling is trusted. Ori tooling (lexer, parser, type checker, evaluator, test runner) is NOT. When something fails, investigate Ori infrastructure first—the bug is often in the compiler/tooling, not user code or tests.
 
 **Fix issues encountered in code you touch. No "pre-existing" exceptions.**
 
 **Do it properly, not just simply. Correct architecture over quick hacks; no shortcuts or "good enough" solutions.**
+
+**⚠️ Ori is EXPRESSION-BASED — NO `return`**: Functions evaluate their body expression; the result IS the return value. No `ExprKind::Return` exists. Control flow: `?` (error propagation), `break` (loops), `panic`.
 
 # Interpreter
 

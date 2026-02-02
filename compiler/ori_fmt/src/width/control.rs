@@ -23,24 +23,6 @@ fn receiver_needs_parens<I: StringLookup>(calc: &WidthCalculator<'_, I>, receive
     )
 }
 
-/// Calculate width of `return` or `return value`.
-pub(super) fn return_width<I: StringLookup>(
-    calc: &mut WidthCalculator<'_, I>,
-    value: Option<ExprId>,
-) -> usize {
-    match value {
-        Some(expr) => {
-            let val_w = calc.width(expr);
-            if val_w == ALWAYS_STACKED {
-                return ALWAYS_STACKED;
-            }
-            // "return " + val
-            7 + val_w
-        }
-        None => 6, // "return"
-    }
-}
-
 /// Calculate width of `break` or `break value`.
 pub(super) fn break_width<I: StringLookup>(
     calc: &mut WidthCalculator<'_, I>,
@@ -56,6 +38,24 @@ pub(super) fn break_width<I: StringLookup>(
             6 + val_w
         }
         None => 5, // "break"
+    }
+}
+
+/// Calculate width of `continue` or `continue value`.
+pub(super) fn continue_width<I: StringLookup>(
+    calc: &mut WidthCalculator<'_, I>,
+    value: Option<ExprId>,
+) -> usize {
+    match value {
+        Some(expr) => {
+            let val_w = calc.width(expr);
+            if val_w == ALWAYS_STACKED {
+                return ALWAYS_STACKED;
+            }
+            // "continue " + val
+            9 + val_w
+        }
+        None => 8, // "continue"
     }
 }
 

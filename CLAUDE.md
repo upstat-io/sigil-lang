@@ -1,10 +1,14 @@
+**Ori is under construction.** Rust tooling (cargo, rustc) is trusted and stable. Ori tooling (lexer, parser, type checker, evaluator, test runner) is NOT—all are being built from scratch. When something fails, investigate the Ori infrastructure first. Do not assume user code or tests are wrong; the bug is often in the compiler/tooling itself.
+
 **Fix every issue encountered. No "unrelated" or "pre-existing" exceptions.**
 
 **Do it properly, not just simply. Correct architecture over quick hacks; no shortcuts or "good enough" solutions.**
 
 **TDD for bugs**: Issue found + tests pass → write test for correct behavior (must fail) → fix code → test passes unchanged
 
-**Ori**: Statically-typed expression language. HM inference, ARC memory, capability effects, mandatory tests. Targets LLVM/WASM. Compiler in Rust (Salsa-based).
+**Ori**: Statically-typed **expression-based** language. HM inference, ARC memory, capability effects, mandatory tests. Targets LLVM/WASM. Compiler in Rust (Salsa-based).
+
+**⚠️ EXPRESSION-BASED — NO `return` KEYWORD**: Every block's value is its last expression. There is no `return` statement. Early exit uses `?` (propagate errors), `break` (exit loops), or `panic` (terminate). The `return` keyword is intentionally not part of Ori. Similar to: Rust (closest), Gleam, Roc, Ruby, Elixir, OCaml.
 
 ---
 
@@ -36,7 +40,7 @@
 
 # Ori — Code That Proves Itself
 
-Expression-based, strict static typing, type inference, mandatory testing. Compiles → has tests; has tests → they pass.
+**Expression-based** (no `return` — last expression is the value), strict static typing, type inference, mandatory testing. Compiles → has tests; has tests → they pass.
 
 ## Commands
 
@@ -50,14 +54,15 @@ Expression-based, strict static typing, type inference, mandatory testing. Compi
 
 ## Key Paths
 
-`compiler/oric/` — compiler | `docs/ori_lang/0.1-alpha/spec/` — **spec (authoritative)** | `docs/ori_lang/proposals/` — proposals | `library/std/` — stdlib | `tests/spec/` — conformance | `plans/roadmap/` — roadmap
+`compiler/oric/` — compiler | `docs/ori_lang/0.1-alpha/spec/` — **spec (authoritative)** | `docs/ori_lang/proposals/` — proposals | `library/std/` — stdlib | `tests/spec/` — conformance | `compiler/oric/tests/phases/` — phase tests | `plans/roadmap/` — roadmap
 
 ## Design Pillars
 
-1. **Mandatory Verification**: Functions need tests; contracts (`pre_check:`/`post_check:`)
-2. **Dependency-Aware Integrity**: Tests in dep graph; changes propagate
-3. **Explicit Effects**: Capabilities (`uses Http`); trivial mocking (`with Http = Mock in`)
-4. **ARC-Safe**: No GC/borrow checker; capture by value; no shared mutable refs
+1. **Expression-Based**: Everything is an expression; last expression is the block's value; no `return` keyword
+2. **Mandatory Verification**: Functions need tests; contracts (`pre_check:`/`post_check:`)
+3. **Dependency-Aware Integrity**: Tests in dep graph; changes propagate
+4. **Explicit Effects**: Capabilities (`uses Http`); trivial mocking (`with Http = Mock in`)
+5. **ARC-Safe**: No GC/borrow checker; capture by value; no shared mutable refs
 
 ## Reference Repos (`~/lang_repos/`)
 
@@ -128,8 +133,9 @@ Expression-based, strict static typing, type inference, mandatory testing. Compi
 
 ### Duration & Size
 
-**Duration**: 64-bit nanoseconds; suffixes `ns`/`us`/`ms`/`s`/`m`/`h`; no float prefix (`1500ms` not `1.5s`)
-**Size**: 64-bit bytes (non-negative); suffixes `b`/`kb`/`mb`/`gb`/`tb`; binary units (1024-based)
+**Duration**: 64-bit nanoseconds; suffixes `ns`/`us`/`ms`/`s`/`m`/`h`; decimal syntax (`0.5s`=500ms, `1.5s`=1500ms)
+**Size**: 64-bit bytes (non-negative); suffixes `b`/`kb`/`mb`/`gb`/`tb`; SI units (1000-based); decimal syntax (`1.5kb`=1500 bytes)
+**Decimal literals**: Compile-time sugar using integer arithmetic (no floats); must result in whole base unit; `1.5ns`/`0.5b` = error
 **Arithmetic**: `+`/`-`/`*`/`/`/`%`, unary `-` (Duration only; Size `-` panics if negative, unary `-` = compile error)
 **Methods**: `.nanoseconds()`/`.microseconds()`/`.milliseconds()`/`.seconds()`/`.minutes()`/`.hours()` | `.bytes()`/`.kilobytes()`/`.megabytes()`/`.gigabytes()`/`.terabytes()` → `int`
 **Factory**: `Duration.from_nanoseconds(ns:)`... | `Size.from_bytes(b:)`...
@@ -226,7 +232,7 @@ Bottom type (uninhabited); coerces to any `T`
 
 ## Formatting
 
-4 spaces, 100 char limit, trailing commas multi-line only | Space around: binary ops, arrows, colons/commas, `pub`, struct braces, `as`/`by`/`|`, `=` in `<T = Self>` | No space: parens/brackets, `.`/`..`/`?`, empty delimiters | Break at 100; `run`/`try`/`match`/`recurse`/`parallel`/`spawn`/`nursery` always stacked | Params/args/generics/where/fields/variants one-per-line; chains break at `.method()`; binary break before op; `if...then` together, `else` newline
+4 spaces, 100 char limit, trailing commas multi-line only | Space around: binary ops, arrows, colons/commas, `pub`, struct braces, `as`/`by`/`|`, `=` in `<T = Self>` | No space: parens/brackets, `.`/`..`/`?`, empty delimiters | Break at 100; `run` width-based; `try`/`match`/`recurse`/`parallel`/`spawn`/`nursery` always stacked | Params/args/generics/where/fields/variants one-per-line; chains break at `.method()`; binary break before op; `if...then` together, `else` newline; chained `else if` each on own line | Parens preserved when semantically required: `(for x in items yield x).fold(...)`, `(x -> x * 2)(5)`, `for x in (inner) yield x`
 
 ## Keywords
 

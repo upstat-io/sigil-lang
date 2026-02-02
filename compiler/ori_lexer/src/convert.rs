@@ -41,10 +41,26 @@ pub(crate) fn convert_token(raw: RawToken, slice: &str, interner: &StringInterne
         | RawToken::SizeGb((v, u))
         | RawToken::SizeTb((v, u)) => TokenKind::Size(v, u),
 
+        // Float with duration suffix errors (e.g., 1.5s, 2.5ms)
+        RawToken::FloatDurationNs
+        | RawToken::FloatDurationUs
+        | RawToken::FloatDurationMs
+        | RawToken::FloatDurationS
+        | RawToken::FloatDurationM
+        | RawToken::FloatDurationH => TokenKind::FloatDurationError,
+
+        // Float with size suffix errors (e.g., 1.5kb, 2.5mb)
+        RawToken::FloatSizeB
+        | RawToken::FloatSizeKb
+        | RawToken::FloatSizeMb
+        | RawToken::FloatSizeGb
+        | RawToken::FloatSizeTb => TokenKind::FloatSizeError,
+
         // Keywords
         RawToken::Async => TokenKind::Async,
         RawToken::Break => TokenKind::Break,
         RawToken::Continue => TokenKind::Continue,
+        RawToken::Return => TokenKind::Return,
         RawToken::Def => TokenKind::Def,
         RawToken::Do => TokenKind::Do,
         RawToken::Else => TokenKind::Else,
@@ -101,6 +117,7 @@ pub(crate) fn convert_token(raw: RawToken, slice: &str, interner: &StringInterne
         RawToken::Run => TokenKind::Run,
         RawToken::Timeout => TokenKind::Timeout,
         RawToken::Try => TokenKind::Try,
+        RawToken::By => TokenKind::By,
 
         // Built-in I/O primitives
         RawToken::Print => TokenKind::Print,

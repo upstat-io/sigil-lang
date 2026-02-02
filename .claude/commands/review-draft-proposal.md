@@ -25,7 +25,8 @@ Review a draft proposal, analyze implications, and (if approved) integrate into 
 7. Walk through recommendations one-by-one
 8. Confirm approval
 9. Execute approval workflow
-10. Verify documentation formatting (final step)
+10. **Sync spec and grammar** (invoke `/sync-spec` and `/sync-grammar`) ← CRITICAL
+11. Verify documentation formatting (final step)
 
 ---
 
@@ -252,13 +253,35 @@ Brief description.
 - Blocked on: [deps or "None"]
 ```
 
-### Step 15: Update Spec and CLAUDE.md
+### Step 15: Update Spec, Grammar, and CLAUDE.md
 
-If proposal introduces new syntax/types/semantics:
-- [ ] Update relevant spec file in `docs/ori_lang/0.1-alpha/spec/`
-- [ ] Update `grammar.ebnf` if syntax changes
+If proposal introduces new syntax/types/semantics, **invoke the sync skills**:
+
+**Step 15a: Sync Spec (if semantics changed)**
+
+If the proposal affects language semantics, types, or behavior:
+
+```
+Invoke: `Skill(skill: "sync-spec")`
+```
+
+This ensures spec files use formal, declarative language and follow `.claude/rules/spec.md`.
+
+**Step 15b: Sync Grammar (if syntax changed)**
+
+If the proposal introduces or modifies syntax:
+
+```
+Invoke: `Skill(skill: "sync-grammar")`
+```
+
+This ensures `grammar.ebnf` stays synchronized as the single source of truth.
+
+**Step 15c: Update CLAUDE.md (manual)**
+
 - [ ] Update `CLAUDE.md` if syntax/types/patterns affected
 - [ ] Follow rules in `.claude/rules/ori-lang.md`
+- [ ] Verify consistency between spec, grammar.ebnf, and CLAUDE.md
 
 ### Step 16: Verify Documentation Formatting
 
@@ -347,8 +370,8 @@ Proposal: docs/ori_lang/proposals/approved/<name>-proposal.md
 - [ ] Implementation tasks added to section file(s)
 - [ ] `plan.md` updated (if applicable)
 - [ ] `priority-and-tracking.md` updated
-- [ ] Spec updated (if affects semantics)
-- [ ] `grammar.ebnf` updated (if affects syntax)
+- [ ] **`/sync-spec` invoked** (if affects semantics) ← CRITICAL
+- [ ] **`/sync-grammar` invoked** (if affects syntax) ← CRITICAL
 - [ ] `CLAUDE.md` updated (if affects syntax/types/patterns)
 
 **Formatting Verification (final step):**

@@ -1,10 +1,15 @@
 ---
-paths: **/docs/ori_lang/**
+paths:
+  - "**/docs/ori_lang/**"
 ---
+
+**Ori is under construction.** Rust tooling is trusted. Ori tooling (lexer, parser, type checker, evaluator, test runner) is NOT. When something fails, investigate Ori infrastructure first—the bug is often in the compiler/tooling, not user code or tests.
 
 **Fix issues encountered in code you touch. No "pre-existing" exceptions.**
 
 **Do it properly, not just simply. Correct architecture over quick hacks; no shortcuts or "good enough" solutions.**
+
+**⚠️ Ori is EXPRESSION-BASED — NO `return` KEYWORD**: The last expression in any block IS its value. Early exit: `?` (error propagation), `break` (loops), `panic` (terminate). Never document `return`.
 
 # Ori Documentation Rules
 

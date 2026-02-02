@@ -21,6 +21,8 @@ pub enum ErrorCode {
     E0004,
     /// Invalid escape sequence
     E0005,
+    /// Floating-point duration/size literal not supported
+    E0911,
 
     // Parser Errors (E1xxx)
     /// Unexpected token
@@ -51,6 +53,8 @@ pub enum ErrorCode {
     E1013,
     /// Reserved built-in function name
     E1014,
+    /// Unsupported keyword (e.g., `return` is not valid in Ori)
+    E1015,
 
     // Type Errors (E2xxx)
     /// Type mismatch
@@ -120,6 +124,7 @@ impl ErrorCode {
             ErrorCode::E0003 => "E0003",
             ErrorCode::E0004 => "E0004",
             ErrorCode::E0005 => "E0005",
+            ErrorCode::E0911 => "E0911",
             // Parser
             ErrorCode::E1001 => "E1001",
             ErrorCode::E1002 => "E1002",
@@ -135,6 +140,7 @@ impl ErrorCode {
             ErrorCode::E1012 => "E1012",
             ErrorCode::E1013 => "E1013",
             ErrorCode::E1014 => "E1014",
+            ErrorCode::E1015 => "E1015",
             // Type
             ErrorCode::E2001 => "E2001",
             ErrorCode::E2002 => "E2002",

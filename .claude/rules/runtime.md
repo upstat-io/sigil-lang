@@ -1,6 +1,9 @@
 ---
-paths: **/ori_rt/**
+paths:
+  - "**/ori_rt/**"
 ---
+
+**Ori is under construction.** Rust tooling is trusted. Ori tooling (lexer, parser, type checker, evaluator, test runner) is NOT. When something fails, investigate Ori infrastructure first—the bug is often in the compiler/tooling, not user code or tests.
 
 **Fix issues encountered in code you touch. No "pre-existing" exceptions.**
 

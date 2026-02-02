@@ -2,9 +2,17 @@
 //!
 //! Helper methods for emitting collections (lists, tuples), call arguments,
 //! and Result/Option wrappers.
+//!
+//! # Layer Integration
+//!
+//! This module integrates with:
+//! - Layer 2 (Packing): Uses `is_simple_item()` for list packing decisions
+//! - Layer 4 (Rules): Uses `ParenthesesRule` for parentheses decisions
 
+use crate::packing;
+use crate::rules::ParenPosition;
 use crate::width::ALWAYS_STACKED;
-use ori_ir::{CallArgRange, ExprId, ExprKind, ExprRange, StringLookup};
+use ori_ir::{CallArgRange, ExprId, ExprRange, StringLookup};
 
 use super::Formatter;
 
@@ -52,9 +60,12 @@ impl<I: StringLookup> Formatter<'_, I> {
     }
 
     /// Emit a receiver expression inline, wrapping in parentheses if needed for precedence.
+    ///
+    /// # Layer Integration
+    ///
+    /// Uses `ParenthesesRule` from Layer 4 (Breaking Rules) for parentheses decisions.
     pub(super) fn emit_receiver_inline(&mut self, receiver: ExprId) {
-        let expr = self.arena.get_expr(receiver);
-        if super::needs_receiver_parens(expr) {
+        if crate::rules::needs_parens(self.arena, receiver, ParenPosition::Receiver) {
             self.ctx.emit("(");
             self.emit_inline(receiver);
             self.ctx.emit(")");
@@ -64,14 +75,83 @@ impl<I: StringLookup> Formatter<'_, I> {
     }
 
     /// Format a receiver expression, wrapping in parentheses if needed for precedence.
+    ///
+    /// # Layer Integration
+    ///
+    /// Uses `ParenthesesRule` from Layer 4 (Breaking Rules) for parentheses decisions.
     pub(super) fn format_receiver(&mut self, receiver: ExprId) {
-        let expr = self.arena.get_expr(receiver);
-        if super::needs_receiver_parens(expr) {
+        if crate::rules::needs_parens(self.arena, receiver, ParenPosition::Receiver) {
             self.ctx.emit("(");
             self.format(receiver);
             self.ctx.emit(")");
         } else {
             self.format(receiver);
+        }
+    }
+
+    /// Emit a call target expression inline, wrapping in parentheses if needed for precedence.
+    ///
+    /// Call targets like `(x -> x + 1)(5)` or `(if cond then f else g)(5)` need
+    /// parentheses to be parsed correctly.
+    ///
+    /// # Layer Integration
+    ///
+    /// Uses `ParenthesesRule` from Layer 4 (Breaking Rules) for parentheses decisions.
+    pub(super) fn emit_call_target_inline(&mut self, func: ExprId) {
+        if crate::rules::needs_parens(self.arena, func, ParenPosition::CallTarget) {
+            self.ctx.emit("(");
+            self.emit_inline(func);
+            self.ctx.emit(")");
+        } else {
+            self.emit_inline(func);
+        }
+    }
+
+    /// Format a call target expression, wrapping in parentheses if needed for precedence.
+    ///
+    /// # Layer Integration
+    ///
+    /// Uses `ParenthesesRule` from Layer 4 (Breaking Rules) for parentheses decisions.
+    pub(super) fn format_call_target(&mut self, func: ExprId) {
+        if crate::rules::needs_parens(self.arena, func, ParenPosition::CallTarget) {
+            self.ctx.emit("(");
+            self.format(func);
+            self.ctx.emit(")");
+        } else {
+            self.format(func);
+        }
+    }
+
+    /// Emit a for-loop iterator expression inline, wrapping in parentheses if needed.
+    ///
+    /// Iterator expressions like `(for y in items yield y)` need parentheses
+    /// to avoid ambiguity with the outer `for` loop.
+    ///
+    /// # Layer Integration
+    ///
+    /// Uses `ParenthesesRule` from Layer 4 (Breaking Rules) for parentheses decisions.
+    pub(super) fn emit_iter_inline(&mut self, iter: ExprId) {
+        if crate::rules::needs_parens(self.arena, iter, ParenPosition::IteratorSource) {
+            self.ctx.emit("(");
+            self.emit_inline(iter);
+            self.ctx.emit(")");
+        } else {
+            self.emit_inline(iter);
+        }
+    }
+
+    /// Format a for-loop iterator expression, wrapping in parentheses if needed.
+    ///
+    /// # Layer Integration
+    ///
+    /// Uses `ParenthesesRule` from Layer 4 (Breaking Rules) for parentheses decisions.
+    pub(super) fn format_iter(&mut self, iter: ExprId) {
+        if crate::rules::needs_parens(self.arena, iter, ParenPosition::IteratorSource) {
+            self.ctx.emit("(");
+            self.format(iter);
+            self.ctx.emit(")");
+        } else {
+            self.format(iter);
         }
     }
 
@@ -123,25 +203,12 @@ impl<I: StringLookup> Formatter<'_, I> {
     ///
     /// Simple items wrap multiple per line when broken.
     /// Complex items (structs, calls, nested collections) go one per line.
+    ///
+    /// # Layer Integration
+    ///
+    /// Delegates to `packing::is_simple_item()` from Layer 2 (Container Packing).
     pub(super) fn is_simple_item(&self, expr_id: ExprId) -> bool {
-        let expr = self.arena.get_expr(expr_id);
-        matches!(
-            expr.kind,
-            ExprKind::Int(_)
-                | ExprKind::Float(_)
-                | ExprKind::Bool(_)
-                | ExprKind::String(_)
-                | ExprKind::Char(_)
-                | ExprKind::Unit
-                | ExprKind::Duration { .. }
-                | ExprKind::Size { .. }
-                | ExprKind::Ident(_)
-                | ExprKind::Config(_)
-                | ExprKind::FunctionRef(_)
-                | ExprKind::SelfRef
-                | ExprKind::HashLength
-                | ExprKind::None
-        )
+        packing::is_simple_item(self.arena, expr_id)
     }
 
     pub(super) fn emit_broken_list(&mut self, items: &[ExprId]) {

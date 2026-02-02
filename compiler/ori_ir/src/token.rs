@@ -65,6 +65,7 @@ pub enum TokenKind {
     Async,
     Break,
     Continue,
+    Return,
     Def,
     Do,
     Else,
@@ -120,6 +121,7 @@ pub enum TokenKind {
     Run,
     Timeout,
     Try,
+    By, // Context-sensitive: range step (0..10 by 2)
 
     Print,
     Panic,
@@ -175,7 +177,16 @@ pub enum TokenKind {
     Newline,
     Eof,
 
+    /// Generic error token for unrecognized input.
     Error,
+
+    /// Float with duration suffix error (e.g., 1.5s, 2.5ms).
+    /// Per spec: "Duration: no float prefix (`1500ms` not `1.5s`)"
+    FloatDurationError,
+
+    /// Float with size suffix error (e.g., 1.5kb, 2.5mb).
+    /// Per spec: "Size: no float prefix"
+    FloatSizeError,
 }
 
 impl TokenKind {
@@ -268,6 +279,7 @@ impl TokenKind {
             TokenKind::Async => "async",
             TokenKind::Break => "break",
             TokenKind::Continue => "continue",
+            TokenKind::Return => "return",
             TokenKind::Def => "def",
             TokenKind::Do => "do",
             TokenKind::Else => "else",
@@ -316,6 +328,7 @@ impl TokenKind {
             TokenKind::Run => "run",
             TokenKind::Timeout => "timeout",
             TokenKind::Try => "try",
+            TokenKind::By => "by",
             TokenKind::Print => "print",
             TokenKind::Panic => "panic",
             TokenKind::Todo => "todo",
@@ -367,6 +380,8 @@ impl TokenKind {
             TokenKind::Newline => "newline",
             TokenKind::Eof => "end of file",
             TokenKind::Error => "error",
+            TokenKind::FloatDurationError => "invalid float duration literal",
+            TokenKind::FloatSizeError => "invalid float size literal",
         }
     }
 }

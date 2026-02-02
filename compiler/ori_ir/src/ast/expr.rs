@@ -195,10 +195,11 @@ pub enum ExprKind {
     /// Tuple: (a, b, c)
     Tuple(ExprRange),
 
-    /// Range: start..end or start..=end
+    /// Range: start..end or start..=end or start..end by step
     Range {
         start: Option<ExprId>,
         end: Option<ExprId>,
+        step: Option<ExprId>,
         inclusive: bool,
     },
 
@@ -214,14 +215,13 @@ pub enum ExprKind {
     /// None
     None,
 
-    /// Return from function
-    Return(Option<ExprId>),
-
     /// Break from loop
     Break(Option<ExprId>),
 
     /// Continue loop
-    Continue,
+    /// Optional value is only valid in `for...yield` context (substitutes the element)
+    /// Error E0861 if value provided in `loop()` context
+    Continue(Option<ExprId>),
 
     /// Await async operation
     Await(ExprId),
@@ -346,17 +346,20 @@ impl fmt::Debug for ExprKind {
             ExprKind::Range {
                 start,
                 end,
+                step,
                 inclusive,
             } => {
-                write!(f, "Range({start:?}, {end:?}, inclusive={inclusive})")
+                write!(
+                    f,
+                    "Range({start:?}, {end:?}, step={step:?}, inclusive={inclusive})"
+                )
             }
             ExprKind::Ok(inner) => write!(f, "Ok({inner:?})"),
             ExprKind::Err(inner) => write!(f, "Err({inner:?})"),
             ExprKind::Some(inner) => write!(f, "Some({inner:?})"),
             ExprKind::None => write!(f, "None"),
-            ExprKind::Return(val) => write!(f, "Return({val:?})"),
             ExprKind::Break(val) => write!(f, "Break({val:?})"),
-            ExprKind::Continue => write!(f, "Continue"),
+            ExprKind::Continue(val) => write!(f, "Continue({val:?})"),
             ExprKind::Await(inner) => write!(f, "Await({inner:?})"),
             ExprKind::Try(inner) => write!(f, "Try({inner:?})"),
             ExprKind::Assign { target, value } => write!(f, "Assign({target:?}, {value:?})"),

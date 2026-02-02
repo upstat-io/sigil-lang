@@ -1,10 +1,15 @@
 ---
-paths: **/typeck/**
+paths:
+  - "**/typeck/**"
 ---
+
+**Ori is under construction.** Rust tooling is trusted. Ori tooling (lexer, parser, type checker, evaluator, test runner) is NOT. When something fails, investigate Ori infrastructure first—the bug is often in the compiler/tooling, not user code or tests.
 
 **Fix issues encountered in code you touch. No "pre-existing" exceptions.**
 
 **Do it properly, not just simply. Correct architecture over quick hacks; no shortcuts or "good enough" solutions.**
+
+**⚠️ Ori is EXPRESSION-BASED — NO `return`**: Function body type IS the return type. No special return-type unification. Control flow: `?` (propagates via `EvalError`), `break` (loops), `panic` (Never).
 
 # Type Checking
 

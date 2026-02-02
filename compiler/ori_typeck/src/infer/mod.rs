@@ -147,7 +147,9 @@ fn infer_expr_inner(checker: &mut TypeChecker<'_>, expr_id: ExprId) -> Type {
         ExprKind::Struct { name, fields } => infer_struct(checker, *name, *fields),
 
         // Range
-        ExprKind::Range { start, end, .. } => infer_range(checker, *start, *end),
+        ExprKind::Range {
+            start, end, step, ..
+        } => infer_range(checker, *start, *end, *step),
 
         // Field access
         ExprKind::Field { receiver, field } => infer_field(checker, *receiver, *field),
@@ -168,9 +170,8 @@ fn infer_expr_inner(checker: &mut TypeChecker<'_>, expr_id: ExprId) -> Type {
         ExprKind::None => infer_none(checker),
 
         // Control flow
-        ExprKind::Return(value) => infer_return(checker, *value),
         ExprKind::Break(value) => infer_break(checker, *value),
-        ExprKind::Continue => Type::Never,
+        ExprKind::Continue(value) => infer_continue(checker, *value),
 
         ExprKind::Await(inner) => infer_await(checker, *inner, span),
         ExprKind::Try(inner) => infer_try(checker, *inner, span),
