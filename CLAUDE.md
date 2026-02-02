@@ -1,3 +1,5 @@
+**Ori is under construction.** Rust tooling (cargo, rustc) is trusted and stable. Ori tooling (lexer, parser, type checker, evaluator, test runner) is NOT—all are being built from scratch. When something fails, investigate the Ori infrastructure first. Do not assume user code or tests are wrong; the bug is often in the compiler/tooling itself.
+
 **Fix every issue encountered. No "unrelated" or "pre-existing" exceptions.**
 
 **Do it properly, not just simply. Correct architecture over quick hacks; no shortcuts or "good enough" solutions.**
@@ -128,8 +130,9 @@ Expression-based, strict static typing, type inference, mandatory testing. Compi
 
 ### Duration & Size
 
-**Duration**: 64-bit nanoseconds; suffixes `ns`/`us`/`ms`/`s`/`m`/`h`; no float prefix (`1500ms` not `1.5s`)
-**Size**: 64-bit bytes (non-negative); suffixes `b`/`kb`/`mb`/`gb`/`tb`; binary units (1024-based)
+**Duration**: 64-bit nanoseconds; suffixes `ns`/`us`/`ms`/`s`/`m`/`h`; decimal syntax (`0.5s`=500ms, `1.5s`=1500ms)
+**Size**: 64-bit bytes (non-negative); suffixes `b`/`kb`/`mb`/`gb`/`tb`; SI units (1000-based); decimal syntax (`1.5kb`=1500 bytes)
+**Decimal literals**: Compile-time sugar using integer arithmetic (no floats); must result in whole base unit; `1.5ns`/`0.5b` = error
 **Arithmetic**: `+`/`-`/`*`/`/`/`%`, unary `-` (Duration only; Size `-` panics if negative, unary `-` = compile error)
 **Methods**: `.nanoseconds()`/`.microseconds()`/`.milliseconds()`/`.seconds()`/`.minutes()`/`.hours()` | `.bytes()`/`.kilobytes()`/`.megabytes()`/`.gigabytes()`/`.terabytes()` → `int`
 **Factory**: `Duration.from_nanoseconds(ns:)`... | `Size.from_bytes(b:)`...
