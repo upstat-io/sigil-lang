@@ -14,7 +14,10 @@ paths: **/diagnostic/**
 - **E1xxx**: Parser (E1001-E1014)
 - **E2xxx**: Type checker (E2001-E2018)
 - **E3xxx**: Pattern (E3001-E3003)
+- **E08xx**: Evaluator/Runtime (E0801-E0899)
 - **E9xxx**: Internal (E9001-E9002)
+
+New codes: increment within range, add doc in `errors/EXXX.md`.
 
 ## Diagnostic Structure
 
@@ -35,6 +38,14 @@ paths: **/diagnostic/**
 - **Title**: `# EXXX: Error Name`
 - **Sections**: Problem, Example, Causes (numbered), Solutions (with code), See Also
 
+## Emitters
+
+| Emitter | Output |
+|---------|--------|
+| `AriadneEmitter` | Rich terminal output with colors |
+| `JsonEmitter` | Machine-readable JSON for tooling |
+| `LspEmitter` | LSP-compatible diagnostics |
+
 ## Key Files
 
 | File | Purpose |
@@ -42,3 +53,5 @@ paths: **/diagnostic/**
 | `error_code.rs` | Error code enum, phase ranges |
 | `diagnostic.rs` | Diagnostic struct, builder, Label, Suggestion |
 | `errors/mod.rs` | Embedded markdown docs, lazy HashMap |
+| `emitters/` | AriadneEmitter, JsonEmitter, LspEmitter |
+| `queue.rs` | DiagnosticQueue for accumulation |

@@ -109,6 +109,8 @@ Compiler: constructs requiring special syntax or static analysis. Everything els
 | `ori_typeck` | Type checking |
 | `ori_patterns` | Pattern definitions, Value, EvalError |
 | `ori_eval` | Interpreter, Environment, method dispatch |
+| `ori_llvm` | LLVM backend, JIT and AOT compilation |
+| `ori_rt` | Runtime library for AOT (staticlib + rlib) |
 | `oric` | CLI, Salsa queries, orchestration |
 
 ## Testing
@@ -119,9 +121,21 @@ Compiler: constructs requiring special syntax or static analysis. Everything els
 - **TDD for bugs**: failing test first
 
 ```bash
-cargo test --workspace       # all
+cargo t                      # all (alias)
 cargo test -p oric           # single crate
+./test-all                   # full suite including LLVM
+./llvm-test                  # LLVM crates only
 ```
+
+## Cargo Aliases
+
+| Alias | Command |
+|-------|---------|
+| `cargo t` | `test --workspace` |
+| `cargo st` | Ori spec tests (interpreter) |
+| `cargo bl` | Build oric + ori_rt with LLVM (debug) |
+| `cargo blr` | Build oric + ori_rt with LLVM (release) |
+| `cargo cll` | Clippy on LLVM crates |
 
 ## Debug
 

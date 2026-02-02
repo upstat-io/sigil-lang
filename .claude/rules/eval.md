@@ -56,3 +56,13 @@ paths: **/eval/**
 | `interpreter/resolvers/mod.rs` | MethodDispatcher, resolver chain |
 | `environment.rs` | Environment, LocalScope |
 | `interpreter/scope_guard.rs` | ScopedInterpreter, RAII |
+
+## Backends
+
+| Backend | Crate | Usage |
+|---------|-------|-------|
+| Interpreter | `ori_eval` | Default, tree-walking |
+| LLVM JIT | `ori_llvm` | `--backend=llvm` flag |
+| LLVM AOT | `ori_llvm` | `ori build` command |
+
+The interpreter is the reference implementation. LLVM backends must produce identical results.

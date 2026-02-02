@@ -46,9 +46,20 @@ paths: **/tests/**
 ## Running
 
 ```bash
-ori test tests/spec/             # all spec tests
-ori test tests/spec/types/       # specific category
-ori test tests/spec/expressions/ # another category
+cargo st                         # all spec tests (interpreter)
+cargo st tests/spec/types/       # specific category
+./test-all                       # full suite: Rust + interpreter + LLVM
+./llvm-test                      # LLVM crate unit tests
+```
+
+### LLVM Backend Tests
+
+```bash
+# Run spec tests with LLVM backend
+./target/release/ori test --backend=llvm tests/
+
+# Build first if needed
+cargo blr && ./target/release/ori test --backend=llvm tests/
 ```
 
 ## Adding Tests
@@ -63,14 +74,23 @@ ori test tests/spec/expressions/ # another category
 Use `cargo tarpaulin` for Rust code coverage.
 
 ```bash
-# Standard crates (no LLVM)
+# Standard crates
 cargo tarpaulin -p ori_parse --lib --out Stdout
 
-# LLVM crate - MUST use docker
-./docker/llvm/run.sh "cargo tarpaulin --manifest-path compiler/ori_llvm/Cargo.toml --lib --out Stdout"
+# LLVM crate (requires LLVM 17 installed)
+cargo tarpaulin -p ori_llvm --lib --out Stdout
 
 # Filter to specific module
-./docker/llvm/run.sh "cargo tarpaulin --manifest-path compiler/ori_llvm/Cargo.toml --lib --out Stdout -- linker"
+cargo tarpaulin -p ori_llvm --lib --out Stdout -- linker
 ```
 
 **Target: 60-80% coverage** for new modules.
+
+## Test Attributes
+
+| Attribute | Purpose |
+|-----------|---------|
+| `#skip("reason")` | Skip test with explanation |
+| `#compile_fail("error")` | Expect compilation to fail |
+| `#fail("error")` | Expect runtime failure |
+| `#timeout(5s)` | Set test timeout |
