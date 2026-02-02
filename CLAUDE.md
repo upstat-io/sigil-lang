@@ -50,7 +50,7 @@ Expression-based, strict static typing, type inference, mandatory testing. Compi
 
 ## Key Paths
 
-`compiler/oric/` — compiler | `docs/ori_lang/0.1-alpha/spec/` — **spec (authoritative)** | `docs/ori_lang/proposals/` — proposals | `library/std/` — stdlib | `tests/spec/` — conformance | `plans/roadmap/` — roadmap
+`compiler/oric/` — compiler | `docs/ori_lang/0.1-alpha/spec/` — **spec (authoritative)** | `docs/ori_lang/proposals/` — proposals | `library/std/` — stdlib | `tests/spec/` — conformance | `compiler/oric/tests/phases/` — phase tests | `plans/roadmap/` — roadmap
 
 ## Design Pillars
 
