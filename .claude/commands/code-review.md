@@ -1,7 +1,7 @@
 ---
 name: code-review
 description: Analyze the Ori compiler for DRY/SOLID violations and industry best practices
-allowed-tools: Read, Grep, Glob, Task
+allowed-tools: Read, Grep, Glob, Task, Bash
 ---
 
 # Compiler Code Review
@@ -9,6 +9,31 @@ allowed-tools: Read, Grep, Glob, Task
 Analyze the Ori compiler for violations of documented patterns and industry best practices.
 
 ## Execution Strategy
+
+### Phase 0: Automated Tooling (run first)
+
+Run these **7 cargo tools in parallel** using Bash. Send a **single message with 7 Bash tool calls**.
+
+**IMPORTANT**: Each command must end with `|| true` to prevent one failure from cascading to all parallel calls:
+
+| Tool | Command | What it Detects |
+|------|---------|-----------------|
+| **clippy** | `./clippy-all 2>&1 \|\| true` | Lint violations, code smells, common mistakes |
+| **audit** | `cargo audit 2>&1 \|\| true` | Security vulnerabilities in dependencies |
+| **outdated** | `cargo outdated -R 2>&1 \|\| true` | Outdated dependencies (direct only) |
+| **machete** | `cargo machete 2>&1 \|\| true` | Unused dependencies in Cargo.toml |
+| **geiger** | `(cd compiler/oric && cargo geiger 2>&1 \| tail -50) \|\| true` | Unsafe code usage |
+| **modules** | `cargo modules structure --lib -p ori_parse 2>&1 \|\| true` | Module structure visualization |
+| **tokei** | `tokei compiler/ 2>&1 \|\| true` | Lines of code metrics |
+
+**After tools complete**, summarize automated findings:
+- **Security**: Any vulnerabilities from `cargo audit`
+- **Dependencies**: Unused deps (machete), outdated deps
+- **Unsafe**: Count and location of unsafe blocks (geiger)
+- **Lints**: Any clippy warnings/errors
+- **Metrics**: Total LOC, largest files
+
+### Phase 1: Manual Analysis (after Phase 0)
 
 Use the **Task tool** to launch **10 parallel Explore agents** (one per category below). Send a **single message with 10 Task tool calls** to maximize parallelism.
 
@@ -26,17 +51,58 @@ Task(
 )
 ```
 
-**After all 10 agents complete**, aggregate and synthesize:
+### Phase 2: Synthesis (after both phases)
+
+Aggregate and synthesize all findings:
 1. Group findings by severity (CRITICAL → HIGH → MEDIUM)
-2. Identify patterns (same issue in multiple places)
-3. Prioritize by impact on maintainability
-4. Present actionable summary to user
+2. Cross-reference automated and manual findings
+3. Identify patterns (same issue in multiple places)
+4. Prioritize by impact on maintainability
+5. Present actionable summary to user
 
 ## Severity Guide
 
-- **CRITICAL**: Must fix before merge
-- **HIGH**: Should fix, blocks new code
-- **MEDIUM**: Fix when touching code
+- **CRITICAL**: Must fix before merge (security vulns, breaking bugs)
+- **HIGH**: Should fix, blocks new code (outdated deps, unsafe in wrong places)
+- **MEDIUM**: Fix when touching code (style, minor improvements)
+
+## Tool Reference
+
+### Quick Commands
+
+```bash
+# Security & Dependencies
+cargo audit                    # Check for security vulnerabilities
+cargo outdated -R              # Show outdated direct dependencies
+cargo machete                  # Find unused dependencies
+cargo deny check               # Comprehensive dep linting (if deny.toml exists)
+
+# Code Quality
+./clippy-all                              # Run clippy on all crates
+cd compiler/oric && cargo geiger          # Count unsafe code usage (from crate dir)
+tokei compiler/                           # Lines of code statistics
+
+# Architecture
+cargo modules structure --lib -p oric    # Module structure tree
+cargo modules dependencies --lib -p oric # Internal dependency graph
+cargo tree                               # External dependency tree
+cargo tree -d                            # Show duplicate dependencies
+```
+
+### Interpreting Results
+
+**cargo audit**: Any vulnerability = CRITICAL. Update or replace affected deps.
+
+**cargo machete**: Lists crates in `[dependencies]` not used in code. Verify before removing (some are feature-gated).
+
+**cargo geiger**: Shows unsafe usage per crate. In a compiler:
+- `ori_ir`, `ori_parse`, `ori_lexer` should have **zero** unsafe
+- `oric` may have minimal unsafe for FFI/LLVM
+- High unsafe count = investigate
+
+**cargo modules**: Reveals hidden coupling. Watch for:
+- Unexpected dependencies between modules
+- Circular references (not caught by Rust, but bad design)
 
 ---
 
