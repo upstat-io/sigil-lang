@@ -214,7 +214,8 @@ Bottom type (uninhabited); coerces to any `T`
 **C Variadics**: `extern "c" { @printf (fmt: CPtr, ...) -> c_int }` — untyped, requires `unsafe`, platform va_list ABI
 **Types**: `CPtr` opaque | `Option<CPtr>` nullable | `JsValue` handle | `JsPromise<T>` async
 **C Types**: `c_char`, `c_short`, `c_int`, `c_long`, `c_longlong`, `c_float`, `c_double`, `c_size`
-**Layout**: `#repr("c") type T = { ... }` | **Unsafe**: `unsafe { ptr_read(...) }` | **Capability**: `uses FFI`
+**Layout**: `#repr("c")` C-compatible | `#repr("packed")` no padding | `#repr("transparent")` same as single field | `#repr("aligned", N)` minimum alignment (power of two) | struct types only; newtypes implicitly transparent
+**Unsafe**: `unsafe(ptr_read(...))` | **Capability**: `uses FFI`
 **Async WASM**: `JsPromise<T>` implicitly resolved at binding sites | **Compile Error**: `compile_error("msg")`
 
 ## Capabilities
@@ -237,6 +238,7 @@ Bottom type (uninhabited); coerces to any `T`
 ## Keywords
 
 **Reserved**: `break continue def do else extern false for if impl in let loop match pub self Self suspend then trait true type unsafe use uses void where with yield`
+**Reserved (future)**: `asm inline static union view` (reserved for future low-level features)
 **Context-sensitive**: `by cache catch for max parallel recurse run spawn timeout try with without`
 **Built-in names**: `int float str byte len is_empty is_some is_none is_ok is_err assert assert_eq assert_ne assert_some assert_none assert_ok assert_err assert_panics assert_panics_with compare min max print panic todo unreachable dbg compile_error`
 
