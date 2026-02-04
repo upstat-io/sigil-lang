@@ -2,6 +2,8 @@
 // Spec: 10-patterns.md § parallel, spawn, timeout
 // Design: tooling/formatter/design/appendices/A-edge-cases.md
 
+use std.testing { assert, assert_eq }
+
 type TaskResult = Success(value: int) | Failure(reason: str) | Timeout
 
 type WorkItem = { id: int, payload: str, priority: int }
@@ -68,14 +70,14 @@ type BatchResult = { completed: int, failed: int, total: int }
 @test_process_item tests @process_item () -> void = run(
     let item = WorkItem { id: 1, payload: "test", priority: 5 },
     let result = process_item(item: item),
-    assert(cond: is_ok(result: result)),
+    assert(cond: is_ok(r: result)),
 )
 
 #skip("LLVM backend: struct parameters not supported")
 @test_invalid_priority tests @process_item () -> void = run(
     let item = WorkItem { id: 1, payload: "test", priority: 0 },
     let result = process_item(item: item),
-    assert(cond: is_err(result: result)),
+    assert(cond: is_err(r: result)),
 )
 
 #skip("LLVM backend: struct parameters not supported")

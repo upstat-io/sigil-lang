@@ -69,7 +69,7 @@ pub mod infer {
 // Re-export DiagnosticConfig from ori_diagnostic (for type_check_with_config)
 pub use ori_diagnostic::queue::DiagnosticConfig;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -79,6 +79,67 @@ use crate::eval::module::import::{resolve_import, ImportError};
 use crate::ir::{Name, StringInterner};
 use crate::parser::ParseOutput;
 use crate::query::parsed;
+
+// =============================================================================
+// Prelude Auto-Loading for Type Checking
+// =============================================================================
+
+/// Generate candidate paths for the prelude by walking up from the current file.
+fn prelude_candidates(current_file: &Path) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    let mut dir = current_file.parent();
+    while let Some(d) = dir {
+        candidates.push(d.join("library").join("std").join("prelude.ori"));
+        dir = d.parent();
+    }
+    candidates
+}
+
+/// Check if a file is the prelude itself (to avoid recursive loading).
+fn is_prelude_file(file_path: &Path) -> bool {
+    file_path.ends_with("library/std/prelude.ori")
+        || (file_path.file_name().is_some_and(|n| n == "prelude.ori")
+            && file_path.parent().is_some_and(|p| p.ends_with("std")))
+}
+
+/// Load prelude functions for type checking.
+///
+/// This function finds and loads the prelude file, extracting all public functions
+/// as `ImportedFunction` entries. This makes prelude functions available to the type
+/// checker without requiring explicit imports, matching the evaluator's behavior.
+fn load_prelude_for_type_checking(db: &dyn Db, current_file: &Path) -> Vec<ImportedFunction> {
+    // Don't load prelude if we're type checking the prelude itself
+    if is_prelude_file(current_file) {
+        return Vec::new();
+    }
+
+    // Find the prelude file
+    let prelude_file = prelude_candidates(current_file)
+        .iter()
+        .find_map(|candidate| db.load_file(candidate));
+
+    let Some(prelude_file) = prelude_file else {
+        // Prelude not found - this is okay for tests outside the project
+        return Vec::new();
+    };
+
+    let interner = db.interner();
+    let prelude_result = parsed(db, prelude_file);
+
+    // Extract all public functions from the prelude
+    let mut functions = Vec::new();
+    for func in &prelude_result.module.functions {
+        if func.visibility.is_public() {
+            functions.push(create_imported_function(
+                func,
+                &prelude_result.arena,
+                interner,
+            ));
+        }
+    }
+
+    functions
+}
 
 /// Type check a parsed module with a custom compiler context.
 ///
@@ -269,6 +330,12 @@ fn parsed_type_to_type(
             let elem_ty = arena.get_parsed_type(*elem_id);
             Type::List(Box::new(parsed_type_to_type(elem_ty, arena, interner)))
         }
+        ParsedType::FixedList { elem, .. } => {
+            // Fixed-capacity lists resolve to List for now
+            // (full type system support in later phase)
+            let elem_ty = arena.get_parsed_type(*elem);
+            Type::List(Box::new(parsed_type_to_type(elem_ty, arena, interner)))
+        }
         ParsedType::Tuple(elems) => {
             let elem_ids = arena.get_parsed_type_list(*elems);
             Type::Tuple(
@@ -317,38 +384,79 @@ fn parsed_type_to_type(
 }
 
 /// Create an `ImportedFunction` directly from a Function AST.
+///
+/// For generic functions, this creates unique `TypeVar`s for each generic parameter
+/// and substitutes `Type::Named("T")` references with `Type::Var` in the function type.
 fn create_imported_function(
     func: &ori_ir::Function,
     arena: &ori_ir::ExprArena,
     interner: &StringInterner,
 ) -> ImportedFunction {
-    // Convert parameter types
-    let params: Vec<ori_types::Type> = arena
+    use ori_types::{Type, TypeFolder, TypeVar};
+    use rustc_hash::FxHashMap;
+
+    // First, collect generic parameters and create TypeVars for them.
+    // We use local IDs (0, 1, 2...) since each function is independent.
+    let generic_params = arena.get_generic_params(func.generics);
+    let mut name_to_typevar: FxHashMap<Name, TypeVar> = FxHashMap::default();
+    let mut generics: Vec<ImportedGeneric> = Vec::with_capacity(generic_params.len());
+
+    for (idx, gp) in generic_params.iter().enumerate() {
+        // Generic parameter count is always small (typically < 10), safe to truncate
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "generic param count << u32::MAX"
+        )]
+        let type_var = TypeVar::new(idx as u32);
+        name_to_typevar.insert(gp.name, type_var);
+        generics.push(ImportedGeneric {
+            param: gp.name,
+            bounds: gp.bounds.iter().map(ori_ir::TraitBound::path).collect(),
+            type_var,
+        });
+    }
+
+    // Convert parameter types, initially as Type::Named for generic params
+    let raw_params: Vec<Type> = arena
         .get_params(func.params)
         .iter()
-        .map(|p| {
-            match &p.ty {
-                Some(parsed_ty) => parsed_type_to_type(parsed_ty, arena, interner),
-                None => ori_types::Type::Var(ori_types::TypeVar::new(0)), // Inference placeholder
-            }
+        .map(|p| match &p.ty {
+            Some(parsed_ty) => parsed_type_to_type(parsed_ty, arena, interner),
+            None => Type::Var(TypeVar::new(0)), // Inference placeholder
         })
         .collect();
 
     // Convert return type
-    let return_type = match &func.return_ty {
+    let raw_return_type = match &func.return_ty {
         Some(parsed_ty) => parsed_type_to_type(parsed_ty, arena, interner),
-        None => ori_types::Type::Unit, // Default to void
+        None => Type::Unit,
     };
 
-    // Convert generics
-    let generics: Vec<ImportedGeneric> = arena
-        .get_generic_params(func.generics)
-        .iter()
-        .map(|gp| ImportedGeneric {
-            param: gp.name,
-            bounds: gp.bounds.iter().map(ori_ir::TraitBound::path).collect(),
-        })
-        .collect();
+    // Substitute Type::Named(generic_name) with Type::Var for generic parameters.
+    // This ensures the function type uses TypeVars that match ImportedGeneric.type_var.
+    let (params, return_type) = if name_to_typevar.is_empty() {
+        (raw_params, raw_return_type)
+    } else {
+        struct GenericSubstituter<'a> {
+            name_to_typevar: &'a FxHashMap<Name, TypeVar>,
+        }
+        impl TypeFolder for GenericSubstituter<'_> {
+            fn fold_named(&mut self, name: Name) -> Type {
+                if let Some(&tv) = self.name_to_typevar.get(&name) {
+                    Type::Var(tv)
+                } else {
+                    Type::Named(name)
+                }
+            }
+        }
+
+        let mut folder = GenericSubstituter {
+            name_to_typevar: &name_to_typevar,
+        };
+        let params = raw_params.iter().map(|t| folder.fold(t)).collect();
+        let return_type = folder.fold(&raw_return_type);
+        (params, return_type)
+    };
 
     // Extract capabilities
     let capabilities: Vec<Name> = func
@@ -387,6 +495,31 @@ pub fn type_check_with_imports(
     parse_result: &ParseOutput,
     current_file: &Path,
 ) -> TypedModule {
+    type_check_with_imports_and_interner(db, parse_result, current_file, None)
+}
+
+/// Type check a parsed module with resolved imports and a shared type interner.
+///
+/// Like `type_check_with_imports`, but allows passing a `SharedTypeInterner` so the
+/// same interner can be shared between the type checker and evaluator. This enables
+/// type-aware evaluation for operators like `??` that need access to type information.
+///
+/// # Arguments
+///
+/// * `db` - The compiler database for Salsa queries
+/// * `parse_result` - The parsed module to type check
+/// * `current_file` - Path to the current file (for resolving relative imports)
+/// * `type_interner` - Optional shared type interner to use (creates a new one if None)
+///
+/// # Returns
+///
+/// A `TypedModule` with type information, or errors if type checking fails.
+pub fn type_check_with_imports_and_interner(
+    db: &dyn Db,
+    parse_result: &ParseOutput,
+    current_file: &Path,
+    type_interner: Option<ori_types::SharedTypeInterner>,
+) -> TypedModule {
     let interner = db.interner();
 
     // Resolve imports and extract function signatures and module aliases
@@ -408,8 +541,18 @@ pub fn type_check_with_imports(
         }
     };
 
-    // Create type checker and register imported functions and module aliases
-    let mut checker = TypeCheckerBuilder::new(&parse_result.arena, interner).build();
+    // Create type checker, optionally with a shared type interner
+    let mut builder = TypeCheckerBuilder::new(&parse_result.arena, interner);
+    if let Some(ti) = type_interner {
+        builder = builder.with_type_interner(ti);
+    }
+    let mut checker = builder.build();
+
+    // Auto-load prelude functions (like the evaluator does)
+    let prelude_functions = load_prelude_for_type_checking(db, current_file);
+    checker.register_imported_functions(&prelude_functions);
+
+    // Register explicitly imported functions and module aliases
     checker.register_imported_functions(&resolved.functions);
     for alias in &resolved.module_aliases {
         checker.register_module_alias(alias);
@@ -428,6 +571,29 @@ pub fn type_check_with_imports_and_source(
     parse_result: &ParseOutput,
     current_file: &Path,
     source: String,
+) -> TypedModule {
+    type_check_with_imports_source_and_interner(db, parse_result, current_file, source, None)
+}
+
+/// Type check a parsed module with resolved imports, source, and shared type interner.
+///
+/// Like `type_check_with_imports_and_source`, but allows passing a `SharedTypeInterner`
+/// so the same interner can be shared between the type checker and evaluator. This enables
+/// type-aware evaluation for operators like `??` that need access to type information.
+///
+/// # Arguments
+///
+/// * `db` - The compiler database for Salsa queries
+/// * `parse_result` - The parsed module to type check
+/// * `current_file` - Path to the current file (for resolving relative imports)
+/// * `source` - Source code for better error messages
+/// * `type_interner` - Optional shared type interner to use (creates a new one if None)
+pub fn type_check_with_imports_source_and_interner(
+    db: &dyn Db,
+    parse_result: &ParseOutput,
+    current_file: &Path,
+    source: String,
+    type_interner: Option<ori_types::SharedTypeInterner>,
 ) -> TypedModule {
     let interner = db.interner();
 
@@ -449,10 +615,18 @@ pub fn type_check_with_imports_and_source(
         }
     };
 
-    // Create type checker with source and register imported functions and module aliases
-    let mut checker = TypeCheckerBuilder::new(&parse_result.arena, interner)
-        .with_source(source)
-        .build();
+    // Create type checker with source, optionally with a shared type interner
+    let mut builder = TypeCheckerBuilder::new(&parse_result.arena, interner).with_source(source);
+    if let Some(ti) = type_interner {
+        builder = builder.with_type_interner(ti);
+    }
+    let mut checker = builder.build();
+
+    // Auto-load prelude functions (like the evaluator does)
+    let prelude_functions = load_prelude_for_type_checking(db, current_file);
+    checker.register_imported_functions(&prelude_functions);
+
+    // Register explicitly imported functions and module aliases
     checker.register_imported_functions(&resolved.functions);
     for alias in &resolved.module_aliases {
         checker.register_module_alias(alias);

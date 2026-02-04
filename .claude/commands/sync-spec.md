@@ -41,6 +41,7 @@ docs/ori_lang/0.1-alpha/spec/
 | `21-constant-expressions.md` | Const functions |
 | `22-system-considerations.md` | Platform considerations |
 | `grammar.ebnf` | Formal grammar (single source of truth for syntax) |
+| `operator-rules.md` | Formal operator semantics (type rules, eval rules, precedence) |
 
 ## Writing Style — CRITICAL
 
@@ -118,15 +119,17 @@ Normative definitions here.
 \`\`\`
 ```
 
-## Grammar References
+## Grammar & Rules References
 
-**Do not inline EBNF in spec files.** Reference the grammar file:
+**Do not inline EBNF in spec files.** Reference the formal files:
 
 ```markdown
 > **Grammar:** See [grammar.ebnf](grammar.ebnf) § SECTION_NAME
+> **Rules:** See [operator-rules.md](operator-rules.md) § OPERATOR_NAME
 ```
 
 Where `SECTION_NAME` matches headers in grammar.ebnf (LEXICAL GRAMMAR, TYPES, DECLARATIONS, EXPRESSIONS, PATTERNS).
+Where `OPERATOR_NAME` matches headers in operator-rules.md (Coalesce, Arithmetic, Comparison, etc.).
 
 ## Update Process
 
@@ -142,7 +145,9 @@ Where `SECTION_NAME` matches headers in grammar.ebnf (LEXICAL GRAMMAR, TYPES, DE
 
 4. **Update grammar.ebnf** if syntax changed (or note it needs updating)
 
-5. **Verify cross-references** within spec files are accurate
+5. **Update operator-rules.md** if operator behavior changed (type rules, eval rules, precedence)
+
+6. **Verify cross-references** within spec files are accurate
 
 ## Specification vs Design Docs
 
@@ -161,6 +166,7 @@ Where `SECTION_NAME` matches headers in grammar.ebnf (LEXICAL GRAMMAR, TYPES, DE
 - [ ] Listed constraints explicitly
 - [ ] Updated cross-references
 - [ ] Updated grammar.ebnf if syntax changed
+- [ ] Updated operator-rules.md if operator behavior changed
 
 ## Output
 
@@ -168,4 +174,5 @@ Report what was updated:
 - Which spec files were modified
 - Sections added or changed
 - Whether grammar.ebnf needs updating
+- Whether operator-rules.md needs updating
 - Any cross-references updated

@@ -3,56 +3,37 @@ paths:
   - "**/docs/ori_lang/**"
 ---
 
-**Ori is under construction.** Rust tooling is trusted. Ori tooling (lexer, parser, type checker, evaluator, test runner) is NOT. When something fails, investigate Ori infrastructure first—the bug is often in the compiler/tooling, not user code or tests.
+**NO WORKAROUNDS/HACKS/SHORTCUTS.** Proper fixes only. When unsure, STOP and ask. Fact-check against spec. Consult `~/lang_repos/`.
 
-**Fix issues encountered in code you touch. No "pre-existing" exceptions.**
+**Ori tooling is under construction** — bugs are usually in compiler, not user code. Fix every issue you encounter.
 
-**Do it properly, not just simply. Correct architecture over quick hacks; no shortcuts or "good enough" solutions.**
+**Expression-based — NO `return`**: Last expression IS the value. Exit via `?`/`break`/`panic`. Never document `return`.
 
-**⚠️ Ori is EXPRESSION-BASED — NO `return` KEYWORD**: The last expression in any block IS its value. Early exit: `?` (error propagation), `break` (loops), `panic` (terminate). Never document `return`.
+# Ori Documentation
 
-# Ori Documentation Rules
+Design docs archived to `archived-design/`. Do not update.
 
-**Note:** Design docs archived to `archived-design/`. Do not update them.
-
-## Sync Requirements
+## Sync Rules
 
 **If `spec/` changed:**
-- Sync to `/CLAUDE.md` if syntax, types, or patterns affected
-- Update `guide/` examples to match
-- Update `modules/` if stdlib affected
-- Ask: "Create draft proposal in `proposals/drafts/`?"
+- Sync to `.claude/rules/ori-syntax.md` if syntax/types/patterns affected
+- Update `guide/` examples
+- Ask: "Create draft proposal?"
 
-**If `/CLAUDE.md` changed:**
+**If `.claude/rules/ori-syntax.md` changed:**
 - Verify consistent with `spec/`
-- If CLAUDE.md introduces new feature, update spec first
-
-**If adding new type:**
-- Add to `spec/06-types.md`
-- Update `/CLAUDE.md` Types section
-- Ask: "Create draft proposal?"
-
-**If adding new pattern:**
-- Add to `spec/10-patterns.md`
-- Update `/CLAUDE.md` Patterns section
-- Ask: "Create draft proposal?"
+- If new feature, update spec first
 
 **If changing syntax:**
-- Update grammar in `spec/`
-- Update `spec/03-lexical-elements.md` if tokens changed
-- Update ALL example code in spec
-- Update `/CLAUDE.md`
-- Ask: "Create draft proposal?"
+- Update `grammar.ebnf`
+- Update ALL example code
+- Update `.claude/rules/ori-syntax.md`
 
-## Document Types
-
-| Type | Location | Purpose | Tone |
-|------|----------|---------|------|
-| Spec | `spec/` | Define what IS valid Ori | Formal, normative |
-| Proposals | `proposals/` | Capture decisions and rationale | Explanatory |
+**If changing operator behavior:**
+- Update `operator-rules.md`
+- Verify: `ori_typeck/operators.rs`, `ori_eval/interpreter/`
 
 ## Never Do
-
-- Add examples that don't match spec
-- Update docs without updating `/CLAUDE.md` for syntax/types/patterns
+- Examples that don't match spec
+- Update docs without updating `.claude/rules/ori-syntax.md`
 - Update `archived-design/`

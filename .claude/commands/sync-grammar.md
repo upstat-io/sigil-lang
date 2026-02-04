@@ -12,11 +12,14 @@ Update `docs/ori_lang/0.1-alpha/spec/grammar.ebnf` to accurately reflect the cur
 
 The grammar.ebnf file is the **single source of truth** for Ori's formal syntax. It must stay synchronized with the prose descriptions in the spec files.
 
-## Target File
+## Target Files
 
 ```
-docs/ori_lang/0.1-alpha/spec/grammar.ebnf
+docs/ori_lang/0.1-alpha/spec/grammar.ebnf      # Syntax (EBNF)
+docs/ori_lang/0.1-alpha/spec/operator-rules.md # Semantics (type/eval rules)
 ```
+
+**Note:** If operator precedence, associativity, or type rules change, update BOTH files.
 
 ## Source Files
 
@@ -139,10 +142,24 @@ If the spec adds a new pattern form like `timeout`:
 
 4. Update comments if the spec file reference changed
 
+## When to Update operator-rules.md
+
+Update `operator-rules.md` alongside `grammar.ebnf` when:
+- Operator precedence or associativity changes
+- New operators added
+- Operator type rules change (e.g., new type combinations)
+- Operator evaluation semantics change
+- Never type behavior changes
+
+The `operator-rules.md` file contains:
+- Type inference rules (premises → conclusion)
+- Evaluation rules (pattern ⇒ result)
+- Precedence table
+- Trait dispatch mapping
+
 ## Output
 
 After updating, report:
-- Productions added
-- Productions modified
-- Productions removed
-- Any inconsistencies found between spec and grammar
+- Productions added/modified/removed (grammar.ebnf)
+- Rules added/modified/removed (operator-rules.md)
+- Any inconsistencies found between spec, grammar, and rules
