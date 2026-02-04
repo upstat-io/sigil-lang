@@ -3,7 +3,7 @@ paths:
   - "**/patterns/**"
 ---
 
-**NO WORKAROUNDS/HACKS/SHORTCUTS.** Proper fixes only. When unsure, STOP and ask. Fact-check against spec. Consult `~/lang_repos/`.
+**NO WORKAROUNDS/HACKS/SHORTCUTS.** Proper fixes only. When unsure, STOP and ask. Fact-check against spec. Consult `~/projects/reference_repos/lang_repos/`.
 
 **Ori tooling is under construction** — bugs are usually in compiler, not user code. Fix every issue you encounter.
 

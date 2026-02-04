@@ -679,9 +679,9 @@ Group by severity, then by category. Identify patterns (same issue in multiple p
 - Ori guidelines: `.claude/rules/compiler.md`
 
 **Diagnostic patterns by repo:**
-- **Rust** (`~/lang_repos/rust/compiler/rustc_errors/`): Applicability levels (MachineApplicable, MaybeIncorrect, HasPlaceholders), imperative suggestion phrasing, multi-part suggestions
-- **Go** (`~/lang_repos/golang/src/go/types/errors.go`): Verb phrase fix descriptions, error code organization (adjective + noun naming)
-- **Elm** (`~/lang_repos/elm/compiler/src/Reporting/`): Three-part error structure, type comparison highlighting, problem-specific hints
-- **Zig** (`~/lang_repos/zig/src/Sema.zig`): "declared here" notes, "consider..." suggestions, reference traces, note deduplication
-- **Gleam** (`~/lang_repos/gleam/compiler-core/src/error.rs`): Edit distance with substring support, extra labels for related locations
-- **Roc** (`~/lang_repos/roc/crates/reporting/src/`): Semantic annotation types, progressive disclosure, output target abstraction
+- **Rust** (`~/projects/reference_repos/lang_repos/rust/compiler/rustc_errors/`): Applicability levels (MachineApplicable, MaybeIncorrect, HasPlaceholders), imperative suggestion phrasing, multi-part suggestions
+- **Go** (`~/projects/reference_repos/lang_repos/golang/src/go/types/errors.go`): Verb phrase fix descriptions, error code organization (adjective + noun naming)
+- **Elm** (`~/projects/reference_repos/lang_repos/elm/compiler/src/Reporting/`): Three-part error structure, type comparison highlighting, problem-specific hints
+- **Zig** (`~/projects/reference_repos/lang_repos/zig/src/Sema.zig`): "declared here" notes, "consider..." suggestions, reference traces, note deduplication
+- **Gleam** (`~/projects/reference_repos/lang_repos/gleam/compiler-core/src/error.rs`): Edit distance with substring support, extra labels for related locations
+- **Roc** (`~/projects/reference_repos/lang_repos/roc/crates/reporting/src/`): Semantic annotation types, progressive disclosure, output target abstraction
