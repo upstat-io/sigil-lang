@@ -1,10 +1,8 @@
 {
   "permissions": {
     "deny": [
-      "Bash(git commit --no-verify*)",
-      "Bash(git commit * --no-verify*)",
-      "Bash(git push --no-verify*)",
-      "Bash(git push * --no-verify*)"
+      "Bash(*--no-verify*)",
+      "Bash(*--no-gpg-sign*)"
     ]
   }
 }

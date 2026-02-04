@@ -34,3 +34,40 @@ cargo blr  # release
 - `compiler/ori_llvm/`: LLVM backend
 - `compiler/ori_rt/`: Runtime library
 - `aot/runtime.rs`: Runtime discovery
+
+## LLVM Test Execution
+LLVM backend tests run **sequentially** (not parallel) due to `Context::create()` global lock contention. This matches Roc (`Threading::Single`) and rustc patterns.
+
+## Debugging LLVM Hangs
+
+**Use aggressive timeouts** — never wait more than a few seconds for what should be fast:
+```bash
+timeout 5 ./target/release/ori test --backend=llvm path/to/file.ori
+```
+
+**Isolation strategy** (find the culprit fast):
+1. Single file first: `timeout 3 ori test --backend=llvm file.ori`
+2. If hangs, use `--filter=test_name` to isolate specific test
+3. Binary search with filter patterns if needed
+
+**Common hang patterns:**
+- "Parallel slowdown" often = runtime infinite loop, not compile-time issue
+- For-loop `continue` bugs: if `continue` skips index increment → infinite loop
+- Check if hang is at compile time (IR gen) or runtime (JIT execution)
+
+## Loop Codegen Architecture
+
+For-loops use a **latch block** pattern:
+```
+entry → header → body → latch → header (or exit)
+              ↑___________|
+```
+
+- `header`: condition check, branch to body or exit
+- `body`: loop body execution
+- `latch`: increment index, branch back to header
+- `exit`: post-loop code
+
+**Critical**: `continue` must jump to `latch` (not `header`) to ensure index increments. Jumping directly to header skips increment → infinite loop.
+
+**Break** jumps to `exit` block (correct as-is).
