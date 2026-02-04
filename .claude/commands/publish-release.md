@@ -91,7 +91,7 @@ After user confirms:
 ### Step 5: Run Tests
 
 ```bash
-./test-all
+./test-all.sh
 ```
 
 If tests fail, stop and report the failure. Do not continue.

@@ -52,7 +52,7 @@ paths:
 ## Testing
 - TDD for bugs: tests first, verify fail, fix, tests pass unchanged
 - Inline < 200 lines; separate if larger
-- `cargo t` (all), `cargo st` (spec), `./test-all` (full)
+- `cargo t` (all), `cargo st` (spec), `./test-all.sh` (full)
 
 ## Key Patterns
 

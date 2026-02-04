@@ -73,7 +73,7 @@ Run these **10 cargo/analysis tools in parallel** using Bash. Send a **single me
 
 | Tool | Command | What it Detects |
 |------|---------|-----------------|
-| **clippy** | `./clippy-all 2>&1 \|\| true` | Lint violations, code smells |
+| **clippy** | `./clippy-all.sh 2>&1 \|\| true` | Lint violations, code smells |
 | **audit** | `cargo audit 2>&1 \|\| true` | Security vulnerabilities |
 | **outdated** | `cargo outdated -R 2>&1 \|\| true` | Outdated direct dependencies |
 | **machete** | `cargo machete 2>&1 \|\| true` | Unused dependencies |
@@ -884,7 +884,7 @@ cargo deny check               # License/advisory checks
 cargo tree -d                  # Duplicate dependencies
 
 # Code Quality
-./clippy-all                   # Clippy on all crates
+./clippy-all.sh                # Clippy on all crates
 cargo geiger                   # Unsafe code count (from crate dir)
 tokei compiler/                # Lines of code stats
 
