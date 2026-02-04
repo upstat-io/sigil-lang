@@ -8,7 +8,7 @@
 - **Proper fixes only** — If a fix feels hacky, it IS hacky. Find the right solution.
 - **When unsure, STOP and ASK** — Do not guess. Do not assume. Pause and ask the user for guidance.
 - **Fact-check everything** — Verify behavior against the spec. Test your assumptions. Read the code you're modifying.
-- **Consult reference repos** — Check `~/lang_repos/` (Rust, Go, Zig, TypeScript, Gleam, Elm, Roc) for established patterns and idioms.
+- **Consult reference repos** — Check `~/projects/reference_repos/lang_repos/` (Rust, Go, Zig, TypeScript, Gleam, Elm, Roc) for established patterns and idioms.
 - **No "temporary" fixes** — There is no such thing. Today's temporary fix is tomorrow's permanent tech debt.
 - **If you can't do it right, say so** — Communicate blockers rather than shipping bad code.
 
@@ -91,7 +91,7 @@ For Ori syntax, types, patterns, and prelude:
 
 `compiler/oric/` — compiler | `docs/ori_lang/0.1-alpha/spec/` — **spec (authoritative)** | `spec/grammar.ebnf` — syntax | `spec/operator-rules.md` — operator semantics | `docs/ori_lang/proposals/` — proposals | `library/std/` — stdlib | `tests/spec/` — conformance | `compiler/oric/tests/phases/` — phase tests | `plans/roadmap/` — roadmap
 
-## Reference Repos (`~/lang_repos/`)
+## Reference Repos (`~/projects/reference_repos/lang_repos/`)
 
 - **rust** — `rustc_errors/src/{lib,diagnostic,json}.rs`, `rustc_lint_defs/src/lib.rs`
 - **golang** — `cmd/compile/internal/base/print.go`, `go/types/errors.go`, `internal/types/errors/codes.go`

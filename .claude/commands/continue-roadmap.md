@@ -100,7 +100,7 @@ For each section file in order:
 
 If ALL sections have `status: complete`, report "Roadmap complete!"
 
-> **Note:** The YAML frontmatter `status` field is the source of truth. It should always match the checkbox state in the body. If they're out of sync, trust the checkboxes and fix the frontmatter.
+> **CRITICAL:** The YAML frontmatter `status` field must ALWAYS match the checkbox state in the body. If they're out of sync, trust the checkboxes and **immediately fix the frontmatter**. Never proceed with stale frontmatter — the website and progress tracking depend on accurate status values. See "Verification/Audit Workflow" below for the full sync process.
 
 ### Step 3: Load Section Details
 
@@ -250,6 +250,69 @@ status: complete
 ### Why This Matters
 
 The website dynamically loads roadmap data from these YAML frontmatter blocks. Incorrect status values cause the roadmap page to show wrong progress information.
+
+---
+
+## Verification/Audit Workflow
+
+When auditing roadmap accuracy (verifying status rather than implementing features), follow this workflow:
+
+### Step 1: Compare Frontmatter to Body
+
+Before testing anything, check if frontmatter matches checkbox state:
+
+1. Read the YAML frontmatter subsection statuses
+2. Scan the body for `[x]` and `[ ]` checkboxes under each `## X.Y` header
+3. **If they don't match** — the roadmap is stale and needs updating
+
+### Step 2: Test Claimed Status
+
+Don't trust checkboxes blindly. Verify actual implementation:
+
+1. **For `[x]` items**: Write quick test to confirm feature works
+2. **For `[ ]` items**: Write quick test to confirm feature fails/is missing
+3. **Document discrepancies**: Note items where claimed status doesn't match reality
+
+### Step 3: Update Body Checkboxes
+
+Fix checkboxes to match verified reality:
+
+- Feature works → `[x]`
+- Feature broken/missing → `[ ]`
+- Add date stamps for verification: `✅ (2026-02-04)`
+
+### Step 4: Update Frontmatter Immediately
+
+**Never leave frontmatter stale.** After updating body checkboxes:
+
+1. Recalculate each subsection status from its checkboxes
+2. Update subsection `status` values in frontmatter
+3. Recalculate section status from subsection statuses
+4. Update section `status` value in frontmatter
+
+### Step 5: Update Status Summary
+
+Update any status messages in the body (e.g., "~45 failures remain" → "Only 2 bugs remain").
+
+### Audit Checklist
+
+When verifying a section:
+
+- [ ] Frontmatter subsection statuses match body checkboxes
+- [ ] Tested sample of `[x]` items — they actually work
+- [ ] Tested sample of `[ ]` items — they actually fail
+- [ ] Updated checkboxes to match reality
+- [ ] **Updated frontmatter to match checkboxes**
+- [ ] Updated status summary text in body
+- [ ] Added verification date to completion summary
+
+### Common Audit Triggers
+
+Run an audit when:
+- Starting work on a section after a long gap
+- User reports "this feature works but roadmap says broken"
+- Major refactoring that might have fixed/broken multiple items
+- Before presenting roadmap status to stakeholders
 
 ---
 
