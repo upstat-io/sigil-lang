@@ -206,6 +206,7 @@ cargo tree -d                            # Show duplicate dependencies
 - String comparisons where interned ID comparison works
 - Excessive cloning of IR structures
 - `Arc<dyn Trait>` where `&dyn` or `Box<dyn>` suffices
+- `SharedTypeInterner` (Arc) where `&TypeInterner` suffices (downstream phases should borrow, not own)
 
 **MEDIUM**
 - Scattered heap allocations for related nodes
@@ -219,6 +220,7 @@ cargo tree -d                            # Show duplicate dependencies
 - **Interning**: Identifiers, strings, method keys → O(1) comparison
 - **Newtypes**: Type-safe IDs prevent mixing `ExprId` with `TypeId`
 - **Push allocations to caller**: Return iterators, not `Vec`
+- **Arc vs Borrow**: Use `&'a T` when one owner exists and others borrow (e.g., codegen borrows from type-check). Use `Arc<T>` only when ownership is truly shared or data must outlive creator.
 
 ### Checklist
 
@@ -227,6 +229,7 @@ cargo tree -d                            # Show duplicate dependencies
 - [ ] IDs are newtypes, not raw integers
 - [ ] No `Arc` cloning in hot paths
 - [ ] Error paths marked `#[cold]`
+- [ ] Downstream phases use `&T` not `Arc<T>` for shared data
 
 ---
 
@@ -384,13 +387,16 @@ cargo tree -d                            # Show duplicate dependencies
 - No test for public function
 - Test verifies implementation, not behavior
 - Flaky test (timing, shared state, order-dependent)
-- `#[ignore]` without tracking issue
+- `#[ignore]` without reason comment explaining why and when it can be unskipped
+- `#[skip]` used as test avoidance (skipping because test is hard to write, not because feature is incomplete)
 
 **HIGH**
 - Inline tests exceeding 200 lines (should be in `tests/` subdirectory)
 - Missing edge case tests (empty, boundary, error conditions)
 - Snapshot test without clear expected output
 - Test mocks 5+ dependencies (suggests SRP violation)
+- Stale skipped tests: `#[ignore]` or `#[skip]` on tests where the blocking feature is now implemented
+- Skipped test without clear unskip criteria (when should this be enabled?)
 
 **MEDIUM**
 - Poor test naming (`test_1`, `test_parser`)
@@ -404,6 +410,23 @@ cargo tree -d                            # Show duplicate dependencies
 - **Snapshot testing**: Complex output (errors, IR dumps) use snapshots
 - **Behavior, not implementation**: Test what it does, not how
 - **Data-driven**: Fixture + expected output, not API-direct
+- **Skipped tests are temporary**: Every skip needs a reason and unskip criteria; review periodically to unskip when blocking feature lands
+
+### Skipped Test Audit
+
+During code review, run:
+```bash
+# Find all skipped/ignored tests
+grep -rn '#\[ignore\]\|#\[skip\]\|#skip' compiler/ tests/ --include='*.rs' --include='*.ori'
+```
+
+For each skipped test, verify:
+1. **Has reason**: Skip comment explains *why* (not just "skip")
+2. **Has criteria**: When can this be unskipped? (feature X, issue #Y)
+3. **Still blocked**: Is the blocking feature still unimplemented?
+4. **Not avoidance**: Skip is for incomplete feature, not because test is hard
+
+If a test's blocking feature is now implemented, **unskip it** as part of the review.
 
 ### Checklist
 
@@ -412,6 +435,8 @@ cargo tree -d                            # Show duplicate dependencies
 - [ ] Inline tests < 200 lines
 - [ ] Snapshot tests for complex output
 - [ ] No flaky tests
+- [ ] Skipped tests reviewed: unskip any where blocking feature is complete
+- [ ] All skips have reason comment and unskip criteria
 
 ---
 

@@ -3,85 +3,44 @@ paths:
   - "**/aot/**"
 ---
 
-**Ori is under construction.** Rust tooling is trusted. Ori tooling (lexer, parser, type checker, evaluator, test runner) is NOT. When something fails, investigate Ori infrastructure first—the bug is often in the compiler/tooling, not user code or tests.
+**NO WORKAROUNDS/HACKS/SHORTCUTS.** Proper fixes only. When unsure, STOP and ask. Fact-check against spec. Consult `~/lang_repos/`.
 
-**Fix issues encountered in code you touch. No "pre-existing" exceptions.**
-
-**Do it properly, not just simply. Correct architecture over quick hacks; no shortcuts or "good enough" solutions.**
+**Ori tooling is under construction** — bugs are usually in compiler, not user code. Fix every issue you encounter.
 
 # AOT Compilation
 
-## Architecture
-
-- Pipeline: Parse → TypeCheck → LLVM IR → Object → Link → Executable
-- Extends JIT infrastructure with target config, object emission, linking
-- Platform-agnostic design; linker drivers handle platform specifics
+## Pipeline
+Parse → TypeCheck → LLVM IR → Object → Link → Executable
 
 ## Building
-
 ```bash
-cargo bl   # debug: builds oric + ori_rt with LLVM
-cargo blr  # release: builds oric + ori_rt with LLVM
+cargo bl   # debug
+cargo blr  # release
 ```
-
-**Critical**: Always build `ori_rt` alongside `oric`. Cargo only builds `rlib` as dependency; the `staticlib` (`libori_rt.a`) must be explicitly requested.
+**Always build `ori_rt` alongside `oric`.**
 
 ## Runtime Discovery
-
-Discovery order (like rustc's sysroot):
-
-1. Same directory as compiler (`target/release/libori_rt.a`)
-2. Installed layout (`<exe>/../lib/libori_rt.a`)
-3. Workspace fallback (`$ORI_WORKSPACE_DIR/target/{release,debug}/`)
-
-If not found, error lists searched paths. See `runtime.rs`.
+1. Same directory as compiler
+2. `<exe>/../lib/libori_rt.a`
+3. `$ORI_WORKSPACE_DIR/target/`
 
 ## Symbol Mangling
-
 Format: `_ori_<module>$<function>[<suffix>]`
-
-| Ori Symbol | Mangled |
-|------------|---------|
-| `@main` | `_ori_main` |
-| `math.@add` | `_ori_math$add` |
-| `int::Eq.@equals` | `_ori_int$$Eq$equals` |
-| `Option.@some<int>` | `_ori_Option$A$some$Gint` |
-
-Use `Mangler` struct; `demangle()` for reverse.
+- `@main` → `_ori_main`
+- `math.@add` → `_ori_math$add`
 
 ## Linker Drivers
-
-| Platform | Driver | Backend |
-|----------|--------|---------|
-| Linux/macOS | `GccLinker` | gcc/clang |
-| Windows | `MsvcLinker` | link.exe |
-| WebAssembly | `WasmLinker` | wasm-ld |
-
-- `LinkerDriver::new(&target)` auto-detects
-- `LinkInput` configures objects, libraries, output
-- Always link `ori_rt` for runtime functions
+- Linux/macOS: `GccLinker`
+- Windows: `MsvcLinker`
+- WASM: `WasmLinker`
 
 ## Optimization
-
-- Uses LLVM new pass manager
 - `OptimizationLevel`: None, Less, Default, Aggressive
 - `LtoMode`: None, ThinLocal, Thin, Full
-- Configure via `OptimizationConfig`
 
 ## Key Files
-
-| File | Purpose |
-|------|---------|
-| `target.rs` | Target triple, CPU features |
-| `object.rs` | Object file emission |
-| `mangle.rs` | Symbol mangling/demangling |
-| `runtime.rs` | Runtime library discovery |
-| `linker/mod.rs` | Linker driver abstraction |
-| `linker/gcc.rs` | GCC/Clang linker |
-| `linker/msvc.rs` | MSVC linker |
-| `linker/wasm.rs` | WebAssembly linker |
-| `passes.rs` | Optimization passes |
-| `debug.rs` | DWARF/CodeView debug info |
-| `multi_file.rs` | Multi-file compilation |
-| `incremental/` | Incremental compilation |
-| `wasm.rs` | WASM-specific config |
+- `target.rs`: Target triple
+- `object.rs`: Object emission
+- `mangle.rs`: Symbol mangling
+- `runtime.rs`: Runtime discovery
+- `linker/`: Linker drivers

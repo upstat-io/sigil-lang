@@ -253,7 +253,7 @@ Brief description.
 - Blocked on: [deps or "None"]
 ```
 
-### Step 15: Update Spec, Grammar, and CLAUDE.md
+### Step 15: Update Spec, Grammar, and Ori Syntax Reference
 
 If proposal introduces new syntax/types/semantics, **invoke the sync skills**:
 
@@ -277,11 +277,11 @@ Invoke: `Skill(skill: "sync-grammar")`
 
 This ensures `grammar.ebnf` stays synchronized as the single source of truth.
 
-**Step 15c: Update CLAUDE.md (manual)**
+**Step 15c: Update Ori Syntax Reference (manual)**
 
-- [ ] Update `CLAUDE.md` if syntax/types/patterns affected
+- [ ] Update `.claude/rules/ori-syntax.md` if syntax/types/patterns affected
 - [ ] Follow rules in `.claude/rules/ori-lang.md`
-- [ ] Verify consistency between spec, grammar.ebnf, and CLAUDE.md
+- [ ] Verify consistency between spec, grammar.ebnf, and ori-syntax.md
 
 ### Step 16: Verify Documentation Formatting
 
@@ -296,7 +296,7 @@ This ensures `grammar.ebnf` stays synchronized as the single source of truth.
 - [ ] No inline EBNF (references grammar.ebnf instead)
 - [ ] Examples follow `// Valid` / `// Invalid - reason` format
 
-**Check CLAUDE.md and proposal files against `.claude/rules/ori-lang.md`:**
+**Check ori-syntax.md and proposal files against `.claude/rules/ori-lang.md`:**
 - [ ] Consistent with spec (no contradictions)
 - [ ] Syntax/types/patterns synchronized across all docs
 
@@ -340,7 +340,7 @@ docs(proposal): approve <proposal-name>
 - Add implementation plan to Section X
 - Update roadmap tracking
 - Update spec ([affected files])
-- Update CLAUDE.md with [feature]
+- Update ori-syntax.md with [feature]
 
 Key decisions:
 - [Decision 1]
@@ -372,13 +372,13 @@ Proposal: docs/ori_lang/proposals/approved/<name>-proposal.md
 - [ ] `priority-and-tracking.md` updated
 - [ ] **`/sync-spec` invoked** (if affects semantics) ← CRITICAL
 - [ ] **`/sync-grammar` invoked** (if affects syntax) ← CRITICAL
-- [ ] `CLAUDE.md` updated (if affects syntax/types/patterns)
+- [ ] `.claude/rules/ori-syntax.md` updated (if affects syntax/types/patterns)
 
 **Formatting Verification (final step):**
 - [ ] Spec files use formal/declarative language (no tutorial tone)
 - [ ] Technical terms in italics, syntax in backticks
 - [ ] Informative sections marked with `> **Note:**`
-- [ ] All docs synchronized (no contradictions between spec/CLAUDE.md/proposal)
+- [ ] All docs synchronized (no contradictions between spec/ori-syntax.md/proposal)
 - [ ] Formatting issues resolved with user via `AskUserQuestion`
 - [ ] Committed and pushed via `/commit-push`
 

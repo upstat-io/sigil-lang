@@ -3,44 +3,30 @@ paths:
   - "**/Cargo.toml"
 ---
 
-**Ori is under construction.** Rust tooling is trusted. Ori tooling (lexer, parser, type checker, evaluator, test runner) is NOT. When something fails, investigate Ori infrastructure first—the bug is often in the compiler/tooling, not user code or tests.
+**NO WORKAROUNDS/HACKS/SHORTCUTS.** Proper fixes only. When unsure, STOP and ask. Fact-check against spec. Consult `~/lang_repos/`.
 
-**Fix issues encountered in code you touch. No "pre-existing" exceptions.**
-
-**Do it properly, not just simply. Correct architecture over quick hacks; no shortcuts or "good enough" solutions.**
+**Ori tooling is under construction** — bugs are usually in compiler, not user code. Fix every issue you encounter.
 
 # Cargo Configuration
 
-**Do NOT edit Cargo.toml files without explicit user permission.**
-
-- Workspace members and dependencies carefully configured
-- Lint configurations strict by design
-- Build settings optimized for workspace
-- Always ask before modifying
+**Do NOT edit Cargo.toml without explicit user permission.**
 
 ## Aliases (`.cargo/config.toml`)
-
-| Alias | Command | Purpose |
-|-------|---------|---------|
-| `cargo t` | `test --workspace` | All Rust tests |
-| `cargo st` | `run -p oric -- test tests/` | Ori spec tests |
-| `cargo c` | `check --workspace` | Fast check |
-| `cargo b` | `build --workspace` | Build all |
-| `cargo cl` | `clippy --workspace` | Lint all |
-| `cargo bl` | `build -p oric -p ori_rt --features llvm` | LLVM debug |
-| `cargo blr` | `build -p oric -p ori_rt --features llvm --release` | LLVM release |
-| `cargo cll` | `clippy -p ori_llvm -p ori_rt` | Lint LLVM |
+- `cargo t`: `test --workspace`
+- `cargo st`: `run -p oric -- test tests/`
+- `cargo c`: `check --workspace`
+- `cargo b`: `build --workspace`
+- `cargo cl`: `clippy --workspace`
+- `cargo bl`: `build -p oric -p ori_rt --features llvm`
+- `cargo blr`: `build -p oric -p ori_rt --features llvm --release`
+- `cargo cll`: `clippy -p ori_llvm -p ori_rt`
 
 ## Workspace Lints
-
 - `unsafe_code = "deny"` (except `ori_rt`)
 - `dead_code = "deny"`
 - `clippy::unwrap_used = "deny"`
 - `clippy::expect_used = "deny"`
 
 ## Key Files
-
-| File | Purpose |
-|------|---------|
-| `Cargo.toml` | Workspace config, members, deps |
-| `.cargo/config.toml` | Aliases, LLVM path, env vars |
+- `Cargo.toml`: Workspace config
+- `.cargo/config.toml`: Aliases, LLVM path

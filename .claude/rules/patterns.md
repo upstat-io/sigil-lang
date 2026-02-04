@@ -3,57 +3,40 @@ paths:
   - "**/patterns/**"
 ---
 
-**Ori is under construction.** Rust tooling is trusted. Ori tooling (lexer, parser, type checker, evaluator, test runner) is NOT. When something fails, investigate Ori infrastructure first—the bug is often in the compiler/tooling, not user code or tests.
+**NO WORKAROUNDS/HACKS/SHORTCUTS.** Proper fixes only. When unsure, STOP and ask. Fact-check against spec. Consult `~/lang_repos/`.
 
-**Fix issues encountered in code you touch. No "pre-existing" exceptions.**
-
-**Do it properly, not just simply. Correct architecture over quick hacks; no shortcuts or "good enough" solutions.**
+**Ori tooling is under construction** — bugs are usually in compiler, not user code. Fix every issue you encounter.
 
 # Pattern System
 
 ## PatternDefinition Trait
-
 **Required:**
 - `name() -> &'static str`
 - `required_props() -> &'static [&'static str]`
 - `type_check(&mut TypeCheckContext) -> Type`
 - `evaluate(&EvalContext, &mut dyn PatternExecutor) -> EvalResult`
 
-**Optional (with defaults):**
-- `optional_props()`, `optional_args()`, `scoped_bindings()`
-- `allows_arbitrary_props()`, `signature()`, `can_fuse_with()`
+**Optional:** `optional_props()`, `scoped_bindings()`, `can_fuse_with()`
 
 ## Registry
-
 - Static ZST instances: `static RECURSE: RecursePattern = RecursePattern;`
-- Enum dispatch on `FunctionExpKind` (not HashMap)
-- 9 patterns: Recurse, Parallel, Spawn, Timeout, Cache, With, Print, Panic, Catch
+- Enum dispatch on `FunctionExpKind`
+- Patterns: Recurse, Parallel, Spawn, Timeout, Cache, With, Print, Panic, Catch
 
-## PatternExecutor Abstraction
-
+## PatternExecutor
 - `eval(expr_id)` — evaluate expression
-- `call(func, args)` — call function value
+- `call(func, args)` — call function
 - `lookup_capability(name)` — get capability
-- `call_method(receiver, method, args)` — call method
-- `lookup_var(name)`, `bind_var(name, value)`
-
-## Context Types
-
-- **EvalContext**: `get_prop()`, `eval_prop()`, `prop_span()`, `error_with_prop_span()`
-- **TypeCheckContext**: `get_prop_type()`, `fresh_var()`, `list_of()`, `option_of()`
+- `call_method(receiver, method, args)`
 
 ## Adding New Pattern
-
 1. Create `ori_patterns/src/<name>.rs`
-2. Implement `PatternDefinition` trait
+2. Implement `PatternDefinition`
 3. Register in `registry.rs`
-4. Add `FunctionExpKind` variant in `ori_ir`
+4. Add `FunctionExpKind` variant
 5. Add parsing in `ori_parse`
 
 ## Key Files
-
-| File | Purpose |
-|------|---------|
-| `lib.rs` | PatternDefinition trait, contexts |
-| `registry.rs` | Pattern lookup, static instances |
-| `recurse.rs` | Example implementation |
+- `lib.rs`: PatternDefinition trait
+- `registry.rs`: Pattern lookup
+- `recurse.rs`: Example impl

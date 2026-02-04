@@ -1,0 +1,192 @@
+---
+paths:
+  - "**/*.ori"
+  - "**/library/**"
+  - "**/tests/spec/**"
+---
+
+# Ori Quick Reference
+
+**Spec is authoritative**: `docs/ori_lang/0.1-alpha/spec/` (`grammar.ebnf` for syntax, `operator-rules.md` for semantics)
+
+## Declarations
+
+**Functions**: `@name (p: T) -> R = expr` | `pub @name` | `@name<T>` | `@name<T: Trait>` | `@name<T: A + B>` | `where T: Clone` | `uses Capability` | `(x: int = 10)` defaults
+**Variadics**: `@sum (nums: ...int) -> int` | receives as `[T]` | call: `sum(1, 2, 3)` | spread: `sum(...list)` | trait objects: `...Printable` | empty calls need explicit type for generics
+**Clauses**: `@f (0: int) -> int = 1` then `@f (n) = n * f(n-1)` | `if guard` | exhaustive, top-to-bottom
+**Constants**: `let $name = value` | `pub let $name` | module-level must be `$`
+**Const Functions**: `$name (p: T) -> R = expr` — pure, comptime, limits: 1M steps/1000 depth/100MB/10s
+**Types**: `type N = { f: T }` struct | `A | B | C(f: T)` sum | `type N = Existing` newtype | `type N<T>` | `#derive(Eq)` | `pub type`
+**Newtypes**: `type UserId = int` | construct: `UserId(42)` | `.inner` (always public) | no trait/method inheritance | `#derive(Eq, Clone)` required | zero cost
+**Traits**: `trait N { @m (self) -> T }` | `@m (self) -> T = default` | `type Item` assoc | `type Output = Self` default | `trait C: P` | `@m () -> Self` assoc fn | `trait N<T = Self>` default type param
+**Impls**: `impl T { @m }` inherent | `impl Trait for T` | `impl<T: B> Trait for C<T>` | `self`/`Self`
+**Associated Functions**: `impl T { @new () -> T }` — no `self` | call: `Type.method()` | `Self` in return | generics: `Option<int>.some(v:)`
+**Default Impls**: `pub def impl Trait { @m }` — stateless, one per trait/module, auto-bound, override with `with`
+**Extensions**: `extend Type { @m (self) -> T }` | `extend<T: Bound> [T]` | `extend T where T: Bound` | `pub extend` | no statics/fields/override
+**Resolution**: Diamond=single impl; Inherent>Trait>Extension; qualified: `Trait.method(v)`, `Type::Trait::Assoc`; extensions: `module.Type.method(v)`
+**Object Safety**: No `Self` return/param (except receiver), no generic methods; safe: `Printable`, `Debug`, `Hashable`; unsafe: `Clone`, `Eq`, `Iterator`
+**Tests**: `@t tests @fn () -> void` | `tests _` floating | `tests @a tests @b` multi | `#skip("r")` | `#compile_fail("e")` | `#fail("e")`
+
+## Conditional Compilation
+
+**Target**: `#target(os: "linux")` | `arch:` | `family:` | `any_os:` | `not_os:` | file-level: `#!target(...)`
+**Config**: `#cfg(debug)` | `release` | `feature:` | `any_feature:` | `not_debug` | `not_feature:`
+**Constants**: `$target_os`, `$target_arch`, `$target_family`, `$debug`, `$release` — false branch not type-checked
+
+## Types
+
+**Primitives**: `int` (i64), `float` (f64), `bool`, `str` (UTF-8), `char`, `byte`, `void`, `Never`
+**Special**: `Duration` (`100ns`/`us`/`ms`/`s`/`m`/`h`), `Size` (`100b`/`kb`/`mb`/`gb`/`tb`)
+**Collections**: `[T]` list, `[T, max N]` fixed-capacity, `{K: V}` map, `Set<T>`
+**Compound**: `(T, U)` tuple, `()` unit, `(T) -> U` fn, `Trait` object, `impl Trait` existential
+**Generic**: `Option<T>`, `Result<T, E>`, `Range<T>`, `Ordering`
+**Const Generics**: `$N: int` | `@f<T, $N: int>` | `$B: bool` | `where N > 0` | `where N > 0 && N <= 100`
+**Const Bounds**: comparison (`==`/`!=`/`<`/`<=`/`>`/`>=`), logical (`&&`/`||`/`!`), arithmetic (`+`/`-`/`*`/`/`/`%`), bitwise (`&`/`|`/`^`/`<<`/`>>`) | multiple `where` = AND
+**Channels**: `Producer<T>`, `Consumer<T>`, `CloneableProducer<T>`, `CloneableConsumer<T>` (`T: Sendable`)
+**Concurrency**: `Nursery`, `NurseryErrorMode` (`CancelRemaining | CollectAll | FailFast`)
+**FFI**: `CPtr` (C opaque), `JsValue` (JS handle), `JsPromise<T>` (JS async)
+**Rules**: No implicit conversions; overflow panics; `str[i]` → single-codepoint `str`
+
+### Duration & Size
+
+**Duration**: 64-bit nanoseconds; suffixes `ns`/`us`/`ms`/`s`/`m`/`h`; decimal syntax (`0.5s`=500ms, `1.5s`=1500ms)
+**Size**: 64-bit bytes (non-negative); suffixes `b`/`kb`/`mb`/`gb`/`tb`; SI units (1000-based); decimal syntax (`1.5kb`=1500 bytes)
+**Decimal literals**: Compile-time sugar using integer arithmetic (no floats); must result in whole base unit; `1.5ns`/`0.5b` = error
+**Arithmetic**: `+`/`-`/`*`/`/`/`%`, unary `-` (Duration only; Size `-` panics if negative, unary `-` = compile error)
+**Methods**: `.nanoseconds()`/`.microseconds()`/`.milliseconds()`/`.seconds()`/`.minutes()`/`.hours()` | `.bytes()`/`.kilobytes()`/`.megabytes()`/`.gigabytes()`/`.terabytes()` → `int`
+**Factory**: `Duration.from_nanoseconds(ns:)`... | `Size.from_bytes(b:)`...
+**Traits**: `Eq`, `Comparable`, `Hashable`, `Clone`, `Debug`, `Printable`, `Default` (`0ns`/`0b`), `Sendable`
+
+### Never
+
+Bottom type (uninhabited); coerces to any `T`
+**Producers**: `panic(msg:)`, `todo()`, `unreachable()`, `break`, `continue`, `expr?` on Err/None, infinite `loop`
+**Generics**: `Result<Never, E>` = always Err | `Result<T, Never>` = always Ok | `Option<Never>` = always None
+**Restrictions**: Cannot be struct field; may be sum variant payload (unconstructable)
+
+### Fixed-Capacity Lists
+
+`[T, max N]` — inline-allocated, compile-time max N, dynamic length 0..N | `[T, max N] <: [T]`
+**Methods**: `.capacity()`, `.is_full()`, `.remaining()`, `.push()` (panics), `.try_push()` → `bool`, `.push_or_drop()`, `.push_or_oldest()`, `.to_dynamic()`
+**Conversion**: `.to_fixed<$N>()` panics | `.try_to_fixed<$N>()` → `Option`
+
+### Existential Types (`impl Trait`)
+
+`impl Trait where Assoc == Type` — opaque return type; concrete type hidden from callers
+**Position**: return only | argument position: use generics instead
+**Syntax**: `@f () -> impl Iterator where Item == int` | `impl A + B` multi-trait
+**Where clause**: type-local (constraints on associated types, not type params)
+**Dispatch**: static (monomorphized) — no vtable overhead
+**Rules**: all return paths must yield same concrete type
+**vs Trait objects**: `impl Trait` (static/single type) vs `Trait` (dynamic/any type at runtime)
+
+## Literals
+
+`42`, `1_000_000`, `0xFF` | `3.14`, `2.5e-8` | `"hello"` (escapes: `\\\"\n\t\r\0`) | `` `{name}` `` | `'a'` | `true`/`false` | duration/size literals | `[1, 2]`, `[...a, ...b]` | `{key: v}`, `{"key": v}`, `{[expr]: v}`, `{...a, ...b}` | `Point { x, y }`, `{ ...p, x: 10 }`
+
+## Operators (precedence high→low)
+
+1. `.` `[]` `()` `?` — 2. `!` `-` `~` — 3. `*` `/` `%` `div` — 4. `+` `-` — 5. `<<` `>>` — 6. `..` `..=` `by` — 7. `<` `>` `<=` `>=` — 8. `==` `!=` — 9. `&` — 10. `^` — 11. `|` — 12. `&&` — 13. `||` — 14. `??`
+
+**Unary**: `!` (Not), `-` (Neg), `~` (BitNot) | **Bitwise**: `&`/`|`/`^` (BitAnd/Or/Xor), `<<`/`>>` (Shl/Shr)
+**Shift overflow**: negative count panics; count ≥ bit width panics; `1 << 63` panics
+**Operator traits**: desugar to trait methods; user types implement for operator support
+
+## Expressions
+
+**Conditionals**: `if c then e else e` | `if c then e` (void)
+**Bindings**: `let x = v` mutable | `let $x` immutable | `let x: T` | shadowing OK | `let { x, y }` | `let { x: px }` | `let (a, b)` | `let [$h, ..t]`
+**Indexing**: `list[0]`, `list[# - 1]` (`#`=length, panics OOB) | `map["k"]` → `Option<V>`
+**Access**: `v.field`, `v.method(arg: v)` — named args required except: fn variables, single-param with inline lambda
+**Lambdas**: `x -> x + 1` | `(a, b) -> a + b` | `() -> 42` | `(x: int) -> int = x * 2` — capture by value
+**Ranges**: `0..10` excl | `0..=10` incl | `0..10 by 2` | descending: `10..0 by -1` | infinite: `0..`, `0.. by -1` | int only
+**Loops**: `for i in items do e` | `for x in items yield x * 2` | `for x in items if g yield x` | nested `for` | `loop(body)` + `break`/`continue` | `break value` | `continue value`
+**Loop body**: single expression; `loop(run(...))` for sequences | type: `void` (break no value), inferred (break value), `Never` (no break) | `continue value` error (E0861)
+**Yield control**: `continue` skips | `continue value` substitutes | `break` stops | `break value` adds final | `{K: V}` from `(K, V)` tuples
+**Labels**: `loop:name` | `for:name` | `break:name` | `continue:name` | no shadowing | `continue:name value` in yield → outer
+**Spread**: `[...a, ...b]` | `{...a, ...b}` | `P { ...orig, x: 10 }` — later wins, literal contexts only | `fn(...list)` into variadic only
+
+## Patterns (compiler constructs)
+
+**function_seq**: `run(let x = a, result)` | `run(pre_check:, body, post_check:)` | `try(let x = f()?, Ok(x))` | `match(v, P -> e, _ -> d)`
+**function_exp**: `recurse(condition:, base:, step:, memo:, parallel:)` | `parallel(tasks:, max_concurrent:, timeout:)` → `[Result]` | `spawn(tasks:, max_concurrent:)` → `void` | `timeout(op:, after:)` | `cache(key:, op:, ttl:)` | `with(acquire:, use:, release:)` | `for(over:, match:, default:)` | `catch(expr:)` → `Result<T, str>` | `nursery(body:, on_error:, timeout:)`
+**Channels**: `channel<T>(buffer:)` → `(Producer, Consumer)` | `channel_in` | `channel_out` | `channel_all`
+**Conversions**: `42 as float` infallible | `"42" as? int` fallible → `Option`
+**Match patterns**: literal | `x` | `_` | `Some(x)` | `{ x, y }` | `[a, ..rest]` | `1..10` | `A | B` | `x @ pat` | `x.match(guard)`
+**Exhaustiveness**: match exhaustive; guards need `_`; `let` patterns irrefutable
+
+## Imports
+
+**Relative**: `use "./math" { add }` | `"../utils"` | `"./http/client"`
+**Module**: `use std.math { sqrt }` | `use std.net.http as http`
+**Private**: `use "./m" { ::internal }` | **Alias**: `{ add as plus }` | **Re-export**: `pub use`
+**Without default**: `use "m" { Trait without def }` — import without `def impl`
+**Extensions**: `extension std.iter.extensions { Iterator.count }` — method-level, no wildcards | `pub extension`
+
+## FFI
+
+**Native (C)**: `extern "c" from "lib" { @_sin (x: float) -> float as "sin" }` | `from` specifies library | `as` maps name
+**JavaScript**: `extern "js" { @_sin (x: float) -> float as "Math.sin" }` | `extern "js" from "./utils.js"`
+**C Variadics**: `extern "c" { @printf (fmt: CPtr, ...) -> c_int }` — untyped, requires `unsafe`, platform va_list ABI
+**Types**: `CPtr` opaque | `Option<CPtr>` nullable | `JsValue` handle | `JsPromise<T>` async
+**C Types**: `c_char`, `c_short`, `c_int`, `c_long`, `c_longlong`, `c_float`, `c_double`, `c_size`
+**Layout**: `#repr("c")` C-compatible | `#repr("packed")` no padding | `#repr("transparent")` same as single field | `#repr("aligned", N)` minimum alignment (power of two) | struct types only; newtypes implicitly transparent
+**Unsafe**: `unsafe(ptr_read(...))` | **Capability**: `uses FFI`
+**Async WASM**: `JsPromise<T>` implicitly resolved at binding sites | **Compile Error**: `compile_error("msg")`
+
+## Capabilities
+
+**Declare**: `@f (...) -> T uses Http = ...` | `uses FileSystem, Suspend`
+**Provide**: `with Http = RealHttp { } in expr` | `with Http = mock, Cache = mock in expr`
+**Resolution**: with...in > imported `def impl` > module-local `def impl`
+**Suspend**: `uses Suspend` = may suspend; no `uses` = sync; concurrency via `parallel(...)`
+**Standard**: `Http`, `FileSystem`, `Clock`, `Random`, `Crypto`, `Cache`, `Print` (default), `Logger`, `Env`, `Intrinsics`, `Suspend`, `FFI`
+**Intrinsics**: SIMD/bit ops; `Intrinsics.simd_add_f32x4(a:, b:)`, `count_ones(value:)`, `cpu_has_feature(feature:)`
+
+## Comments
+
+`// comment` — own line only | Doc: `// Desc` | `// * name:` | `// ! Error:` | `// > expr -> result`
+
+## Formatting
+
+4 spaces, 100 char limit, trailing commas multi-line only | Space around: binary ops, arrows, colons/commas, `pub`, struct braces, `as`/`by`/`|`, `=` in `<T = Self>` | No space: parens/brackets, `.`/`..`/`?`, empty delimiters | Break at 100; `run` width-based; `try`/`match`/`recurse`/`parallel`/`spawn`/`nursery` always stacked | Params/args/generics/where/fields/variants one-per-line; chains break at `.method()`; binary break before op; `if...then` together, `else` newline; chained `else if` each on own line | Parens preserved when semantically required: `(for x in items yield x).fold(...)`, `(x -> x * 2)(5)`, `for x in (inner) yield x`
+
+## Keywords
+
+**Reserved**: `break continue def do else extern false for if impl in let loop match pub self Self suspend then trait true type unsafe use uses void where with yield`
+**Reserved (future)**: `asm inline static union view` (reserved for future low-level features)
+**Context-sensitive**: `by cache catch for max parallel recurse run spawn timeout try with without`
+**Built-in names**: `int float str byte len is_empty is_some is_none is_ok is_err assert assert_eq assert_ne assert_some assert_none assert_ok assert_err assert_panics assert_panics_with compare min max print panic todo unreachable dbg compile_error`
+
+## Prelude
+
+**Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `TraceEntry`, `Ordering`, `PanicInfo`, `CancellationError`, `CancellationReason`, `FormatSpec`, `Alignment`, `Sign`, `FormatType`
+**Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Formattable`, `Debug`, `Clone`, `Default`, `Drop`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`, `Index`
+
+**Built-ins**: `print(msg:)`, `len(collection:)`, `is_empty(collection:)`, `is_some/is_none(option:)`, `is_ok/is_err(result:)`, `assert(condition:)`, `assert_eq(actual:, expected:)`, `assert_ne(actual:, unexpected:)`, `assert_some/none/ok/err(...)`, `assert_panics(f:)`, `assert_panics_with(f:, msg:)`, `panic(msg:)`→`Never`, `todo()`/`todo(reason:)`→`Never`, `unreachable()`/`unreachable(reason:)`→`Never`, `dbg(value:)`/`dbg(value:, label:)`→`T`, `compare(left:, right:)`→`Ordering`, `min/max(left:, right:)`, `hash_combine(seed:, value:)`→`int`, `repeat(value:)`→iter, `is_cancelled()`→`bool`, `compile_error(msg:)`, `drop_early(value:)`
+
+**Option**: `.map(transform:)`, `.unwrap_or(default:)`, `.ok_or(error:)`, `.and_then(transform:)`, `.filter(predicate:)`
+**Result**: `.map(transform:)`, `.map_err(transform:)`, `.unwrap_or(default:)`, `.ok()`, `.err()`, `.and_then(transform:)`, `.context(msg:)`, `.trace()`→`str`, `.trace_entries()`→`[TraceEntry]`, `.has_trace()`
+**Error**: `.trace()`, `.trace_entries()`, `.has_trace()`
+**Ordering**: `Less | Equal | Greater` — `.is_less/equal/greater()`, `.is_less_or_equal/greater_or_equal()`, `.reverse()`, `.then(other:)`, `.then_with(f:)`; default `Equal`; order `Less < Equal < Greater`; impls Eq, Comparable, Clone, Debug, Printable, Hashable, Default
+
+**Printable**: `@to_str (self) -> str` — required for `` `{x}` ``; all primitives impl
+**Formattable**: `@format (self, spec: FormatSpec) -> str` — blanket for Printable; spec: `[[fill]align][sign][#][0][width][.precision][type]`; align `<>^`; sign `+ - `; types `bxXoeEf%`; `#` prefix; `0` pads
+**Debug**: `@debug (self) -> str` — escaped strings, derivable | **Clone**: `@clone (self) -> Self` — all primitives/collections, derivable
+**Iterator**: `type Item; @next (self) -> (Option<Self.Item>, Self)` — fused, copy elision, lazy
+**DoubleEndedIterator**: `trait: Iterator { @next_back (self) -> (Option<Self.Item>, Self) }`
+**Iterable**: `type Item; @iter (self) -> impl Iterator` | **Collect**: `@from_iter (iter: impl Iterator) -> Self`
+**Iterator methods**: `.map`, `.filter`, `.fold`, `.find`, `.for_each`, `.collect`, `.count`, `.any`, `.all`, `.take`, `.skip`, `.enumerate`, `.zip`, `.chain`, `.flatten`, `.flat_map`, `.cycle`
+**DoubleEnded methods**: `.rev`, `.last`, `.rfind`, `.rfold`
+**Infinite**: `repeat(value:)`, `(0..).iter()` — bound with `.take(count:)` before `.collect()`
+**Into**: `@into (self) -> T` — lossless, explicit `.into()`, standard: str→Error, int→float, Set<T>→[T]; no identity/chaining
+**Traceable**: `@with_trace`, `@trace`→`str`, `@trace_entries`→`[TraceEntry]`, `@has_trace`
+**TraceEntry**: `{ function, file, line, column: int }` — `@` prefix; most recent first
+**PanicInfo**: `{ message, location: TraceEntry, stack_trace: [TraceEntry], thread_id: Option<int> }`
+**Drop**: `@drop (self) -> void` — refcount zero; not async; panic during unwind aborts
+**Index**: `@index (self, key: Key) -> Value` — `x[k]`→`x.index(key: k)`; return `T`/`Option<T>`/`Result<T, E>`; `#` built-in only
+**Eq**: `@equals (self, other: Self) -> bool` — reflexive/symmetric/transitive; derives `==`/`!=`
+**Comparable**: `trait: Eq { @compare (self, other: Self) -> Ordering }` — total order; derives `<`/`<=`/`>`/`>=`; NaN > all; `None < Some`; `Ok < Err`
+**Hashable**: `trait: Eq { @hash (self) -> int }` — `a == b` ⇒ same hash; +0.0/-0.0 same; use `hash_combine`
+**Operator traits**: `Add`/`Sub`/`Mul`/`Div`/`FloorDiv`/`Rem<Rhs = Self>` — binary; `Neg`/`Not`/`BitNot` — unary; `BitAnd`/`BitOr`/`BitXor<Rhs = Self>`, `Shl`/`Shr<Rhs = int>` — bitwise; all default `type Output = Self`
+**Operator methods**: `add`/`subtract`/`multiply`/`divide`/`floor_divide`/`remainder` — arithmetic; `negate`/`not`/`bit_not` — unary; `bit_and`/`bit_or`/`bit_xor`/`shift_left`/`shift_right` — bitwise
