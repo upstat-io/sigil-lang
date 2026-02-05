@@ -36,6 +36,21 @@ paths:
 4. Add `FunctionExpKind` variant
 5. Add parsing in `ori_parse`
 
+## Debugging / Tracing
+
+**Always use `ORI_LOG` first when debugging pattern issues.** Tracing target: `ori_patterns` (dependency declared, instrumentation in progress).
+
+```bash
+ORI_LOG=ori_eval=debug ori run file.ori             # See pattern evaluation in interpreter
+ORI_LOG=ori_types=debug ori check file.ori          # See pattern type checking
+ORI_LOG=debug ORI_LOG_TREE=1 ori run file.ori       # Full hierarchical trace across all phases
+```
+
+**Tips**:
+- Pattern not matching? Use `ori_eval=debug` to see method dispatch during pattern execution
+- Type error in pattern? Use `ori_types=debug` to see type checking of pattern expressions
+- Add `#[tracing::instrument]` to `PatternDefinition::evaluate()` impls when debugging specific patterns
+
 ## Key Files
 - `lib.rs`: PatternDefinition trait
 - `registry.rs`: Pattern lookup

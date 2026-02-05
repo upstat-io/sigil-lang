@@ -42,6 +42,21 @@ paths:
 - `Visitor<'ast>` trait + `walk_*()` functions
 - Visitor mutates own state; AST immutable
 
+## Debugging / Tracing
+
+The `ori_ir` crate does not use tracing directly (it's a data structure crate). Debug IR issues through consuming crates:
+
+```bash
+ORI_LOG=oric=debug ori check file.ori               # See Salsa query flow (tokens→parsed→typed)
+ORI_LOG=ori_types=trace ori check file.ori          # See how IR nodes are consumed by type checker
+ORI_LOG=ori_eval=trace ori run file.ori             # See how IR nodes are consumed by evaluator
+```
+
+**Tips**:
+- TypeId mismatch? Check `type_id.rs` alignment with `ori_types::Idx` (primitives 0-11 must match)
+- Wrong ExprId? Use `ori_types=trace` to see which expression IDs the type checker processes
+- Arena issue? Add temporary `tracing::debug!` calls to the IR code you're debugging
+
 ## Key Files
 - `arena.rs`: ExprArena, ranges
 - `type_id.rs`: TypeId (parser-level type index, aligned with Idx)

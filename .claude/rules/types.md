@@ -60,6 +60,26 @@ paths:
 - No `Arc<Mutex<T>>` or fn pointers
 - Deterministic (no random/time/IO)
 
+## Debugging / Tracing
+
+**Always use `ORI_LOG` first when debugging type issues.** Tracing target: `ori_types`.
+
+```bash
+ORI_LOG=ori_types=debug ori check file.ori          # Phase boundaries, module checking
+ORI_LOG=ori_types=trace ori check file.ori          # Per-expression inference (hot path)
+ORI_LOG=ori_types=trace ORI_LOG_TREE=1 ori check file.ori  # Hierarchical call tree
+ORI_LOG=ori_types=debug,oric=debug ori check file.ori      # Types + Salsa query execution
+```
+
+**Instrumented functions** (`debug` level): `check_module()`, `check_module_impl()`, `collect_signatures()`, `check_function_bodies()`, `check_test_bodies()`, `check_impl_bodies()`
+**Instrumented functions** (`trace` level): `infer_expr()`, `check_expr()` — per-expression, very verbose
+**Manual events**: `push_error()` logs type errors at debug level
+
+**Tips**:
+- Type mismatch? Use `ORI_LOG=ori_types=debug` to see which function body triggers the error
+- Inference wrong? Use `ORI_LOG=ori_types=trace ORI_LOG_TREE=1` to trace the full inference chain
+- Salsa re-execution? Add `oric=debug` to see `WillExecute` events for the `typed()` query
+
 ## Key Files
 - `pool/mod.rs`: Pool, interning, query methods
 - `pool/construct.rs`: Type construction helpers

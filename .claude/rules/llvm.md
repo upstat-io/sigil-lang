@@ -71,3 +71,21 @@ entry → header → body → latch → header (or exit)
 **Critical**: `continue` must jump to `latch` (not `header`) to ensure index increments. Jumping directly to header skips increment → infinite loop.
 
 **Break** jumps to `exit` block (correct as-is).
+
+## Tracing / Debugging
+
+**Always use `ORI_LOG` first when debugging LLVM codegen issues.** Tracing target: `ori_llvm`.
+
+```bash
+ORI_LOG=ori_llvm=debug ori build file.ori           # LLVM codegen debug events
+ORI_LOG=ori_llvm=debug,ori_types=debug ori build file.ori  # Codegen + type checking
+ORI_LOG=debug ori build file.ori                    # All phases including LLVM
+timeout 5 ORI_LOG=ori_llvm=debug ori test --backend=llvm file.ori  # Debug with timeout
+```
+
+**Instrumented areas**: Pattern matching (`matching.rs`), control flow (`control_flow.rs`), function calls (`functions/calls.rs`), expression codegen (`functions/expressions.rs`)
+
+**Tips**:
+- Codegen crash? Use `ORI_LOG=ori_llvm=debug` to see last successful codegen step
+- Runtime hang? Combine `timeout` with tracing to distinguish compile-time vs runtime issues
+- Unimplemented pattern? Debug output includes "not yet implemented" messages for catch/concurrency patterns

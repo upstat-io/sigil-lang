@@ -37,6 +37,27 @@ paths:
 - `with_env_scope(|s| { ... })`
 - `with_binding(name, value, mutability, |s| { ... })`
 
+## Debugging / Tracing
+
+**Always use `ORI_LOG` first when debugging evaluation issues.** Tracing target: `ori_eval`.
+
+```bash
+ORI_LOG=ori_eval=debug ori run file.ori             # Method dispatch, function calls
+ORI_LOG=ori_eval=trace ori run file.ori             # Every eval() call (very verbose)
+ORI_LOG=ori_eval=debug ORI_LOG_TREE=1 ori run file.ori  # Hierarchical eval tree
+ORI_LOG=ori_eval=debug,ori_types=debug ori run file.ori  # Eval + type checking together
+```
+
+**Instrumented functions**:
+- `eval()` — trace level (hot path, per-expression)
+- `eval_method_call()` — debug level (method dispatch chain)
+- `eval_call()` — debug level (function calls)
+
+**Tips**:
+- Wrong value? Use `ORI_LOG=ori_eval=trace ORI_LOG_TREE=1` to trace evaluation step by step
+- Method not found? Use `debug` to see which resolver in the dispatch chain is checked
+- Infinite loop? Use `timeout 5 ORI_LOG=ori_eval=trace ori run file.ori` to see last eval before hang
+
 ## Key Files
 - `lib.rs`: Interpreter, eval dispatch
 - `interpreter/resolvers/`: MethodDispatcher

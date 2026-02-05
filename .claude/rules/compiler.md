@@ -44,13 +44,44 @@ paths:
 - Imperative: "try using X"
 - No `panic!` on user errors
 
-## Tracing
+## Tracing — ALWAYS USE FOR DEBUGGING
+
+**`ORI_LOG` is your first debugging tool.** Before adding `println!`, before reading code line-by-line, turn on tracing.
+
+### Environment Variables
+- **`ORI_LOG`**: Filter string (`RUST_LOG` syntax). Falls back to `RUST_LOG`. Default: `warn`.
+- **`ORI_LOG_TREE=1`**: Hierarchical tree output with indentation (uses `tracing-tree`)
+- Setup: `compiler/oric/src/tracing_setup.rs`, initialized in `main.rs`
+
+### Quick Reference
+```bash
+ORI_LOG=debug ori check file.ori                    # All phases at debug level
+ORI_LOG=ori_types=trace ORI_LOG_TREE=1 ori check f.ori  # Type inference call tree
+ORI_LOG=ori_eval=debug ori run file.ori             # Evaluator method dispatch
+ORI_LOG=oric=debug ori check file.ori               # Salsa query execution
+ORI_LOG=ori_types=debug,ori_eval=debug ori run f.ori    # Multiple targets
+```
+
+### Tracing Targets (by crate)
+| Target | What it shows |
+|--------|--------------|
+| `oric` | Salsa queries (lexing, parsing, type checking, evaluating), cache hits/misses |
+| `ori_types` | Type checking phases, inference, unification, type errors |
+| `ori_eval` | Expression evaluation, method dispatch, function calls |
+| `ori_llvm` | LLVM codegen, pattern matching, control flow |
+| `ori_parse` | Parser (dependency declared, limited instrumentation) |
+| `ori_patterns` | Pattern system (dependency declared, limited instrumentation) |
+
+### Levels
+- `error`: Should never happen — internal invariant violations
+- `warn`: Recoverable issues
+- `debug`: Phase boundaries, query execution, function-level events
+- `trace`: Per-expression, hot paths — very verbose
+
+### Coding Guidelines
 - Use `tracing` crate, never `println!`/`eprintln!` for debug output
-- Levels: `error` (should never happen), `warn` (recoverable), `debug` (phases/queries), `trace` (per-expression, hot paths)
 - `#[tracing::instrument]` on public API entry points; use `skip_all` or `skip(arena, engine)` for large/non-Debug args
 - Salsa `#[tracked]` functions: use manual `tracing::debug!()` events (not `#[instrument]`)
-- Env vars: `ORI_LOG` (filter), `ORI_LOG_TREE=1` (hierarchical output), falls back to `RUST_LOG`
-- Setup: `compiler/oric/src/tracing_setup.rs`, initialized in `main.rs`
 
 ## Style
 - Functions < 50 lines (target < 30)
