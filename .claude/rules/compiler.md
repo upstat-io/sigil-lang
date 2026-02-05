@@ -12,7 +12,7 @@ paths:
 # Compiler
 
 ## Architecture
-- **Deps**: `oric` → `ori_typeck/eval/patterns` → `ori_parse` → `ori_lexer` → `ori_ir/diagnostic`
+- **Deps**: `oric` → `ori_types/eval/patterns` → `ori_parse` → `ori_lexer` → `ori_ir/diagnostic`
 - **IO**: only in `oric`; core crates pure
 - **No phase bleeding**: parser ≠ type-check, lexer ≠ parse
 
@@ -44,6 +44,14 @@ paths:
 - Imperative: "try using X"
 - No `panic!` on user errors
 
+## Tracing
+- Use `tracing` crate, never `println!`/`eprintln!` for debug output
+- Levels: `error` (should never happen), `warn` (recoverable), `debug` (phases/queries), `trace` (per-expression, hot paths)
+- `#[tracing::instrument]` on public API entry points; use `skip_all` or `skip(arena, engine)` for large/non-Debug args
+- Salsa `#[tracked]` functions: use manual `tracing::debug!()` events (not `#[instrument]`)
+- Env vars: `ORI_LOG` (filter), `ORI_LOG_TREE=1` (hierarchical output), falls back to `RUST_LOG`
+- Setup: `compiler/oric/src/tracing_setup.rs`, initialized in `main.rs`
+
 ## Style
 - Functions < 50 lines (target < 30)
 - No dead code, no `#[allow(clippy)]` without reason
@@ -56,25 +64,26 @@ paths:
 
 ## Key Patterns
 
-**TypeChecker**: CheckContext, InferenceState, Registries, DiagnosticState, ScopeContext
+**TypeChecker (V2)**: InferEngine, Pool, Registries, ModuleChecker
 
-**Method Dispatch**: UserRegistryResolver → CollectionMethodResolver → BuiltinMethodResolver
+**Method Dispatch**: BuiltinMethods → InherentImpl → TraitImpl (via MethodRegistry)
 
 ## Crates
-- `ori_ir`: AST, spans
+- `ori_ir`: AST, spans, TypeId
 - `ori_lexer`: Tokenization
 - `ori_parse`: Parser
-- `ori_typeck`: Type checking
+- `ori_types`: Type checking (V2 — Pool, InferEngine, registries)
 - `ori_eval`: Interpreter
 - `ori_patterns`: Pattern system
 - `ori_llvm`: LLVM backend
 - `ori_rt`: AOT runtime
+- `ori_diagnostic`: Error reporting
 - `oric`: CLI, Salsa
 
 ## Change Locations
-- Expression: `ori_parse/expr.rs`, `ori_typeck/expressions/`, `ori_eval/expr.rs`
-- Operator: `ori_typeck/operators.rs`, `ori_eval/interpreter/`, `spec/operator-rules.md`
-- Type: `ori_ir/items/`, `ori_parse/item.rs`, `ori_typeck/type_registration.rs`
+- Expression: `ori_parse/grammar/expr/`, `ori_types/infer/expr.rs`, `ori_eval/interpreter/`
+- Type: `ori_ir/type_id.rs`, `ori_types/pool/`, `ori_types/check/`
+- Method: `ori_types/registry/methods.rs`, `ori_eval/interpreter/method_dispatch.rs`
 
 ## Source of Truth
 1. `docs/ori_lang/0.1-alpha/spec/` — authoritative
