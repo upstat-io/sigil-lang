@@ -107,6 +107,22 @@ Remind the user to:
 1. Fill in section details with specific tasks
 2. Add relevant keywords to `index.md` clusters
 3. Update `00-overview.md` with dependencies and success criteria
+4. **If performance-sensitive** (lexer, parser, typeck, eval, codegen): Add `/benchmark` checkpoints to relevant sections
+
+## Performance-Sensitive Plans
+
+For plans touching hot paths, include a "Performance Validation" section in `index.md`:
+
+```markdown
+## Performance Validation
+
+Use `/benchmark short` after modifying hot paths.
+
+**When to benchmark:** [list specific sections]
+**Skip benchmarks for:** [list non-perf sections]
+```
+
+See `plans/_template/plan.md` for full guidance.
 
 ---
 

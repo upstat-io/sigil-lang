@@ -793,81 +793,34 @@ Prioritized implementation order for the best-of-breed designs."
 
 ---
 
-## Final Output Format
+## Final Output
 
-After all phases complete, present:
+**Do NOT output the full review to the screen.** All findings go directly to the plan files (see Phase 6).
 
-### 1. Executive Summary
-- Overall health score (1-10)
-- Critical issues count
-- High issues count
-- Top 3 systemic problems
+After all phases complete:
 
-### 2. Automated Tool Results
-- Security vulnerabilities
-- Dependency issues
-- Unsafe code locations
-- Lint violations
+1. **Write the plan** to `plans/cr_MMDDYYYY_##/` (see Phase 6 for structure)
+2. **Output only a brief summary** to the user:
 
-### 3. Hotspot Analysis
-- Files that are large AND frequently changed
-- God module candidates
-- Tech debt clusters
+```
+✅ Code review complete.
 
-### 4. Findings by Severity
+📊 Health Score: X/10
+📁 Plan written to: plans/cr_MMDDYYYY_##/
 
-#### CRITICAL (must fix)
-| Category | Location | Issue | Fix |
-|----------|----------|-------|-----|
+Quick Stats:
+- Critical: N issues
+- High: N issues
+- Medium: N issues
+- Design Proposals: N
 
-#### HIGH (should fix)
-| Category | Location | Issue | Fix |
-|----------|----------|-------|-----|
+Top 3 priorities:
+1. {brief description}
+2. {brief description}
+3. {brief description}
 
-#### MEDIUM (fix when touching)
-| Category | Location | Issue | Fix |
-|----------|----------|-------|-----|
-
-### 5. Systemic Patterns
-- Issues appearing in 3+ places
-- Architectural concerns
-- Suggested extractions
-
-### 6. Prior Art Insights
-Summary of design patterns learned from studying established compilers:
-| Area | Source | Design Pattern | Relevance to Ori |
-|------|--------|----------------|------------------|
-
-### 7. Ori Design Proposals (Informed by Prior Art)
-
-For each major area, a unique Ori design synthesized from studying multiple established approaches:
-
-#### Error Messages
-- **Influences**: Elm (structure), Rust (applicability), Roc (disclosure), Gleam (suggestions)
-- **Ori's Approach**: [description]
-- **What Makes Ori's Design Unique**: [differentiation]
-
-#### Type Representation
-- **Influences**: Rust (TyKind), Zig (InternPool), Gleam (functional)
-- **Ori's Approach**: [description]
-
-#### Incremental Compilation
-- **Influences**: Rust (queries), Zig (lazy), Go (simplicity)
-- **Ori's Approach**: [description]
-
-#### Diagnostics Infrastructure
-- **Influences**: Rust (suggestions), TypeScript (code actions), Elm (format)
-- **Ori's Approach**: [description]
-
-#### Test Infrastructure
-- **Influences**: Rust (UI tests), Zig (inline), Gleam (snapshots)
-- **Ori's Approach**: [description]
-
-### 8. Recommended Action Plan
-Prioritized list combining:
-1. Critical fixes
-2. Best-of-breed implementations
-3. Architectural improvements
+Run `cat plans/cr_MMDDYYYY_##/00-overview.md` to see the full summary.
+```
 
 ---
 
@@ -999,3 +952,257 @@ The 10 analysis categories with full detection patterns:
 - **Zig** (`Sema.zig`): "declared here" notes, reference traces
 - **Gleam** (`error.rs`): Edit distance, extra labels
 - **Roc** (`reporting/`): Progressive disclosure, semantic annotations
+
+---
+
+## Phase 6: Write Plan Output (REQUIRED)
+
+After completing the review, you **MUST** write the findings to a plan in `plans/` using the standard template format.
+
+### Naming Convention
+
+```
+plans/cr_MMDDYYYY_##/
+```
+
+Where:
+- `cr_` = code review prefix
+- `MMDDYYYY` = date (e.g., `02042026` for February 4, 2026)
+- `_##` = sequential number (01, 02, etc.) if multiple reviews on same day
+
+**To determine the sequence number:**
+1. Check existing `plans/cr_MMDDYYYY_*` directories for today's date
+2. Use the next available number (start with `_01` if none exist)
+
+### Directory Structure
+
+Create this structure:
+
+```
+plans/cr_MMDDYYYY_##/
+├── index.md           # Keyword index for findings
+├── 00-overview.md     # Executive summary, health score, priorities
+├── section-01-critical.md    # CRITICAL severity issues
+├── section-02-high.md        # HIGH severity issues
+├── section-03-medium.md      # MEDIUM severity issues
+├── section-04-proposals.md   # Best-of-breed design proposals
+└── section-05-roadmap.md     # Recommended action plan
+```
+
+### File Templates
+
+#### `00-overview.md`
+
+```markdown
+---
+plan: "cr_MMDDYYYY_##"
+title: Code Review - {Date}
+status: complete
+health_score: {X}/10
+critical_count: {N}
+high_count: {N}
+medium_count: {N}
+---
+
+# Code Review: {Month Day, Year}
+
+**Health Score:** {X}/10
+**Review Duration:** {approximate time}
+
+## Executive Summary
+
+{Top 3 systemic problems identified}
+
+## Automated Tool Results
+
+| Tool | Result Summary |
+|------|----------------|
+| clippy | {summary} |
+| audit | {summary} |
+| ... | ... |
+
+## Hotspot Files
+
+Files that are large AND frequently changed:
+
+| File | Lines | Churn | Issues |
+|------|-------|-------|--------|
+
+## Quick Stats
+
+- **Critical Issues:** {N}
+- **High Issues:** {N}
+- **Medium Issues:** {N}
+- **Design Proposals:** {N}
+```
+
+#### `section-01-critical.md` (and similar for HIGH/MEDIUM)
+
+```markdown
+---
+section: "01"
+title: Critical Issues
+status: not-started
+severity: critical
+issue_count: {N}
+---
+
+# Section 01: Critical Issues
+
+**Status:** 📋 Planned
+**Count:** {N} issues
+
+---
+
+## 01.1 {Category Name}
+
+- [ ] **{Issue Title}** — `file:line`
+  - Description: {what's wrong}
+  - Fix: {how to fix}
+  - Prior Art: {reference if applicable}
+
+- [ ] **{Another Issue}** — `file:line`
+  - Description: {what's wrong}
+  - Fix: {how to fix}
+
+---
+
+## 01.N Completion Checklist
+
+- [ ] All critical issues addressed
+- [ ] Re-run automated tools to verify
+- [ ] No new critical issues introduced
+
+**Exit Criteria:** Zero CRITICAL issues remaining
+```
+
+#### `section-04-proposals.md`
+
+```markdown
+---
+section: "04"
+title: Best-of-Breed Design Proposals
+status: not-started
+---
+
+# Section 04: Design Proposals
+
+**Status:** 📋 Planned
+
+Based on prior art study from Rust, Go, Zig, Gleam, Elm, and Roc.
+
+---
+
+## 04.1 Error Message Architecture
+
+**Influences:** Elm (structure), Rust (applicability), Roc (disclosure), Gleam (suggestions)
+
+**Proposed Design:**
+{description}
+
+**What Makes Ori's Design Unique:**
+{differentiation}
+
+**Implementation Tasks:**
+- [ ] {task 1}
+- [ ] {task 2}
+
+---
+
+## 04.2 Type Representation
+
+{same format}
+
+---
+
+## 04.N Completion Checklist
+
+- [ ] All proposals documented
+- [ ] Implementation tasks identified
+- [ ] Dependencies mapped
+
+**Exit Criteria:** Proposals ready for implementation planning
+```
+
+#### `index.md`
+
+```markdown
+# Code Review {MMDDYYYY} Index
+
+> **Generated:** {timestamp}
+
+## How to Use
+
+1. Search this file (Ctrl+F) for keywords
+2. Find the section
+3. Open the section file
+
+---
+
+## Sections
+
+### Section 01: Critical Issues
+**File:** `section-01-critical.md` | **Count:** {N}
+
+```
+{categories of critical issues}
+security, panic, data loss
+```
+
+---
+
+### Section 02: High Issues
+**File:** `section-02-high.md` | **Count:** {N}
+
+```
+{categories}
+```
+
+---
+
+### Section 03: Medium Issues
+**File:** `section-03-medium.md` | **Count:** {N}
+
+```
+{categories}
+```
+
+---
+
+### Section 04: Design Proposals
+**File:** `section-04-proposals.md`
+
+```
+error messages, types, incremental, diagnostics, testing
+best-of-breed, prior art, architecture
+```
+
+---
+
+### Section 05: Recommended Roadmap
+**File:** `section-05-roadmap.md`
+
+```
+priorities, action plan, sequence
+```
+
+---
+
+## Quick Reference
+
+| ID | Title | File | Count |
+|----|-------|------|-------|
+| 01 | Critical Issues | `section-01-critical.md` | {N} |
+| 02 | High Issues | `section-02-high.md` | {N} |
+| 03 | Medium Issues | `section-03-medium.md` | {N} |
+| 04 | Design Proposals | `section-04-proposals.md` | — |
+| 05 | Roadmap | `section-05-roadmap.md` | — |
+```
+
+### Important Notes
+
+1. **Always write the plan** — This is not optional. Every code review must produce a plan.
+2. **Use real findings** — Populate sections with actual issues found, not placeholders.
+3. **Track by checkbox** — Each issue becomes a trackable task.
+4. **Link to code** — Always include `file:line` references.
+5. **Report the path** — Tell the user where the plan was written: `Plan written to: plans/cr_MMDDYYYY_##/`
