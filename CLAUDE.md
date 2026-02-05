@@ -53,7 +53,7 @@ For Ori syntax, types, patterns, and prelude:
 
 ## Compiler Coding Guidelines
 
-**Architecture**: Crate deps: `oric` → `ori_typeck/eval` → `ori_parse` → `ori_lexer` → `ori_ir/diagnostic` (no upward); IO only in CLI (`oric`); no phase bleeding
+**Architecture**: Crate deps: `oric` → `ori_types/eval` → `ori_parse` → `ori_lexer` → `ori_ir/diagnostic` (no upward); IO only in CLI (`oric`); no phase bleeding
 
 **Memory**: Arena + ID (`ExprArena`+`ExprId`, not `Box<Expr>`); intern identifiers (`Name`, not `String`); newtypes for IDs; no `Arc` cloning in hot paths; `#[cold]` on error factories
 
@@ -71,6 +71,8 @@ For Ori syntax, types, patterns, and prelude:
 
 **Style**: No `#[allow(clippy)]` without justification; functions < 50 lines (target < 30); no dead/commented code or banners; `//!`/`///` docs
 
+**Tracing**: Use `tracing` macros, not `println!`/`eprintln!` for debug output. Levels: `error` (should never happen), `warn` (recoverable issues), `debug` (phase boundaries, query execution), `trace` (per-expression, hot paths). Use `#[tracing::instrument]` on public API functions with `skip_all` or `skip(arena, engine)` for large args. Salsa queries use manual `tracing::debug!` events (can't use `#[instrument]` with `#[salsa::tracked]`). Init: `oric::tracing_setup::init()` in `main.rs`. Setup: `compiler/oric/src/tracing_setup.rs`.
+
 **Match Extraction**: No 20+ arm match in single file; group related arms; 3+ similar → extract helper
 
 **Continuous Improvement**: Fix ALL issues in code you touch—dead code, unclear names, duplicated logic, style violations. "Pre-existing" and "unrelated" are not valid reasons to skip fixes. If you opened the file, you're responsible for its quality. Refactor when patterns emerge.
@@ -83,6 +85,7 @@ For Ori syntax, types, patterns, and prelude:
 **Tests**: `cargo t` (Rust), `cargo st` (Ori), `cargo st tests/spec/path/` (specific), `./llvm-test.sh`
 **Build**: `cargo c`/`cl`/`b`/`fmt`, `./llvm-build.sh`, `./llvm-clippy.sh`
 **LLVM/AOT**: `cargo bl` (debug), `cargo blr` (release) — builds oric + ori_rt with LLVM feature
+**Tracing/Debugging**: `ORI_LOG=debug ori check file.ori` | `ORI_LOG=ori_types=trace ORI_LOG_TREE=1 ori run file.ori` | Falls back to `RUST_LOG`
 **Always run `./test-all.sh` after compiler changes.**
 
 > **Note**: AOT compilation (`ori build`) requires `libori_rt.a`. Use `cargo bl`/`blr` to build both the compiler and runtime library together.

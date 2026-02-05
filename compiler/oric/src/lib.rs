@@ -61,7 +61,6 @@ pub mod query;
 // Re-export lex function from the ori_lexer crate (single source of truth)
 pub use ori_lexer::lex;
 pub mod context;
-pub mod debug;
 pub mod diagnostic;
 pub mod edit;
 pub mod eval;
@@ -70,8 +69,8 @@ pub mod reporting;
 pub mod suggest;
 pub mod test;
 pub mod testing;
+pub mod tracing_setup;
 pub mod typeck;
-pub mod types;
 
 // Re-exports for convenience
 pub use context::{shared_context, CompilerContext, SharedContext};
@@ -133,10 +132,8 @@ pub use ir::{
     Typed,
     UnaryOp,
 };
-pub use ori_patterns::{EvalContext, PatternDefinition, PatternRegistry, TypeCheckContext};
+pub use ori_patterns::{EvalContext, PatternDefinition, PatternRegistry};
 pub use query::evaluated;
 pub use test::{
     run_test_file, run_tests, TestOutcome, TestResult, TestRunner, TestRunnerConfig, TestSummary,
 };
-pub use typeck::{type_check, type_check_with_context, TypeCheckError, TypeChecker, TypedModule};
-pub use types::{InferenceContext, Type, TypeEnv, TypeError, TypeScheme, TypeVar};

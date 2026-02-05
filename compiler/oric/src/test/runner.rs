@@ -3,7 +3,7 @@
 //! Runs tests from parsed modules and collects results.
 
 use std::path::Path;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use rayon::prelude::*;
 
@@ -12,8 +12,8 @@ use crate::eval::Evaluator;
 use crate::input::SourceFile;
 use crate::ir::TestDef;
 use crate::query::parsed;
-use crate::typeck::type_check_with_imports_source_and_interner;
-use ori_types::SharedTypeInterner;
+use crate::typeck;
+use ori_types::TypeCheckResult;
 
 use super::discovery::{discover_tests_in, TestFile};
 use super::error_matching::{format_actual, format_expected, match_errors_refs};
@@ -143,7 +143,14 @@ impl TestRunner {
 
         // Use build_scoped to create a thread pool that's cleaned up before returning.
         // This avoids atexit handler hangs that occur with the global rayon pool.
+        //
+        // Explicit stack size ensures sufficient space for deep recursion in type
+        // inference and evaluation. Default thread stacks vary by platform (512KB
+        // on macOS, 1MB on Windows) and can overflow on complex type expressions.
+        // The stacker crate handles growth dynamically, but a larger initial stack
+        // reduces the frequency of mmap-based growth on worker threads.
         let file_summaries = rayon::ThreadPoolBuilder::new()
+            .stack_size(8 * 1024 * 1024) // 8 MiB, matching typical Linux main thread
             .build_scoped(
                 // Thread initialization wrapper - just run the thread
                 rayon::ThreadBuilder::run,
@@ -227,18 +234,9 @@ impl TestRunner {
 
         let interner = db.interner();
 
-        // Create shared type interner for type-aware evaluation
-        // This allows the evaluator to look up type information for operators like ??
-        let type_interner = SharedTypeInterner::new();
-
-        // Type check with import resolution and shared type interner
-        let typed_module = type_check_with_imports_source_and_interner(
-            &db,
-            &parse_result,
-            path,
-            source.clone(),
-            Some(type_interner.clone()),
-        );
+        // Type check with import resolution
+        let (type_result, _pool) =
+            typeck::type_check_with_imports_and_pool(&db, &parse_result, path);
 
         // Separate compile_fail tests from regular tests
         // compile_fail tests don't need evaluation - they just check for type errors
@@ -258,7 +256,7 @@ impl TestRunner {
                 }
             }
 
-            let inner_result = Self::run_compile_fail_test(test, &typed_module, &source, interner);
+            let inner_result = Self::run_compile_fail_test(test, &type_result, &source, interner);
 
             let result = if let Some(expected_failure) = test.fail_expected {
                 Self::apply_fail_wrapper(inner_result, expected_failure, interner)
@@ -278,8 +276,8 @@ impl TestRunner {
         // Errors within compile_fail test bodies are expected and should not block
         // regular tests. Only errors OUTSIDE compile_fail tests indicate real problems.
         let compile_fail_spans: Vec<_> = compile_fail_tests.iter().map(|t| t.span).collect();
-        let non_compile_fail_errors: Vec<_> = typed_module
-            .errors
+        let non_compile_fail_errors: Vec<_> = type_result
+            .errors()
             .iter()
             .filter(|error| {
                 let error_span = error.span();
@@ -291,6 +289,16 @@ impl TestRunner {
             .collect();
 
         if !non_compile_fail_errors.is_empty() {
+            // Record which tests couldn't run due to type errors
+            for test in &regular_tests {
+                summary.add_result(TestResult::failed(
+                    test.name,
+                    test.targets.clone(),
+                    "blocked by type errors in file".to_string(),
+                    Duration::ZERO,
+                ));
+            }
+            // Also record the actual error messages
             for error in non_compile_fail_errors {
                 summary.add_error(error.message());
             }
@@ -303,8 +311,7 @@ impl TestRunner {
                 // Create evaluator with database and type information for proper evaluation
                 // Type info enables operators like ?? to distinguish chaining vs unwrapping
                 let mut evaluator = Evaluator::builder(interner, &parse_result.arena, &db)
-                    .expr_types(&typed_module.expr_types)
-                    .type_interner(type_interner.clone())
+                    .expr_types(&type_result.typed.expr_types)
                     .build();
 
                 evaluator.register_prelude();
@@ -342,10 +349,9 @@ impl TestRunner {
                 Self::run_file_llvm(
                     &mut summary,
                     &parse_result,
-                    &typed_module,
+                    &type_result,
                     &source,
                     interner,
-                    &type_interner,
                     config,
                 );
             }
@@ -369,10 +375,9 @@ impl TestRunner {
     fn run_file_llvm(
         summary: &mut FileSummary,
         parse_result: &ori_parse::ParseOutput,
-        typed_module: &crate::typeck::TypedModule,
+        type_result: &TypeCheckResult,
         source: &str,
         interner: &crate::ir::StringInterner,
-        type_interner: &SharedTypeInterner,
         config: &TestRunnerConfig,
     ) {
         use ori_llvm::evaluator::OwnedLLVMEvaluator;
@@ -394,7 +399,7 @@ impl TestRunner {
                 }
             }
 
-            let inner_result = Self::run_compile_fail_test(test, typed_module, source, interner);
+            let inner_result = Self::run_compile_fail_test(test, type_result, source, interner);
 
             let result = if let Some(expected_failure) = test.fail_expected {
                 Self::apply_fail_wrapper(inner_result, expected_failure, interner)
@@ -428,18 +433,32 @@ impl TestRunner {
             return;
         }
 
-        // Create LLVM evaluator with type interner
-        let llvm_eval = OwnedLLVMEvaluator::with_type_interner(type_interner);
+        // Create LLVM evaluator (LLVM migration to Pool is tracked in Phase 10)
+        let llvm_eval = OwnedLLVMEvaluator::new();
 
-        // Convert function types from typeck to LLVM format
-        let function_sigs: Vec<FunctionSig> = typed_module
-            .function_types
+        // Convert function signatures to LLVM format
+        // Idx → TypeId bridge (LLVM migration to Pool tracked in Phase 10)
+        let function_sigs: Vec<FunctionSig> = type_result
+            .typed
+            .functions
             .iter()
             .map(|ft| FunctionSig {
-                params: ft.params.clone(),
-                return_type: ft.return_type,
-                is_generic: !ft.generics.is_empty(),
+                params: ft
+                    .params
+                    .iter()
+                    .map(|&idx| ori_ir::TypeId::from_raw(idx.raw()))
+                    .collect(),
+                return_type: ori_ir::TypeId::from_raw(ft.return_type.raw()),
+                is_generic: ft.is_generic,
             })
+            .collect();
+
+        // Bridge expr_types: &[Idx] → &[TypeId] for LLVM
+        let expr_types_bridge: Vec<ori_ir::TypeId> = type_result
+            .typed
+            .expr_types
+            .iter()
+            .map(|idx| ori_ir::TypeId::from_raw(idx.raw()))
             .collect();
 
         // Compile module ONCE with all tests
@@ -448,7 +467,7 @@ impl TestRunner {
             &filtered_tests,
             &parse_result.arena,
             interner,
-            &typed_module.expr_types,
+            &expr_types_bridge,
             &function_sigs,
         ) {
             Ok(c) => c,
@@ -511,7 +530,7 @@ impl TestRunner {
     ///    (for tests checking module-level errors like missing impl members)
     fn run_compile_fail_test(
         test: &TestDef,
-        typed_module: &crate::typeck::TypedModule,
+        type_result: &TypeCheckResult,
         source: &str,
         interner: &crate::ir::StringInterner,
     ) -> TestResult {
@@ -526,8 +545,8 @@ impl TestRunner {
         // Try span-filtered errors first for better isolation.
         // This helps when multiple compile_fail tests exist in the same file,
         // each should only see errors from their own body.
-        let test_errors: Vec<_> = typed_module
-            .errors
+        let test_errors: Vec<_> = type_result
+            .errors()
             .iter()
             .filter(|e| test.span.contains_span(e.span()))
             .collect();
@@ -536,7 +555,7 @@ impl TestRunner {
         // This handles tests that check for module-level errors (like missing
         // associated types in impl blocks) where the error is outside the test body.
         let errors_to_match: Vec<&_> = if test_errors.is_empty() {
-            typed_module.errors.iter().collect()
+            type_result.errors().iter().collect()
         } else {
             test_errors
         };
