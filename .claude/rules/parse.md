@@ -38,6 +38,21 @@ paths:
 - `Progress::None` + error → try alternative
 - `Progress::Made` + error → commit and sync
 
+## Debugging / Tracing
+
+**Always use `ORI_LOG` first when debugging parse issues.** Tracing target: `ori_parse` (dependency declared, instrumentation in progress).
+
+```bash
+ORI_LOG=debug ori check file.ori                    # See Salsa parse query execution
+ORI_LOG=oric=debug ori check file.ori               # See when parsed() query runs
+ORI_LOG=ori_parse=trace ori check file.ori          # Parser-level tracing (as instrumented)
+```
+
+**Tips**:
+- Parse error on valid syntax? Check `grammar.ebnf` first, then context flags
+- Salsa returning stale parse? Use `ORI_LOG=oric=debug` to check `WillExecute` for `parsed()` query
+- Parser currently has tracing dependency prepared but limited instrumentation — add `#[tracing::instrument]` to functions you're debugging
+
 ## Key Files
 - `ori_lexer/src/lib.rs`: Tokens
 - `context.rs`: ParseContext flags

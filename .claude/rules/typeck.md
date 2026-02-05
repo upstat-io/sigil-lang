@@ -38,6 +38,25 @@ paths:
 - E2009: Trait bound not satisfied
 - E2010: Coherence violation
 
+## Debugging / Tracing
+
+**Always use `ORI_LOG` first when debugging type checking issues.** Tracing target: `ori_types` (typeck lives in the same crate).
+
+```bash
+ORI_LOG=ori_types=debug ori check file.ori          # Module-level checking phases
+ORI_LOG=ori_types=trace ori check file.ori          # Per-expression inference/checking
+ORI_LOG=ori_types=trace ORI_LOG_TREE=1 ori check file.ori  # Full call tree with nesting
+```
+
+**What each level shows**:
+- `debug`: Module check start/end, signature collection, body checking phases, type errors
+- `trace`: Every `infer_expr()` and `check_expr()` call — very verbose, use for specific files
+
+**Tips**:
+- Unification failure? Trace shows both sides before unify
+- Wrong type inferred? Use tree output to see bidirectional check/infer flow
+- Salsa cache issues? Add `oric=debug` to see query re-execution
+
 ## Key Files
 - `checker/components.rs`: TypeChecker struct
 - `checker/expressions/`: Expression checking

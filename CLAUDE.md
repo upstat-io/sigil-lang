@@ -71,7 +71,7 @@ For Ori syntax, types, patterns, and prelude:
 
 **Style**: No `#[allow(clippy)]` without justification; functions < 50 lines (target < 30); no dead/commented code or banners; `//!`/`///` docs
 
-**Tracing**: Use `tracing` macros, not `println!`/`eprintln!` for debug output. Levels: `error` (should never happen), `warn` (recoverable issues), `debug` (phase boundaries, query execution), `trace` (per-expression, hot paths). Use `#[tracing::instrument]` on public API functions with `skip_all` or `skip(arena, engine)` for large args. Salsa queries use manual `tracing::debug!` events (can't use `#[instrument]` with `#[salsa::tracked]`). Init: `oric::tracing_setup::init()` in `main.rs`. Setup: `compiler/oric/src/tracing_setup.rs`.
+**Tracing — ALWAYS USE FOR DEBUGGING**: `ORI_LOG` is your **first** debugging tool. Before `println!`, before reading code line-by-line, turn on tracing. Use `tracing` macros, not `println!`/`eprintln!`. Levels: `error` (never happen), `warn` (recoverable), `debug` (phases/queries), `trace` (per-expression). Targets by crate: `ori_types` (type checker), `ori_eval` (evaluator), `ori_llvm` (codegen), `oric` (Salsa queries). Use `#[tracing::instrument]` on public API functions. Salsa queries use manual `tracing::debug!()`. Setup: `compiler/oric/src/tracing_setup.rs`.
 
 **Match Extraction**: No 20+ arm match in single file; group related arms; 3+ similar → extract helper
 
@@ -85,7 +85,8 @@ For Ori syntax, types, patterns, and prelude:
 **Tests**: `cargo t` (Rust), `cargo st` (Ori), `cargo st tests/spec/path/` (specific), `./llvm-test.sh`
 **Build**: `cargo c`/`cl`/`b`/`fmt`, `./llvm-build.sh`, `./llvm-clippy.sh`
 **LLVM/AOT**: `cargo bl` (debug), `cargo blr` (release) — builds oric + ori_rt with LLVM feature
-**Tracing/Debugging**: `ORI_LOG=debug ori check file.ori` | `ORI_LOG=ori_types=trace ORI_LOG_TREE=1 ori run file.ori` | Falls back to `RUST_LOG`
+**Tracing/Debugging** (USE FIRST — before println, before reading code line-by-line):
+`ORI_LOG=debug ori check file.ori` | `ORI_LOG=ori_types=trace ORI_LOG_TREE=1 ori check file.ori` | `ORI_LOG=ori_eval=debug ori run file.ori` | `ORI_LOG=oric=debug ori check file.ori` (Salsa queries) | Falls back to `RUST_LOG`
 **Always run `./test-all.sh` after compiler changes.**
 
 > **Note**: AOT compilation (`ori build`) requires `libori_rt.a`. Use `cargo bl`/`blr` to build both the compiler and runtime library together.

@@ -64,5 +64,23 @@ cargo blr && ./target/release/ori test --backend=llvm tests/
 - `#fail("error")`: Expect runtime failure
 - `#timeout(5s)`: Set timeout
 
+## Debugging / Tracing
+
+**Always use `ORI_LOG` first when debugging test failures.** The test runner (`oric`) and all compiler phases support structured tracing.
+
+```bash
+ORI_LOG=debug cargo st tests/spec/types/            # Debug all phases for specific tests
+ORI_LOG=ori_types=debug cargo st tests/spec/types/   # Type checker only
+ORI_LOG=ori_eval=debug cargo st tests/spec/eval/     # Evaluator only
+ORI_LOG=debug ORI_LOG_TREE=1 cargo st tests/spec/patterns/  # Hierarchical trace
+ORI_LOG=oric=debug cargo st tests/spec/              # Salsa query execution + cache hits
+```
+
+**Tips**:
+- Test crashes/hangs? Use `timeout 10 ORI_LOG=debug cargo st path/to/test.ori`
+- Wrong result? Use `ORI_LOG=ori_eval=trace ORI_LOG_TREE=1` on the specific test file
+- Type error in test? Use `ORI_LOG=ori_types=debug` to see which check fails
+- Salsa caching issue? Use `ORI_LOG=oric=debug` to see `WillExecute` vs `DidValidateMemoizedValue`
+
 ## Coverage
 `cargo tarpaulin -p CRATE --lib --out Stdout` — target 60-80%
