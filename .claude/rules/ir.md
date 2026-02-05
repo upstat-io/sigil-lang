@@ -19,10 +19,12 @@ paths:
 - Derive: `Copy, Clone, Eq, PartialEq, Hash, Debug`
 - Sentinel: `INVALID = u32::MAX`, `.is_valid()`
 
-## TypeId Sharding
-- Bits 31-28: shard (16 shards)
-- Bits 27-0: local index
-- Pre-interned: INT=0, FLOAT=1, BOOL=2, STR=3, CHAR=4, BYTE=5, VOID=6, NEVER=7
+## TypeId Layout (aligned with ori_types::Idx)
+- Flat u32 index (no sharding)
+- Primitives 0-11 match Idx: INT=0..ORDERING=11
+- Markers: INFER=12, SELF_TYPE=13 (not stored in type pool)
+- VOID is alias for UNIT (index 6)
+- Compounds start at FIRST_COMPOUND=64
 
 ## Range Types
 - `ExprRange { start: u32, len: u16 }` = 8 bytes
@@ -42,6 +44,6 @@ paths:
 
 ## Key Files
 - `arena.rs`: ExprArena, ranges
-- `type_id.rs`: TypeId sharding
+- `type_id.rs`: TypeId (parser-level type index, aligned with Idx)
 - `name.rs`: Name interning
 - `visitor.rs`: Visitor trait
