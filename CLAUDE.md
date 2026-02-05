@@ -79,11 +79,11 @@ For Ori syntax, types, patterns, and prelude:
 
 ## Commands
 
-**Primary**: `./test-all`, `./clippy-all`, `./fmt-all`, `./build-all` (includes LLVM)
-**Tests**: `cargo t` (Rust), `cargo st` (Ori), `cargo st tests/spec/path/` (specific), `./llvm-test`
-**Build**: `cargo c`/`cl`/`b`/`fmt`, `./llvm-build`, `./llvm-clippy`
+**Primary**: `./test-all.sh`, `./clippy-all.sh`, `./fmt-all.sh`, `./build-all.sh` (includes LLVM)
+**Tests**: `cargo t` (Rust), `cargo st` (Ori), `cargo st tests/spec/path/` (specific), `./llvm-test.sh`
+**Build**: `cargo c`/`cl`/`b`/`fmt`, `./llvm-build.sh`, `./llvm-clippy.sh`
 **LLVM/AOT**: `cargo bl` (debug), `cargo blr` (release) — builds oric + ori_rt with LLVM feature
-**Always run `./test-all` after compiler changes.**
+**Always run `./test-all.sh` after compiler changes.**
 
 > **Note**: AOT compilation (`ori build`) requires `libori_rt.a`. Use `cargo bl`/`blr` to build both the compiler and runtime library together.
 

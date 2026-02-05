@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Analyze the Ori compiler for DRY/SOLID violations and industry best practices
+description: Comprehensive compiler review with design synthesis informed by prior art from established compilers
 allowed-tools: Read, Grep, Glob, Task, Bash
 ---
 
@@ -8,63 +8,821 @@ allowed-tools: Read, Grep, Glob, Task, Bash
 
 Analyze the Ori compiler for violations of documented patterns and industry best practices.
 
-## Execution Strategy
+**This is a thorough, sprawling review.** Expect 20-30 minutes for full execution. The review systematically examines ALL crates, identifies systemic patterns, and synthesizes **best-of-breed designs** informed by prior art from established compilers.
 
-### Phase 0: Automated Tooling (run first)
+> *"Good artists borrow, great artists steal."* — Picasso (misattributed)
+>
+> In language design, studying prior art isn't optional—it's scholarly rigor. Every major language cites influences: Rust learned from ML and C++, Go from Limbo and CSP, Swift from Objective-C and Haskell. This review studies what works elsewhere to inform Ori's unique design.
 
-Run these **7 cargo tools in parallel** using Bash. Send a **single message with 7 Bash tool calls**.
+## Execution Strategy Overview
 
-**IMPORTANT**: Each command must end with `|| true` to prevent one failure from cascading to all parallel calls:
+| Phase | Name | Parallelism | Purpose |
+|-------|------|-------------|---------|
+| **0** | Automated Tooling | 10 parallel bash | Lint, security, metrics |
+| **1** | Discovery & Inventory | 6 parallel bash | Identify hotspots, largest files, complexity |
+| **2** | Breadth-First Exploration | 5 parallel agents | Survey all crates systematically |
+| **3** | Prior Art Research | 6 parallel agents | Study design patterns from Rust/Go/Zig/Gleam/Elm/Roc |
+| **4** | Deep Category Analysis | 10 parallel agents | Pattern-specific violations |
+| **5** | Best-of-Breed Synthesis | 1 agent | Combine reference patterns into superior Ori designs |
+
+---
+
+## Prior Art: Language Design Influences
+
+Ori's design is informed by studying established compilers. Like academic research, we cite our influences and learn from what works. Located at `~/projects/reference_repos/lang_repos/`:
+
+| Repo | Path | Strengths | Key Files |
+|------|------|-----------|-----------|
+| **Rust** | `rust/` | Error applicability, diagnostic infrastructure, query system | `compiler/rustc_errors/src/{lib,diagnostic}.rs`, `rustc_middle/src/ty/` |
+| **Go** | `golang/` | Simplicity, clear error codes, fast compilation | `src/cmd/compile/internal/`, `src/go/types/errors.go` |
+| **Zig** | `zig/` | Compile-time execution, "declared here" notes, incremental | `src/{Sema,Compilation,InternPool}.zig` |
+| **Gleam** | `gleam/` | Edit distance suggestions, exhaustiveness, functional purity | `compiler-core/src/{error,analyse,exhaustiveness}.rs` |
+| **Elm** | `elm/` | Best-in-class error messages, type diffing, progressive hints | `compiler/src/Reporting/{Error,Doc}.hs`, `Error/Type.hs` |
+| **Roc** | `roc/` | Semantic annotations, output abstraction, progressive disclosure | `crates/reporting/src/{report,error/type}.rs` |
+| **TypeScript** | `typescript/` | IDE integration, code fixes, language service | `src/compiler/{checker,diagnosticMessages}.ts`, `src/services/` |
+
+### Design Strengths Worth Learning From
+
+**Error Messages:**
+- **Elm**: Three-part structure (problem → context → hint), conversational tone, type difference highlighting
+- **Rust**: Applicability levels (MachineApplicable, MaybeIncorrect, HasPlaceholders), multi-span suggestions
+- **Roc**: Progressive disclosure (show more detail on request), semantic annotation types
+
+**Type Systems:**
+- **Rust**: Trait solving, lifetime inference, chalk-style unification
+- **Zig**: Comptime, lazy type resolution, intern pools
+- **TypeScript**: Structural typing, mapped types, conditional types
+
+**Architecture:**
+- **Zig**: Single-pass with lazy resolution, minimal memory, no GC
+- **Rust**: Query-based incremental (Salsa-like), arena allocation
+- **Go**: Simple multi-pass, fast full rebuilds
+
+**Code Fixes:**
+- **TypeScript**: Rich code actions, refactoring infrastructure
+- **Rust**: Structured suggestions with applicability
+- **Gleam**: Edit distance with substring matching for typo suggestions
+
+---
+
+## Phase 0: Automated Tooling (run first)
+
+Run these **10 cargo/analysis tools in parallel** using Bash. Send a **single message with 10 Bash tool calls**.
+
+**IMPORTANT**: Each command must end with `|| true` to prevent one failure from cascading.
 
 | Tool | Command | What it Detects |
 |------|---------|-----------------|
-| **clippy** | `./clippy-all 2>&1 \|\| true` | Lint violations, code smells, common mistakes |
-| **audit** | `cargo audit 2>&1 \|\| true` | Security vulnerabilities in dependencies |
-| **outdated** | `cargo outdated -R 2>&1 \|\| true` | Outdated dependencies (direct only) |
-| **machete** | `cargo machete 2>&1 \|\| true` | Unused dependencies in Cargo.toml |
-| **geiger** | `(cd compiler/oric && cargo geiger 2>&1 \| tail -50) \|\| true` | Unsafe code usage |
-| **modules** | `cargo modules structure --lib -p ori_parse 2>&1 \|\| true` | Module structure visualization |
+| **clippy** | `./clippy-all.sh 2>&1 \|\| true` | Lint violations, code smells |
+| **audit** | `cargo audit 2>&1 \|\| true` | Security vulnerabilities |
+| **outdated** | `cargo outdated -R 2>&1 \|\| true` | Outdated direct dependencies |
+| **machete** | `cargo machete 2>&1 \|\| true` | Unused dependencies |
+| **geiger** | `(cd compiler/oric && cargo geiger 2>&1 \| tail -60) \|\| true` | Unsafe code usage |
+| **tree-dups** | `cargo tree -d 2>&1 \|\| true` | Duplicate dependencies |
 | **tokei** | `tokei compiler/ 2>&1 \|\| true` | Lines of code metrics |
+| **modules-oric** | `cargo modules structure --lib -p oric 2>&1 \|\| true` | oric module structure |
+| **modules-typeck** | `cargo modules structure --lib -p ori_typeck 2>&1 \|\| true` | typeck module structure |
+| **deny** | `cargo deny check 2>&1 \|\| true` | License/advisory checks (if deny.toml exists) |
 
-**After tools complete**, summarize automated findings:
-- **Security**: Any vulnerabilities from `cargo audit`
-- **Dependencies**: Unused deps (machete), outdated deps
-- **Unsafe**: Count and location of unsafe blocks (geiger)
-- **Lints**: Any clippy warnings/errors
-- **Metrics**: Total LOC, largest files
+**Summarize findings:**
+- **Security**: Vulnerabilities from `cargo audit`, advisories from `cargo deny`
+- **Dependencies**: Unused (machete), outdated, duplicates (tree -d)
+- **Unsafe**: Count and location of unsafe blocks
+- **Lints**: Clippy warnings/errors
+- **Metrics**: Total LOC by crate
 
-### Phase 1: Manual Analysis (after Phase 0)
+---
 
-Use the **Task tool** to launch **10 parallel Explore agents** (one per category below). Send a **single message with 10 Task tool calls** to maximize parallelism.
+## Phase 1: Discovery & Inventory (after Phase 0)
 
-Each agent prompt should:
-1. Specify the category name and detection patterns from that section
-2. Search `compiler/` for violations matching those patterns
-3. Return findings with: severity, location (`file:line`), issue, fix suggestion
+Run these **6 discovery commands in parallel** to identify hotspots. Send a **single message with 6 Bash tool calls**.
 
-**Example Task call:**
+| Analysis | Command | Purpose |
+|----------|---------|---------|
+| **Largest files** | `find compiler/ -name "*.rs" -exec wc -l {} \; 2>/dev/null \| sort -rn \| head -40 \|\| true` | Find complexity hotspots |
+| **Most functions** | `for f in $(find compiler/ -name "*.rs" 2>/dev/null); do echo "$(grep -c '^[[:space:]]*pub\?\s*fn ' "$f" 2>/dev/null) $f"; done \| sort -rn \| head -30 \|\| true` | Find god modules |
+| **Git churn** | `git log --oneline --since="6 months ago" --name-only 2>/dev/null \| grep -E '\.rs$' \| sort \| uniq -c \| sort -rn \| head -30 \|\| true` | Find frequently changed files |
+| **Long functions** | `grep -rn '^[[:space:]]*pub\?\s*fn ' compiler/ --include='*.rs' 2>/dev/null \| head -100 \|\| true` | Map function locations |
+| **TODO/FIXME** | `grep -rn 'TODO\|FIXME\|HACK\|XXX' compiler/ --include='*.rs' 2>/dev/null \| head -50 \|\| true` | Find technical debt markers |
+| **Skipped tests** | `grep -rn '#\[ignore\]\|#\[skip\]\|#skip' compiler/ tests/ --include='*.rs' --include='*.ori' 2>/dev/null \| head -30 \|\| true` | Find disabled tests |
+
+**Build hotspot list from discovery:**
+1. Files appearing in BOTH "largest" AND "git churn" = **critical hotspots**
+2. Files with 30+ functions = **god module candidates**
+3. Files with 500+ lines = **split candidates**
+4. Files with multiple TODO/FIXME = **tech debt hotspots**
+
+**Pass hotspot list to Phase 2 and 3 agents** so they prioritize examining these files.
+
+---
+
+## Phase 2: Breadth-First Exploration (after Phase 1)
+
+Launch **5 parallel Explore agents** that systematically survey the codebase. Send a **single message with 5 Task tool calls**.
+
+These agents take a **sprawling, big-picture approach** rather than pattern-matching.
+
+### Agent 2A: Crate Survey
+
 ```
 Task(
   subagent_type: "Explore",
-  description: "Review: Architecture",
-  prompt: "Search compiler/ for Architecture & Boundaries violations: [paste detection patterns]. Return findings as: SEVERITY | file:line | issue | fix"
+  description: "Survey: All Crates",
+  prompt: "Systematically survey EVERY crate in the Ori compiler. For EACH of these crates, read lib.rs and identify its purpose:
+
+CRATES TO EXAMINE (read lib.rs for each):
+- compiler/ori_ir/
+- compiler/ori_lexer/
+- compiler/ori_parse/
+- compiler/ori_typeck/
+- compiler/ori_eval/
+- compiler/ori_patterns/
+- compiler/ori_llvm/
+- compiler/ori_diagnostic/
+- compiler/oric/
+
+For each crate, report:
+1. Purpose (1 sentence from doc comment or inferred)
+2. Public module count
+3. Does lib.rs have a doc comment? (yes/no)
+4. Any re-exports that seem wrong?
+5. Dependency direction violations (imports from higher-level crate)?
+
+Return a table: CRATE | PURPOSE | MODULES | HAS_DOCS | ISSUES"
 )
 ```
 
-### Phase 2: Synthesis (after both phases)
+### Agent 2B: Large File Audit
 
-Aggregate and synthesize all findings:
-1. Group findings by severity (CRITICAL → HIGH → MEDIUM)
-2. Cross-reference automated and manual findings
-3. Identify patterns (same issue in multiple places)
-4. Prioritize by impact on maintainability
-5. Present actionable summary to user
+```
+Task(
+  subagent_type: "Explore",
+  description: "Audit: Large Files",
+  prompt: "Audit the 20 largest .rs files in compiler/. For EACH file:
+
+1. Read the file (at least first 200 lines and last 100 lines)
+2. Count approximate functions (grep for 'fn ')
+3. Identify the file's single responsibility (or note if it has multiple)
+4. Check for god-module symptoms:
+   - Multiple unrelated sections
+   - Functions that don't call each other
+   - 3+ distinct import clusters
+5. Check for match statements with 15+ arms
+
+IMPORTANT: Actually READ each file, don't just grep. Look at structure.
+
+Return: FILE | LINES | FUNCTIONS | RESPONSIBILITY | ISSUES"
+)
+```
+
+### Agent 2C: Cross-Crate Coupling
+
+```
+Task(
+  subagent_type: "Explore",
+  description: "Analyze: Crate Coupling",
+  prompt: "Analyze coupling between compiler crates.
+
+1. For each crate, grep for 'use ori_' to find cross-crate imports
+2. Build a dependency map showing which crates import which
+3. Check against expected direction:
+   oric → ori_typeck/ori_eval/ori_patterns → ori_parse → ori_lexer → ori_ir/ori_diagnostic
+4. Flag any UPWARD dependencies (lower importing higher)
+5. Flag any unexpected tight coupling (e.g., ori_lexer importing ori_typeck)
+
+Also check:
+- Are there types being passed through 3+ crates? (suggests wrong home)
+- Are there duplicate type definitions in multiple crates?
+
+Return: FROM_CRATE | TO_CRATE | IMPORT_COUNT | DIRECTION_OK? | NOTES"
+)
+```
+
+### Agent 2D: Public API Surface
+
+```
+Task(
+  subagent_type: "Explore",
+  description: "Audit: Public APIs",
+  prompt: "Audit the public API surface of each crate.
+
+For each crate in compiler/:
+1. Find all 'pub fn', 'pub struct', 'pub enum', 'pub trait' declarations
+2. Check which have doc comments (/// or //!)
+3. Identify functions with 5+ parameters (config struct needed)
+4. Find 'pub use' re-exports and verify they make sense
+
+Focus on:
+- ori_ir (should have clean, well-documented IR types)
+- ori_parse (should expose clear parsing API)
+- ori_typeck (should have documented inference entry points)
+
+Return: CRATE | ITEM | TYPE | HAS_DOCS | PARAM_COUNT | ISSUE"
+)
+```
+
+### Agent 2E: Test Coverage Survey
+
+```
+Task(
+  subagent_type: "Explore",
+  description: "Survey: Test Coverage",
+  prompt: "Survey test organization across the compiler.
+
+1. For each crate, find test modules:
+   - Inline #[cfg(test)] modules
+   - tests/ directories
+   - Integration tests
+
+2. For each crate, estimate coverage:
+   - Count public functions vs test functions
+   - Look for untested public APIs
+   - Check if complex functions have corresponding tests
+
+3. Examine test quality:
+   - Are tests named descriptively?
+   - Do tests follow AAA pattern?
+   - Are there snapshot tests for complex output?
+
+4. Find test gaps:
+   - Public functions with no tests
+   - Error paths not tested
+   - Edge cases missing
+
+Return: CRATE | PUB_FNS | TEST_FNS | COVERAGE_ESTIMATE | GAPS"
+)
+```
+
+---
+
+## Phase 3: Prior Art Research (after Phase 2)
+
+Launch **6 parallel Explore agents** to study design patterns from established compilers. Send a **single message with 6 Task tool calls**.
+
+These agents examine prior art in `~/projects/reference_repos/lang_repos/` to understand proven approaches that can inform Ori's unique design. This is standard practice in language design—every RFC and proposal cites prior art.
+
+### Agent 3A: Error Message Design Study
+
+```
+Task(
+  subagent_type: "Explore",
+  description: "Prior Art: Error Messages",
+  prompt: "Study error message design patterns from established compilers to inform Ori's approach.
+
+EXAMINE THESE FILES:
+- ~/projects/reference_repos/lang_repos/elm/compiler/src/Reporting/Error/Type.hs (type error messages)
+- ~/projects/reference_repos/lang_repos/elm/compiler/src/Reporting/Doc.hs (document formatting)
+- ~/projects/reference_repos/lang_repos/rust/compiler/rustc_errors/src/diagnostic.rs (diagnostic structure)
+- ~/projects/reference_repos/lang_repos/rust/compiler/rustc_errors/src/lib.rs (applicability levels)
+- ~/projects/reference_repos/lang_repos/roc/crates/reporting/src/report.rs (progressive disclosure)
+- ~/projects/reference_repos/lang_repos/gleam/compiler-core/src/error.rs (error formatting)
+
+STUDY:
+1. How does Elm structure its three-part error messages? (problem/context/hint)
+2. How does Rust define applicability levels for suggestions?
+3. How does Roc implement progressive disclosure (show more on request)?
+4. How does Gleam format error output?
+
+Return: SOURCE | DESIGN_PATTERN | APPROACH | EXAMPLE | RELEVANCE_TO_ORI"
+)
+```
+
+### Agent 3B: Type System Design Study
+
+```
+Task(
+  subagent_type: "Explore",
+  description: "Prior Art: Type Systems",
+  prompt: "Study type system implementation approaches from established compilers.
+
+EXAMINE THESE FILES:
+- ~/projects/reference_repos/lang_repos/rust/compiler/rustc_middle/src/ty/mod.rs (type representation)
+- ~/projects/reference_repos/lang_repos/rust/compiler/rustc_infer/src/infer/mod.rs (inference)
+- ~/projects/reference_repos/lang_repos/zig/src/InternPool.zig (type interning)
+- ~/projects/reference_repos/lang_repos/zig/src/Sema.zig (semantic analysis)
+- ~/projects/reference_repos/lang_repos/gleam/compiler-core/src/analyse/infer.rs (HM inference)
+
+STUDY:
+1. How does Rust represent types (TyKind enum, interning)?
+2. How does Zig's InternPool work for deduplication?
+3. How does Gleam implement Hindley-Milner inference?
+4. How do they handle type errors without stopping?
+
+Return: SOURCE | DESIGN_PATTERN | APPROACH | EXAMPLE | RELEVANCE_TO_ORI"
+)
+```
+
+### Agent 3C: Incremental Compilation Study
+
+```
+Task(
+  subagent_type: "Explore",
+  description: "Prior Art: Incremental",
+  prompt: "Study incremental compilation approaches from established compilers.
+
+EXAMINE THESE FILES:
+- ~/projects/reference_repos/lang_repos/rust/compiler/rustc_query_system/src/ (query system)
+- ~/projects/reference_repos/lang_repos/rust/compiler/rustc_middle/src/dep_graph/ (dependency tracking)
+- ~/projects/reference_repos/lang_repos/zig/src/Compilation.zig (compilation model)
+- ~/projects/reference_repos/lang_repos/typescript/src/compiler/builder.ts (incremental builds)
+
+STUDY:
+1. How does Rust's query system track dependencies?
+2. How does Zig achieve fast incremental without a query system?
+3. How does TypeScript handle incremental type checking?
+4. What are the tradeoffs between query-based vs rebuild-based?
+
+Return: REPO | PATTERN_NAME | HOW_IT_WORKS | TRADEOFFS | ORI_APPLICABILITY"
+)
+```
+
+### Agent 3D: Code Fix Design Study
+
+```
+Task(
+  subagent_type: "Explore",
+  description: "Prior Art: Code Fixes",
+  prompt: "Study code fix and suggestion approaches from established compilers.
+
+EXAMINE THESE FILES:
+- ~/projects/reference_repos/lang_repos/rust/compiler/rustc_errors/src/diagnostic.rs (suggestions)
+- ~/projects/reference_repos/lang_repos/typescript/src/services/codeFixProvider.ts (code fixes)
+- ~/projects/reference_repos/lang_repos/typescript/src/services/textChanges.ts (text edits)
+- ~/projects/reference_repos/lang_repos/gleam/compiler-core/src/error.rs (did-you-mean)
+
+STUDY:
+1. How does Rust structure multi-part suggestions?
+2. How does TypeScript provide rich code actions?
+3. How does Gleam compute edit distance for suggestions?
+4. How do they indicate confidence (auto-applicable vs uncertain)?
+
+Return: SOURCE | DESIGN_PATTERN | APPROACH | EXAMPLE | RELEVANCE_TO_ORI"
+)
+```
+
+### Agent 3E: Compiler Architecture Study
+
+```
+Task(
+  subagent_type: "Explore",
+  description: "Prior Art: Architecture",
+  prompt: "Study compiler architecture approaches from established implementations.
+
+EXAMINE THESE FILES:
+- ~/projects/reference_repos/lang_repos/rust/compiler/rustc_driver/src/lib.rs (compiler driver)
+- ~/projects/reference_repos/lang_repos/zig/src/main.zig (entry point)
+- ~/projects/reference_repos/lang_repos/zig/src/Zcu.zig (compilation unit)
+- ~/projects/reference_repos/lang_repos/go/src/cmd/compile/internal/gc/main.go (compilation phases)
+- ~/projects/reference_repos/lang_repos/gleam/compiler-core/src/lib.rs (crate structure)
+
+STUDY:
+1. How does Rust organize compiler passes?
+2. How does Zig achieve single-pass compilation?
+3. How does Go structure its simple multi-pass approach?
+4. How does Gleam organize its functional compiler?
+
+Return: REPO | PATTERN_NAME | HOW_IT_WORKS | PROS_CONS | ORI_APPLICABILITY"
+)
+```
+
+### Agent 3F: Test Infrastructure Study
+
+```
+Task(
+  subagent_type: "Explore",
+  description: "Prior Art: Testing",
+  prompt: "Study compiler testing approaches from established implementations.
+
+EXAMINE THESE DIRECTORIES:
+- ~/projects/reference_repos/lang_repos/rust/tests/ui/ (UI tests structure)
+- ~/projects/reference_repos/lang_repos/zig/test/ (test organization)
+- ~/projects/reference_repos/lang_repos/gleam/compiler-core/src/ (inline tests)
+- ~/projects/reference_repos/lang_repos/elm/tests/ (test structure)
+
+STUDY:
+1. How does Rust organize UI tests (compile-fail, run-pass)?
+2. How does Rust handle expected error annotations?
+3. How does Zig test compiler behavior?
+4. How does Gleam test error messages?
+
+Return: REPO | PATTERN_NAME | HOW_IT_WORKS | EXAMPLE | ORI_APPLICABILITY"
+)
+```
+
+---
+
+## Phase 4: Deep Category Analysis (after Phase 3)
+
+Launch **10 parallel Explore agents** (one per category). Send a **single message with 10 Task tool calls**.
+
+**IMPORTANT**: Include BOTH the hotspot list from Phase 1 AND relevant insights from Phase 3. Agents should evaluate Ori's implementation informed by what we've learned from prior art.
+
+Each agent should:
+1. **Read at least 10-15 actual files** (not just grep)
+2. **Examine hotspot files first** (from Phase 1)
+3. **Consider prior art insights** (from Phase 3) when suggesting improvements
+4. Return findings with: severity, location (`file:line`), issue, fix, prior_art_insight
+
+### Agent 4.1: Architecture & Boundaries
+
+```
+prompt: "Search for Architecture & Boundaries violations.
+
+HOTSPOTS TO PRIORITIZE: [paste from Phase 1]
+
+DETECTION PATTERNS:
+CRITICAL:
+- Upward dependency: lower crate imports higher (ori_ir → oric, ori_parse → ori_typeck)
+- IO in core: file/network/env ops in ori_typeck, ori_types, ori_ir, ori_parse
+- Phase bleeding: parser doing type checking, lexer doing parsing
+
+HIGH:
+- Missing phase boundary documentation
+- Implicit coupling between modules
+- Framework types (Salsa) leaking into pure logic
+- Mixed abstraction levels in single function
+
+MEDIUM:
+- Unclear module responsibility
+- Missing module-level doc comments
+
+EXAMINE: Read lib.rs and 2-3 key files from EACH of ori_ir, ori_lexer, ori_parse, ori_typeck, ori_eval, oric.
+
+Return: SEVERITY | file:line | issue | fix"
+```
+
+### Agent 4.2: Salsa & Incremental
+
+```
+prompt: "Search for Salsa & Incremental violations.
+
+HOTSPOTS TO PRIORITIZE: [paste from Phase 1]
+
+DETECTION PATTERNS:
+CRITICAL:
+- Missing derives on query types (needs Clone, Eq, PartialEq, Hash, Debug)
+- Arc<Mutex<T>> or Arc<RwLock<T>> in Salsa-tracked types
+- Function pointers or dyn Trait in query signatures
+- Non-deterministic query (random, time, IO in query body)
+
+HIGH:
+- Query returns Result where (T, Vec<Error>) better
+- Coarse query granularity
+- Missing #[salsa::tracked] on type that should be tracked
+- Query depends on unstable iteration order
+
+EXAMINE: Focus on ori_typeck (primary Salsa user). Read query definitions, tracked structs. Check ori_parse for any Salsa usage.
+
+Return: SEVERITY | file:line | issue | fix"
+```
+
+### Agent 4.3: Memory & Allocation
+
+```
+prompt: "Search for Memory & Allocation violations.
+
+HOTSPOTS TO PRIORITIZE: [paste from Phase 1]
+
+DETECTION PATTERNS:
+CRITICAL:
+- Box<Expr> instead of arena (ExprArena + ExprId)
+- String for identifiers instead of interned Name
+- Raw integer IDs without newtype (u32 instead of ExprId)
+- Arc<T> cloned in hot loop
+
+HIGH:
+- Type alias instead of newtype: type ExprId = u32
+- String comparisons where interned ID works
+- Arc<dyn Trait> where &dyn or Box<dyn> suffices
+
+EXAMINE: Focus on ori_ir (IR types), ori_parse (AST construction), ori_typeck (type representations). Look for .clone() calls, String::from(), Arc::clone().
+
+Return: SEVERITY | file:line | issue | fix"
+```
+
+### Agent 4.4: API Design
+
+```
+prompt: "Search for API Design violations.
+
+HOTSPOTS TO PRIORITIZE: [paste from Phase 1]
+
+DETECTION PATTERNS:
+CRITICAL:
+- Function with 5+ parameters (needs config struct)
+- Manual save/restore without RAII guard
+- unwrap() on user input or file IO
+- Public API without documentation
+
+HIGH:
+- Boolean parameter that changes behavior
+- Context threaded through 5+ functions
+- Missing builder for complex struct
+
+MEDIUM:
+- Return Vec where iterator works
+- Option<Option<T>> or Result<Result<...>>
+
+EXAMINE: Check public functions in each crate's lib.rs and main modules. Count parameters. Look for bool parameters.
+
+Return: SEVERITY | file:line | issue | fix"
+```
+
+### Agent 4.5: Dispatch & Extensibility
+
+```
+prompt: "Search for Dispatch & Extensibility violations.
+
+HOTSPOTS TO PRIORITIZE: [paste from Phase 1]
+
+DETECTION PATTERNS:
+CRITICAL:
+- Arc<dyn Trait> for fixed compile-time set (should be enum)
+- Registry lookup for built-in patterns
+- dyn Trait where enum gives exhaustiveness
+
+HIGH:
+- Hard-coded dispatch with 20+ match arms
+- Box<dyn Trait> where &dyn suffices
+- Trait object where generic allows inlining
+
+EXAMINE: Look for trait definitions, dyn usage, large match statements. Focus on ori_patterns (pattern dispatch), ori_typeck (type dispatch).
+
+Return: SEVERITY | file:line | issue | fix"
+```
+
+### Agent 4.6: Diagnostics
+
+```
+prompt: "Search for Diagnostics violations.
+
+HOTSPOTS TO PRIORITIZE: [paste from Phase 1]
+
+DETECTION PATTERNS:
+CRITICAL:
+- Cryptic error message
+- Missing span on error
+- panic! on recoverable error
+- Early bailout instead of error accumulation
+
+HIGH:
+- Missing 'did you mean?' for typos
+- Inconsistent error style
+- No error code
+
+Check message phrasing:
+- Question phrasing ('Did you mean?') → should be imperative ('try using')
+- Noun phrase fixes → should be verb phrase ('Replace X with Y')
+
+EXAMINE: Search for Diagnostic, Error, error!, panic!. Read ori_diagnostic crate. Check error construction in ori_typeck, ori_parse.
+
+Return: SEVERITY | file:line | issue | fix"
+```
+
+### Agent 4.7: Testing
+
+```
+prompt: "Search for Testing violations.
+
+HOTSPOTS TO PRIORITIZE: [paste from Phase 1]
+
+DETECTION PATTERNS:
+CRITICAL:
+- No test for public function
+- Test verifies implementation not behavior
+- Flaky test
+- #[ignore] without reason
+
+HIGH:
+- Inline tests >200 lines
+- Missing edge case tests
+- Stale skipped tests (blocking feature now implemented)
+
+EXAMINE: Check each crate's tests/ dir and #[cfg(test)] modules. Cross-reference public functions with test coverage. Read actual test code to assess quality.
+
+Return: SEVERITY | file:line | issue | fix"
+```
+
+### Agent 4.8: Performance
+
+```
+prompt: "Search for Performance violations.
+
+HOTSPOTS TO PRIORITIZE: [paste from Phase 1]
+
+DETECTION PATTERNS:
+CRITICAL:
+- O(n²) where O(n) or O(n log n) possible
+- Linear scan in hot loop (should hash)
+- Allocation in hot loop
+- Unbounded recursion
+
+HIGH:
+- Repeated lookup that could be cached
+- collect() followed by iter()
+- HashMap in hot path (should be FxHashMap)
+
+EXAMINE: Focus on ori_typeck (inference loops), ori_parse (AST construction), ori_llvm (codegen). Look for nested loops, .clone() in loops, Vec::new() in loops.
+
+Return: SEVERITY | file:line | issue | fix"
+```
+
+### Agent 4.9: Code Style
+
+```
+prompt: "Search for Code Style violations.
+
+HOTSPOTS TO PRIORITIZE: [paste from Phase 1]
+
+DETECTION PATTERNS:
+CRITICAL:
+- #[allow(clippy::...)] without comment
+- Duplicated logic across modules
+- God module: 1000+ lines, multiple concerns
+- Hidden side effects
+
+HIGH:
+- Function >50 lines
+- File >500 lines without single purpose
+- Growing match statement (OCP violation)
+
+MEDIUM:
+- Banner comments instead of doc comments
+- Comment explains 'what' not 'why'
+- Dead/commented code
+
+EXAMINE: Read the largest files. Check for long functions. Look for #[allow] attributes. Search for duplicated patterns.
+
+Return: SEVERITY | file:line | issue | fix"
+```
+
+### Agent 4.10: Extractable Patterns
+
+```
+prompt: "Search for Extractable Patterns & Emergent Complexity.
+
+HOTSPOTS TO PRIORITIZE: [paste from Phase 1]
+
+DETECTION PATTERNS:
+CRITICAL:
+- Match with 15+ arms where 3+ follow identical structure
+- 3+ methods with near-identical bodies
+
+HIGH:
+- God match: 20+ arms in one function
+- Implicit grouping: related arms scattered
+- Responsibility divergence: module has 3+ distinct concerns
+- Cross-file pattern: same pattern in 4+ files
+
+MEDIUM:
+- Same 3-line pattern appears 5+ times
+- Functions with common prefix/suffix across files
+
+EXAMINE: Find large match statements. Look for repetitive code. Trace concepts across files (e.g., 'width calculation', 'name resolution' - where do they live?).
+
+Return: SEVERITY | file:line | issue | fix"
+```
+
+---
+
+## Phase 5: Best-of-Breed Synthesis (after Phase 4)
+
+Launch **1 final Explore agent** to synthesize all findings AND propose best-of-breed designs combining patterns from reference implementations.
+
+```
+Task(
+  subagent_type: "Explore",
+  description: "Synthesize: Best-of-Breed",
+  prompt: "You have findings from 21 parallel analyses (5 breadth + 6 reference + 10 category). Synthesize into systemic insights AND propose best-of-breed designs.
+
+FINDINGS FROM PREVIOUS PHASES:
+[Paste summaries from Phase 2, Phase 3, and Phase 4 agents]
+
+PART A: ISSUE SYNTHESIS
+
+1. **Pattern Identification**: What issues appear in 3+ reports? These are systemic.
+
+2. **Hotspot Correlation**: Files appearing in 4+ violation categories = 'worst offenders'.
+
+3. **Architectural Health**: Rate overall health (1-10) with justification.
+
+4. **Technical Debt Map**: Combine TODO/FIXME + code quality issues into debt clusters.
+
+5. **Priority Ranking**: TOP 10 most impactful changes considering severity, breadth, risk, effort.
+
+PART B: BEST-OF-BREED DESIGN PROPOSALS
+
+For each major finding, propose a **combined design** that takes the best from multiple reference implementations:
+
+6. **Error Message Design**: Combine:
+   - Elm's three-part structure (problem/context/hint)
+   - Rust's applicability levels (MachineApplicable, MaybeIncorrect, HasPlaceholders)
+   - Roc's progressive disclosure (show more detail on request)
+   - Gleam's edit-distance suggestions
+   → Propose: Ori's unique error message architecture
+
+7. **Type Representation Design**: Combine:
+   - Rust's TyKind enum structure
+   - Zig's InternPool for deduplication
+   - Gleam's functional type representation
+   → Propose: Ori's unique type system architecture
+
+8. **Incremental Compilation Design**: Combine:
+   - Rust's query-based approach (fine-grained caching)
+   - Zig's lazy resolution (minimal recomputation)
+   - Go's simplicity (fast full rebuilds when needed)
+   → Propose: Ori's unique incrementality strategy
+
+9. **Diagnostic Infrastructure Design**: Combine:
+   - Rust's structured suggestions with spans
+   - TypeScript's code action system
+   - Elm's conversational error format
+   → Propose: Ori's unique diagnostic infrastructure
+
+10. **Test Infrastructure Design**: Combine:
+    - Rust's UI test framework (compile-fail, run-pass)
+    - Zig's inline test expectations
+    - Gleam's snapshot testing for errors
+    → Propose: Ori's unique testing approach
+
+For each proposal:
+- Cite specific patterns from 2-3 reference repos
+- Explain why this combination is superior to any single source
+- Identify what Ori can do that none of the references do
+- Provide a concrete implementation sketch
+
+Return:
+
+## PART A: Issue Synthesis
+### Systemic Issues (3+ occurrences)
+### Worst Offender Files
+### Architecture Health Score: X/10
+### Top 10 Priority Actions
+
+## PART B: Best-of-Breed Designs
+### 1. Error Message Architecture
+**Sources**: [repos used]
+**Combined Design**: [description]
+**Ori Unique Advantage**: [what we do better]
+**Implementation Sketch**: [concrete steps]
+
+### 2. Type Representation
+[same format]
+
+### 3. Incremental Strategy
+[same format]
+
+### 4. Diagnostic Infrastructure
+[same format]
+
+### 5. Test Infrastructure
+[same format]
+
+## Recommended Roadmap
+Prioritized implementation order for the best-of-breed designs."
+)
+```
+
+---
 
 ## Severity Guide
 
-- **CRITICAL**: Must fix before merge (security vulns, breaking bugs)
-- **HIGH**: Should fix, blocks new code (outdated deps, unsafe in wrong places)
-- **MEDIUM**: Fix when touching code (style, minor improvements)
+- **CRITICAL**: Must fix before merge (security vulns, breaking bugs, panic on user input)
+- **HIGH**: Should fix, blocks new code (outdated deps, unsafe in wrong places, missing tests)
+- **MEDIUM**: Fix when touching code (style, minor improvements, missing docs)
+
+---
+
+## Final Output
+
+**Do NOT output the full review to the screen.** All findings go directly to the plan files (see Phase 6).
+
+After all phases complete:
+
+1. **Write the plan** to `plans/cr_MMDDYYYY_##/` (see Phase 6 for structure)
+2. **Output only a brief summary** to the user:
+
+```
+✅ Code review complete.
+
+📊 Health Score: X/10
+📁 Plan written to: plans/cr_MMDDYYYY_##/
+
+Quick Stats:
+- Critical: N issues
+- High: N issues
+- Medium: N issues
+- Design Proposals: N
+
+Top 3 priorities:
+1. {brief description}
+2. {brief description}
+3. {brief description}
+
+Run `cat plans/cr_MMDDYYYY_##/00-overview.md` to see the full summary.
+```
+
+---
 
 ## Tool Reference
 
@@ -72,616 +830,379 @@ Aggregate and synthesize all findings:
 
 ```bash
 # Security & Dependencies
-cargo audit                    # Check for security vulnerabilities
-cargo outdated -R              # Show outdated direct dependencies
-cargo machete                  # Find unused dependencies
-cargo deny check               # Comprehensive dep linting (if deny.toml exists)
+cargo audit                    # Security vulnerabilities
+cargo outdated -R              # Outdated direct dependencies
+cargo machete                  # Unused dependencies
+cargo deny check               # License/advisory checks
+cargo tree -d                  # Duplicate dependencies
 
 # Code Quality
-./clippy-all                              # Run clippy on all crates
-cd compiler/oric && cargo geiger          # Count unsafe code usage (from crate dir)
-tokei compiler/                           # Lines of code statistics
+./clippy-all.sh                # Clippy on all crates
+cargo geiger                   # Unsafe code count (from crate dir)
+tokei compiler/                # Lines of code stats
 
 # Architecture
-cargo modules structure --lib -p oric    # Module structure tree
-cargo modules dependencies --lib -p oric # Internal dependency graph
-cargo tree                               # External dependency tree
-cargo tree -d                            # Show duplicate dependencies
+cargo modules structure --lib -p oric     # Module tree
+cargo modules dependencies --lib -p oric  # Dependency graph
+cargo tree                                 # External deps
+
+# Discovery
+find compiler/ -name "*.rs" -exec wc -l {} \; | sort -rn | head -30  # Largest files
+git log --oneline --since="6 months ago" --name-only | grep '\.rs$' | sort | uniq -c | sort -rn | head -20  # Churn
 ```
 
 ### Interpreting Results
 
-**cargo audit**: Any vulnerability = CRITICAL. Update or replace affected deps.
+**cargo audit**: Any vulnerability = CRITICAL.
 
-**cargo machete**: Lists crates in `[dependencies]` not used in code. Verify before removing (some are feature-gated).
+**cargo machete**: Unused deps. Verify before removing (some are feature-gated).
 
-**cargo geiger**: Shows unsafe usage per crate. In a compiler:
-- `ori_ir`, `ori_parse`, `ori_lexer` should have **zero** unsafe
-- `oric` may have minimal unsafe for FFI/LLVM
-- High unsafe count = investigate
+**cargo geiger**: Unsafe count. ori_ir/ori_parse/ori_lexer should have ZERO unsafe.
 
-**cargo modules**: Reveals hidden coupling. Watch for:
-- Unexpected dependencies between modules
-- Circular references (not caught by Rust, but bad design)
+**cargo tree -d**: Duplicate deps increase binary size and can cause version conflicts.
+
+**Git churn + size**: Files that are BOTH large AND frequently changed are highest priority for refactoring.
 
 ---
 
-## 1. Architecture & Boundaries
+## Category Reference
 
+The 10 analysis categories with full detection patterns:
+
+### 1. Architecture & Boundaries
 > Phase organization, layer dependencies, invariants, IO isolation
 
-### Detection Patterns
+**Dependency direction**: `oric` → `ori_typeck/eval/patterns` → `ori_parse` → `ori_lexer` → `ori_ir/diagnostic`
 
-**CRITICAL**
-- Upward dependency: lower crate imports higher (`ori_ir` → `oric`, `ori_parse` → `ori_typeck`)
-- IO in core: file/network/env ops in `ori_typeck`, `ori_types`, `ori_ir`, `ori_parse`
-- Circular dependency between crates
-- Phase bleeding: parser doing type checking, lexer doing parsing
+**IO isolation**: Only `oric` CLI performs IO; core crates are pure.
 
-**HIGH**
-- Missing phase boundary documentation
-- Implicit coupling: module A assumes internal state of module B
-- Framework types in core: Salsa types leaking into pure logic
-- Mixed abstraction levels in single function
-
-**MEDIUM**
-- Unclear module responsibility (does multiple unrelated things)
-- Missing module-level doc comment explaining purpose
-- Cross-cutting concern not isolated (e.g., span tracking scattered)
-
-### Principles
-
-- **Dependency direction**: `oric` → `ori_typeck/eval/patterns` → `ori_parse` → `ori_lexer` → `ori_ir/diagnostic`
-- **IO isolation**: Only `oric` CLI performs IO; core crates are pure
-- **Phase contracts**: Each phase has documented input/output types
-- **Invariants**: Document what must always hold (parser never fails, always produces AST)
-
-### Checklist
-
-- [ ] No upward dependencies between crates
-- [ ] IO isolated to CLI layer (`oric`)
-- [ ] Each crate has clear single responsibility
-- [ ] Phase boundaries documented in module docs
-- [ ] No Salsa types in non-query code
-
----
-
-## 2. Salsa & Incremental
-
+### 2. Salsa & Incremental
 > Query design, derives, determinism, caching granularity
 
-### Detection Patterns
+**Determinism**: Same inputs → same outputs, always.
 
-**CRITICAL**
-- Missing derives on query types: needs `Clone, Eq, PartialEq, Hash, Debug`
-- `Arc<Mutex<T>>` or `Arc<RwLock<T>>` in Salsa-tracked types
-- Function pointers or `dyn Trait` in query signatures
-- Non-deterministic query: random, time, or IO in query body
-- Side effects in queries (mutation, IO, global state)
+**Partial results**: Return best-effort + errors, not `Result<T, E>`.
 
-**HIGH**
-- Query returns `Result` where `(T, Vec<Error>)` better (partial results)
-- Coarse query granularity: recomputes too much on small changes
-- Missing `#[salsa::tracked]` on type that should be tracked
-- Query depends on unstable iteration order (HashMap without sort)
-
-**MEDIUM**
-- Query could be split for better incrementality
-- Expensive computation not memoized
-- Debug impl on query type is expensive
-
-### Principles
-
-- **Determinism**: Same inputs → same outputs, always
-- **Partial results**: Return best-effort result + errors, not `Result<T, E>`
-- **Granularity**: Finer queries = better incrementality, but more overhead
-- **Immutable after construction**: Build fully, then wrap in `Arc`
-
-### Checklist
-
-- [ ] All query types derive required traits
-- [ ] No interior mutability in tracked types
-- [ ] No side effects in query bodies
-- [ ] Queries are deterministic
-- [ ] Error accumulation, not early bailout
-
----
-
-## 3. Memory & Allocation
-
+### 3. Memory & Allocation
 > Arenas, interning, newtypes, reference counting
 
-### Detection Patterns
+**Arena pattern**: AST/IR nodes in arenas, reference by ID.
 
-**CRITICAL**
-- `Box<Expr>` instead of arena allocation (`ExprArena` + `ExprId`)
-- `String` for identifiers instead of interned `Name`
-- Raw integer IDs without newtype (`u32` instead of `ExprId`)
-- `Arc<T>` cloned in hot loop
-- Unbounded collection growth (Vec/HashMap never cleared)
+**Interning**: Identifiers → O(1) comparison.
 
-**HIGH**
-- Type alias instead of newtype: `type ExprId = u32;`
-- `(String, String)` tuples instead of `MethodKey` newtype
-- String comparisons where interned ID comparison works
-- Excessive cloning of IR structures
-- `Arc<dyn Trait>` where `&dyn` or `Box<dyn>` suffices
-- `SharedTypeInterner` (Arc) where `&TypeInterner` suffices (downstream phases should borrow, not own)
+### 4. API Design
+> Config structs, RAII guards, function signatures
 
-**MEDIUM**
-- Scattered heap allocations for related nodes
-- Missing `#[cold]` on error factory functions
-- Intermediate collections in recursive functions
-- `to_string()` / `clone()` in hot path
+**Config structs**: >3-4 params → single config struct.
 
-### Principles
+**RAII guards**: For lexically-scoped context changes.
 
-- **Arena allocation**: AST/IR nodes in arenas, reference by ID
-- **Interning**: Identifiers, strings, method keys → O(1) comparison
-- **Newtypes**: Type-safe IDs prevent mixing `ExprId` with `TypeId`
-- **Push allocations to caller**: Return iterators, not `Vec`
-- **Arc vs Borrow**: Use `&'a T` when one owner exists and others borrow (e.g., codegen borrows from type-check). Use `Arc<T>` only when ownership is truly shared or data must outlive creator.
+### 5. Dispatch & Extensibility
+> Enum vs dyn Trait, registries, static vs dynamic
 
-### Checklist
+**Enum for fixed sets**: Built-ins → exhaustiveness, static dispatch.
 
-- [ ] AST nodes use arena + ID pattern
-- [ ] Identifiers are interned `Name` type
-- [ ] IDs are newtypes, not raw integers
-- [ ] No `Arc` cloning in hot paths
-- [ ] Error paths marked `#[cold]`
-- [ ] Downstream phases use `&T` not `Arc<T>` for shared data
+**Cost hierarchy**: `&dyn` < `Box<dyn>` < `Arc<dyn>`.
 
----
+### 6. Diagnostics
+> Error messages, suggestions, recovery
 
-## 4. API Design
+**Three-part structure**: Problem → context → guidance.
 
-> Config structs, builders, RAII guards, function signatures
+**Imperative suggestions**: "try using X" not "Did you mean X?".
 
-### Detection Patterns
+### 7. Testing
+> Snapshot testing, organization, coverage
 
-**CRITICAL**
-- Function with 5+ parameters (should use config struct)
-- Manual save/restore of context without RAII guard
-- `unwrap()` on user input or file IO
-- Public API without documentation
+**Three layers**: Unit, integration, spec conformance.
 
-**HIGH**
-- Boolean parameter that changes behavior (flag argument)
-- "Doer" object: `Builder::new().set_x(x).execute()` for simple operation
-- Missing builder for complex struct with many optional fields
-- Context threaded through 5+ functions (consider RAII or context object)
+**Skipped tests**: Every skip needs reason AND unskip criteria.
 
-**MEDIUM**
-- Return `Vec` where iterator would work
-- `Option<Option<T>>` or `Result<Result<T, E1>, E2>` (flatten)
-- Inconsistent parameter ordering across similar functions
-- Missing `Default` impl for config struct
+### 8. Performance
+> Algorithm complexity, hot paths, allocations
 
-### Principles
+**O(n²) → O(n log n)**: Beats micro-optimization.
 
-- **Config structs**: >3-4 params → single config/options struct
-- **Functions over doer objects**: Prefer `do_thing(Config { x, y })` over builder ceremony
-- **RAII guards**: Use for lexically-scoped context changes (capabilities, impl scope)
-- **Push allocations to caller**: Return iterators, accept slices
+**Iterators over indexing**: Bounds checks eliminated.
 
-### Checklist
+### 9. Code Style
+> DRY/SOLID, file organization, documentation
 
-- [ ] No functions with 5+ parameters
-- [ ] No boolean flag parameters
-- [ ] RAII guards for context save/restore
-- [ ] Public items documented
-- [ ] Config structs implement `Default`
+**Functions < 50 lines**: Target < 30.
+
+**No dead code**: If you opened the file, you own it.
+
+### 10. Extractable Patterns
+> Match clustering, repetitive structures, emergent abstractions
+
+**Match with 15+ similar arms**: Extract to module.
+
+**Concept spread across 3+ files**: Needs a home.
 
 ---
-
-## 5. Dispatch & Extensibility
-
-> Enum vs dyn Trait, registries, static vs dynamic dispatch
-
-### Detection Patterns
-
-**CRITICAL**
-- `Arc<dyn Trait>` for fixed, compile-time-known set (should be enum)
-- Registry lookup for built-in patterns (`run`, `try`, `match`)
-- `dyn Trait` where enum gives exhaustiveness checking
-
-**HIGH**
-- Missing registry for user-extensible system (user methods need dynamic dispatch)
-- Hard-coded dispatch growing with every feature (match with 20+ arms on type)
-- `Box<dyn Trait>` where `&dyn Trait` suffices (unnecessary allocation)
-- Trait object where generic would allow inlining
-
-**MEDIUM**
-- Enum variant added but match not updated (missing exhaustiveness benefit)
-- Over-abstracted: trait with single implementation
-- Registry for things that won't change at runtime
-
-### Principles
-
-- **Enum for fixed sets**: Built-in patterns, operators, keywords → exhaustiveness, static dispatch, inlining
-- **`dyn Trait` for user-extensible**: User methods, plugins → runtime dispatch necessary
-- **Cost hierarchy**: `&dyn` < `Box<dyn>` < `Arc<dyn>` (prefer cheapest that works)
-- **Registries**: Only when users add entries at runtime
-
-### Checklist
-
-- [ ] Built-in patterns use enum, not registry
-- [ ] User methods use registry/trait objects
-- [ ] No `Arc<dyn>` for fixed sets
-- [ ] Trait objects only where necessary
-- [ ] Match statements on enums (not type strings)
-
----
-
-## 6. Diagnostics
-
-> Error messages, suggestions, recovery, error codes
-
-### Detection Patterns
-
-**CRITICAL**
-- Terse/cryptic error message (user can't understand what's wrong)
-- Missing source location (span) on error
-- `panic!` on recoverable error (user input, file not found)
-- Early bailout: stops at first error instead of accumulating
-
-**HIGH**
-- Missing "did you mean?" suggestion for typos
-- Inconsistent error message style (capitalization, punctuation)
-- Error without context (what was being done when error occurred)
-- No error code for programmatic handling
-
-**MEDIUM**
-- Missing fix suggestion where one is obvious
-- Error message uses internal jargon instead of user terms
-- Duplicate error for same underlying issue
-- Warning that should be error (or vice versa)
-
-### Message Phrasing (from Rust, Elm, Gleam, Zig, Go)
-
-**CRITICAL**
-- Question phrasing for suggestions ("Did you mean X?") instead of imperative ("try using X" or "a similar name exists: X")
-- Fix description is noun phrase ("the fix") instead of verb phrase ("Replace X with Y", "Remove the surplus argument")
-
-**HIGH**
-- Missing "declared here" note when error references a user-defined type
-- Type comparison shows full types instead of highlighting only the differing parts
-- Suggestion doesn't indicate confidence level:
-  - **Auto-applicable**: Definitely correct, tools can apply automatically
-  - **Maybe incorrect**: Valid code but uncertain if intended
-  - **Has placeholders**: Contains `...` or `/* fields */` requiring user input
-
-**MEDIUM**
-- Error message doesn't follow three-part structure: problem statement → source context → actionable guidance
-- Missing "called from here" trace for errors that propagate through function calls
-- Suggestion message ends in punctuation (Rust: suggestion text should not end in `:` or `.`)
-
-### Principles
-
-- **User-first messages**: Write for the person seeing the error, not the compiler author
-- **Three-part structure**: Problem statement → source context → actionable guidance (Elm/Roc pattern)
-- **Accumulate errors**: Don't stop at first error; show all problems
-- **Imperative suggestions**: "try using X" not "Did you mean X?" (Rust pattern)
-- **Verb phrase fixes**: "Replace X with Y" not "the replacement" (Go pattern)
-- **Confidence levels**: Mark suggestions as auto-applicable, uncertain, or has-placeholders (Rust applicability)
-
-### Checklist
-
-- [ ] All errors have source spans
-- [ ] Error messages follow three-part structure
-- [ ] Errors accumulate, not early bailout
-- [ ] Suggestions use imperative phrasing
-- [ ] Type errors include "declared here" notes
-- [ ] Suggestions indicate applicability confidence
-- [ ] No `panic!` on user errors
-
----
-
-## 7. Testing
-
-> Snapshot testing, test organization, coverage layers
-
-### Detection Patterns
-
-**CRITICAL**
-- No test for public function
-- Test verifies implementation, not behavior
-- Flaky test (timing, shared state, order-dependent)
-- `#[ignore]` without reason comment explaining why and when it can be unskipped
-- `#[skip]` used as test avoidance (skipping because test is hard to write, not because feature is incomplete)
-
-**HIGH**
-- Inline tests exceeding 200 lines (should be in `tests/` subdirectory)
-- Missing edge case tests (empty, boundary, error conditions)
-- Snapshot test without clear expected output
-- Test mocks 5+ dependencies (suggests SRP violation)
-- Stale skipped tests: `#[ignore]` or `#[skip]` on tests where the blocking feature is now implemented
-- Skipped test without clear unskip criteria (when should this be enabled?)
-
-**MEDIUM**
-- Poor test naming (`test_1`, `test_parser`)
-- No AAA structure (Arrange-Act-Assert unclear)
-- Missing compile-fail tests for error paths
-- Test duplicates logic instead of using fixtures
-
-### Principles
-
-- **Three layers**: Unit (isolated), integration (components), spec (language conformance)
-- **Snapshot testing**: Complex output (errors, IR dumps) use snapshots
-- **Behavior, not implementation**: Test what it does, not how
-- **Data-driven**: Fixture + expected output, not API-direct
-- **Skipped tests are temporary**: Every skip needs a reason and unskip criteria; review periodically to unskip when blocking feature lands
-
-### Skipped Test Audit
-
-During code review, run:
-```bash
-# Find all skipped/ignored tests
-grep -rn '#\[ignore\]\|#\[skip\]\|#skip' compiler/ tests/ --include='*.rs' --include='*.ori'
-```
-
-For each skipped test, verify:
-1. **Has reason**: Skip comment explains *why* (not just "skip")
-2. **Has criteria**: When can this be unskipped? (feature X, issue #Y)
-3. **Still blocked**: Is the blocking feature still unimplemented?
-4. **Not avoidance**: Skip is for incomplete feature, not because test is hard
-
-If a test's blocking feature is now implemented, **unskip it** as part of the review.
-
-### Checklist
-
-- [ ] Public functions have tests
-- [ ] Edge cases covered (empty, boundary, error)
-- [ ] Inline tests < 200 lines
-- [ ] Snapshot tests for complex output
-- [ ] No flaky tests
-- [ ] Skipped tests reviewed: unskip any where blocking feature is complete
-- [ ] All skips have reason comment and unskip criteria
-
----
-
-## 8. Performance
-
-> Algorithm complexity, hot paths, allocation patterns
-
-### Detection Patterns
-
-**CRITICAL**
-- O(n²) where O(n) or O(n log n) possible
-- Linear scan in hot loop (should use hash lookup)
-- Allocation in hot loop (`String::new()`, `Vec::new()`, `clone()`)
-- Unbounded recursion without tail-call or iteration
-
-**HIGH**
-- Repeated lookup that could be cached
-- Nested loops over same data
-- `collect()` followed by `iter()` (intermediate allocation)
-- HashMap with bad hash function in hot path
-
-**MEDIUM**
-- Missing `#[inline]` on small hot function
-- `FxHashMap` would outperform `HashMap` in hot path
-- Bounds check on every iteration (use iterators)
-- Debug-only code in hot path
-
-### Principles
-
-- **Measure first**: Profile before optimizing
-- **Algorithmic complexity**: O(n²) → O(n log n) beats micro-optimization
-- **Allocation hierarchy**: Stack < arena < heap; reuse > allocate
-- **Iterators over indexing**: Bounds checks eliminated, better optimization
-
-### Checklist
-
-- [ ] No O(n²) in hot paths
-- [ ] Hash lookups instead of linear scans
-- [ ] No allocation in hot loops
-- [ ] Iterators preferred over indexing
-- [ ] Hot functions profiled
-
----
-
-## 9. Code Style
-
-> DRY/SOLID adapted for compilers, file organization, documentation
-
-### Detection Patterns
-
-**CRITICAL**
-- `#[allow(clippy::...)]` without comment explaining why
-- Duplicated logic across modules (DRY violation)
-- God module: 1000+ lines doing multiple unrelated things
-- Hidden side effect: function does more than name suggests
-
-**HIGH**
-- Function > 50 lines (target < 30)
-- File > 500 lines without clear single purpose
-- Match statement growing with every feature (OCP violation)
-- Import from sibling's internals (coupling)
-
-**MEDIUM**
-- Banner comments (`// ====`) instead of doc comments
-- Comment explains "what" instead of "why"
-- Inconsistent naming conventions
-- Dead code / commented-out code
-
-### Principles
-
-- **Single responsibility**: One reason to change per module/function
-- **Open/closed**: New features = new code, not modified code
-- **Line count as smell**: Investigate 500+ line files, don't auto-split
-- **Documentation**: Public items documented, modules have doc comments
-
-### Checklist
-
-- [ ] No `#[allow(clippy)]` without justification
-- [ ] Functions < 50 lines
-- [ ] Files have single clear purpose
-- [ ] No dead code or commented-out code
-- [ ] Public items documented
-
----
-
-## 10. Extractable Patterns & Emergent Complexity
-
-> Match arm clustering, repetitive structures, module extraction, emergent abstractions, responsibility divergence
-
-This category targets both **structural patterns** (large functions with clustered similar code) and **emergent patterns** (code that has organically evolved to the point where new abstractions should be extracted). Structural patterns are caught by line-count heuristics; emergent patterns require recognizing when complexity has crossed a threshold where the code is "asking" to be restructured.
-
-### Detection Patterns
-
-**CRITICAL**
-- **Match arm clustering**: Match with 15+ arms where 3+ consecutive arms follow identical structure:
-  - Same sequence of operations (get child value → check sentinel → compute formula)
-  - Same error handling pattern (check for error, early return)
-  - Same delegation pattern (call helper, combine results)
-  - *Example*: `ExprKind::Ok`, `ExprKind::Err`, `ExprKind::Some` all doing `calc.width(inner)` + check + return prefix_len + inner_w + 1
-
-- **Repetitive iteration methods**: 3+ methods with near-identical bodies differing only in:
-  - Field name accessed (`entry.key` vs `entry.value` vs `arg.name`)
-  - Type being iterated (`&[ExprId]` vs `&[MapEntry]` vs `&[FieldInit]`)
-  - *Example*: `width_of_expr_list`, `width_of_map_entries`, `width_of_field_inits` all doing accumulate-with-separator
-
-**HIGH**
-- **God match**: Single match statement with 20+ arms in one function (even if function is <100 lines)
-- **Structural similarity**: Code blocks that:
-  1. Get multiple child values/widths
-  2. Check each for error/sentinel condition
-  3. Combine with formula
-  - When 4+ blocks follow this pattern, extract to helper or module
-
-- **Implicit grouping**: Match arms that are conceptually related but scattered:
-  - All call-related: `Call`, `CallNamed`, `MethodCall`, `MethodCallNamed`
-  - All collections: `List`, `Map`, `Struct`, `Tuple`, `Range`
-  - All wrappers: `Ok`, `Err`, `Some`, `None`, `Try`, `Await`
-  - All control flow: `If`, `For`, `Loop`, `Block`, `Return`, `Break`
-
-**Emergent Complexity (HIGH)**
-- **Responsibility divergence**: Module has 3+ distinct concerns that started as one
-  - Look for: logical sections separated by comments, unrelated import clusters, function groups that don't call each other
-  - Symptom: file has 3+ "sections" that could each be their own module
-- **Cross-file pattern crystallization**: Same pattern repeated in 4+ files
-  - Same error handling approach, same type transformation, same visitor structure
-  - If you can name the pattern, it deserves a module
-- **Type clustering**: Types that are always imported together or used together
-  - Suggests they belong in one module with a clear abstraction boundary
-- **Implicit submodule**: File has 100+ line section with its own helpers that don't interact with rest of file
-  - The section has become a module in all but name
-- **Scattered concept ownership**: A concept (e.g., "width calculation", "name resolution") spread across 3+ files with no clear home
-
-**MEDIUM**
-- **Missing abstraction**: Same 3-line pattern appears 5+ times (even with different variable names)
-- **Inline helpers**: Private functions that only serve one match arm but are defined at module level
-- **Scattered related code**: Functions operating on same concept spread across file instead of grouped
-- **Abstraction debt**: 3+ similar helpers with slight variations that could be unified
-- **Naming convergence**: Functions with common prefix/suffix across files (`width_*`, `*_visitor`, `resolve_*`) suggesting latent abstraction
-
-### How to Detect
-
-**Structural patterns (within files):**
-1. **Count match arms**: Any `match` with 15+ arms is a candidate
-2. **Group by structure**: Identify arms with same operation sequence (ignoring specific fields/types)
-3. **Name the groups**: If you can name a group ("wrapper expressions", "binary operations"), it should be a module
-4. **Check delegation**: Arms that immediately delegate to a helper suggest the helper should be in its own file
-
-**Emergent patterns (across codebase):**
-1. **Trace concepts**: Follow a concept (e.g., "formatting") through the codebase - where does it live?
-2. **Check cohesion**: Do functions in a module call each other, or are they independent?
-3. **Look for import clusters**: Files that import the same 3+ items together suggest missing abstraction
-4. **Find naming patterns**: `width_of_*`, `resolve_*`, `visit_*` across files = latent module
-5. **Ask "where does X live?"**: If the answer is "spread across 3 files", that's a smell
-
-### Extraction Indicators
-
-**Structural (extract within file):**
-- Group of match arms has 3+ members with identical structure
-- Has a clear conceptual name (calls, collections, wrappers, control)
-- Would benefit from shared helper functions
-
-**Emergent (extract to new module):**
-- Concept has no clear home - lives in 3+ files partially
-- Functions with common naming pattern could share infrastructure
-- A "section" of a file has become self-contained (100+ lines, own helpers)
-- Types are always used together but defined separately
-- You keep adding to the same scattered set of functions
-
-### Example Violation
-
-```rust
-// BAD: 30-arm match in one function, related arms scattered
-fn calculate_width(&mut self, expr_id: ExprId) -> usize {
-    match &expr.kind {
-        ExprKind::Int(n) => int_width(*n),
-        ExprKind::Call { func, args } => { ... },  // 4 similar call arms scattered
-        ExprKind::Float(f) => float_width(*f),
-        ExprKind::MethodCall { .. } => { ... },
-        ExprKind::List(items) => { ... },          // 5 similar collection arms scattered
-        ExprKind::Ok(inner) => { ... },            // 6 similar wrapper arms scattered
-        ExprKind::Map(entries) => { ... },
-        // ... 20 more arms
-    }
-}
-```
-
-```rust
-// GOOD: Main match delegates to focused modules
-fn calculate_width(&mut self, expr_id: ExprId) -> usize {
-    match &expr.kind {
-        // Literals - delegated to literals module
-        ExprKind::Int(n) => int_width(*n),
-        ExprKind::Float(f) => float_width(*f),
-
-        // Calls - delegated to calls module
-        ExprKind::Call { func, args } => call_width(self, *func, *args),
-        ExprKind::MethodCall { .. } => method_call_width(self, ...),
-
-        // Collections - delegated to collections module
-        ExprKind::List(items) => list_width(self, *items),
-        ExprKind::Map(entries) => map_width(self, *entries),
-
-        // Wrappers - delegated to wrappers module
-        ExprKind::Ok(inner) => ok_width(self, *inner),
-        // ...
-    }
-}
-```
-
-### Checklist
-
-**Structural:**
-- [ ] No match statements with 20+ arms in single file
-- [ ] Related match arms grouped together (not scattered)
-- [ ] Conceptually related arms extracted to modules (calls.rs, wrappers.rs, etc.)
-- [ ] Repetitive iteration patterns use shared helper (`accumulate_widths`)
-
-**Emergent:**
-- [ ] Each concept has a clear home (not spread across 3+ files)
-- [ ] Modules have single responsibility (not 3+ unrelated concerns)
-- [ ] Functions with common naming patterns consolidated
-- [ ] Types that are always used together live together
-- [ ] No 100+ line "sections" that function as implicit submodules
-
----
-
-## Output Format
-
-For each finding:
-1. **Severity**: CRITICAL / HIGH / MEDIUM
-2. **Category**: Which section above
-3. **Location**: `file:line` or file path
-4. **Issue**: What's wrong (one line)
-5. **Fix**: How to resolve (one line)
-
-Group by severity, then by category. Identify patterns (same issue in multiple places).
 
 ## References
 
 - Ori guidelines: `.claude/rules/compiler.md`
 
-**Diagnostic patterns by repo:**
-- **Rust** (`~/projects/reference_repos/lang_repos/rust/compiler/rustc_errors/`): Applicability levels (MachineApplicable, MaybeIncorrect, HasPlaceholders), imperative suggestion phrasing, multi-part suggestions
-- **Go** (`~/projects/reference_repos/lang_repos/golang/src/go/types/errors.go`): Verb phrase fix descriptions, error code organization (adjective + noun naming)
-- **Elm** (`~/projects/reference_repos/lang_repos/elm/compiler/src/Reporting/`): Three-part error structure, type comparison highlighting, problem-specific hints
-- **Zig** (`~/projects/reference_repos/lang_repos/zig/src/Sema.zig`): "declared here" notes, "consider..." suggestions, reference traces, note deduplication
-- **Gleam** (`~/projects/reference_repos/lang_repos/gleam/compiler-core/src/error.rs`): Edit distance with substring support, extra labels for related locations
-- **Roc** (`~/projects/reference_repos/lang_repos/roc/crates/reporting/src/`): Semantic annotation types, progressive disclosure, output target abstraction
+**Diagnostic patterns:**
+- **Rust** (`rustc_errors`): Applicability levels, imperative suggestions
+- **Go** (`go/types/errors.go`): Verb phrase fixes, error codes
+- **Elm** (`Reporting/`): Three-part structure, type highlighting
+- **Zig** (`Sema.zig`): "declared here" notes, reference traces
+- **Gleam** (`error.rs`): Edit distance, extra labels
+- **Roc** (`reporting/`): Progressive disclosure, semantic annotations
+
+---
+
+## Phase 6: Write Plan Output (REQUIRED)
+
+After completing the review, you **MUST** write the findings to a plan in `plans/` using the standard template format.
+
+### Naming Convention
+
+```
+plans/cr_MMDDYYYY_##/
+```
+
+Where:
+- `cr_` = code review prefix
+- `MMDDYYYY` = date (e.g., `02042026` for February 4, 2026)
+- `_##` = sequential number (01, 02, etc.) if multiple reviews on same day
+
+**To determine the sequence number:**
+1. Check existing `plans/cr_MMDDYYYY_*` directories for today's date
+2. Use the next available number (start with `_01` if none exist)
+
+### Directory Structure
+
+Create this structure:
+
+```
+plans/cr_MMDDYYYY_##/
+├── index.md           # Keyword index for findings
+├── 00-overview.md     # Executive summary, health score, priorities
+├── section-01-critical.md    # CRITICAL severity issues
+├── section-02-high.md        # HIGH severity issues
+├── section-03-medium.md      # MEDIUM severity issues
+├── section-04-proposals.md   # Best-of-breed design proposals
+└── section-05-roadmap.md     # Recommended action plan
+```
+
+### File Templates
+
+#### `00-overview.md`
+
+```markdown
+---
+plan: "cr_MMDDYYYY_##"
+title: Code Review - {Date}
+status: complete
+health_score: {X}/10
+critical_count: {N}
+high_count: {N}
+medium_count: {N}
+---
+
+# Code Review: {Month Day, Year}
+
+**Health Score:** {X}/10
+**Review Duration:** {approximate time}
+
+## Executive Summary
+
+{Top 3 systemic problems identified}
+
+## Automated Tool Results
+
+| Tool | Result Summary |
+|------|----------------|
+| clippy | {summary} |
+| audit | {summary} |
+| ... | ... |
+
+## Hotspot Files
+
+Files that are large AND frequently changed:
+
+| File | Lines | Churn | Issues |
+|------|-------|-------|--------|
+
+## Quick Stats
+
+- **Critical Issues:** {N}
+- **High Issues:** {N}
+- **Medium Issues:** {N}
+- **Design Proposals:** {N}
+```
+
+#### `section-01-critical.md` (and similar for HIGH/MEDIUM)
+
+```markdown
+---
+section: "01"
+title: Critical Issues
+status: not-started
+severity: critical
+issue_count: {N}
+---
+
+# Section 01: Critical Issues
+
+**Status:** 📋 Planned
+**Count:** {N} issues
+
+---
+
+## 01.1 {Category Name}
+
+- [ ] **{Issue Title}** — `file:line`
+  - Description: {what's wrong}
+  - Fix: {how to fix}
+  - Prior Art: {reference if applicable}
+
+- [ ] **{Another Issue}** — `file:line`
+  - Description: {what's wrong}
+  - Fix: {how to fix}
+
+---
+
+## 01.N Completion Checklist
+
+- [ ] All critical issues addressed
+- [ ] Re-run automated tools to verify
+- [ ] No new critical issues introduced
+
+**Exit Criteria:** Zero CRITICAL issues remaining
+```
+
+#### `section-04-proposals.md`
+
+```markdown
+---
+section: "04"
+title: Best-of-Breed Design Proposals
+status: not-started
+---
+
+# Section 04: Design Proposals
+
+**Status:** 📋 Planned
+
+Based on prior art study from Rust, Go, Zig, Gleam, Elm, and Roc.
+
+---
+
+## 04.1 Error Message Architecture
+
+**Influences:** Elm (structure), Rust (applicability), Roc (disclosure), Gleam (suggestions)
+
+**Proposed Design:**
+{description}
+
+**What Makes Ori's Design Unique:**
+{differentiation}
+
+**Implementation Tasks:**
+- [ ] {task 1}
+- [ ] {task 2}
+
+---
+
+## 04.2 Type Representation
+
+{same format}
+
+---
+
+## 04.N Completion Checklist
+
+- [ ] All proposals documented
+- [ ] Implementation tasks identified
+- [ ] Dependencies mapped
+
+**Exit Criteria:** Proposals ready for implementation planning
+```
+
+#### `index.md`
+
+```markdown
+# Code Review {MMDDYYYY} Index
+
+> **Generated:** {timestamp}
+
+## How to Use
+
+1. Search this file (Ctrl+F) for keywords
+2. Find the section
+3. Open the section file
+
+---
+
+## Sections
+
+### Section 01: Critical Issues
+**File:** `section-01-critical.md` | **Count:** {N}
+
+```
+{categories of critical issues}
+security, panic, data loss
+```
+
+---
+
+### Section 02: High Issues
+**File:** `section-02-high.md` | **Count:** {N}
+
+```
+{categories}
+```
+
+---
+
+### Section 03: Medium Issues
+**File:** `section-03-medium.md` | **Count:** {N}
+
+```
+{categories}
+```
+
+---
+
+### Section 04: Design Proposals
+**File:** `section-04-proposals.md`
+
+```
+error messages, types, incremental, diagnostics, testing
+best-of-breed, prior art, architecture
+```
+
+---
+
+### Section 05: Recommended Roadmap
+**File:** `section-05-roadmap.md`
+
+```
+priorities, action plan, sequence
+```
+
+---
+
+## Quick Reference
+
+| ID | Title | File | Count |
+|----|-------|------|-------|
+| 01 | Critical Issues | `section-01-critical.md` | {N} |
+| 02 | High Issues | `section-02-high.md` | {N} |
+| 03 | Medium Issues | `section-03-medium.md` | {N} |
+| 04 | Design Proposals | `section-04-proposals.md` | — |
+| 05 | Roadmap | `section-05-roadmap.md` | — |
+```
+
+### Important Notes
+
+1. **Always write the plan** — This is not optional. Every code review must produce a plan.
+2. **Use real findings** — Populate sections with actual issues found, not placeholders.
+3. **Track by checkbox** — Each issue becomes a trackable task.
+4. **Link to code** — Always include `file:line` references.
+5. **Report the path** — Tell the user where the plan was written: `Plan written to: plans/cr_MMDDYYYY_##/`

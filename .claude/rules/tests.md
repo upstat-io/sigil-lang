@@ -53,8 +53,8 @@ paths:
 ```bash
 cargo st                           # all spec tests
 cargo st tests/spec/types/         # specific category
-./test-all                         # full suite
-./llvm-test                        # LLVM unit tests
+./test-all.sh                      # full suite
+./llvm-test.sh                     # LLVM unit tests
 cargo blr && ./target/release/ori test --backend=llvm tests/
 ```
 

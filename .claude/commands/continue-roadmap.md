@@ -167,11 +167,11 @@ Based on user choice:
 
 ### After Writing Code
 
-1. **Run tests** — `./test-all` to verify everything passes
+1. **Run tests** — `./test-all.sh` to verify everything passes
 2. **Check formatting impact** — If syntax was added or changed:
    - Does the formatter handle the new syntax? Check `compiler/ori_fmt/`
    - Are formatting tests needed? Check/update `tests/spec/formatting/`
-   - Run `./fmt-all` to ensure formatter still works
+   - Run `./fmt-all.sh` to ensure formatter still works
 3. **Update section file** — Check off completed items with `[x]`
 4. **Update YAML frontmatter** — See "Updating Section File Frontmatter" below
 5. **Commit with clear message** — Reference the section and task
@@ -364,7 +364,7 @@ When completing a roadmap item:
 - [ ] Implement feature in compiler
 - [ ] Add Ori spec tests
 - [ ] Add Rust unit tests (if applicable)
-- [ ] Run `./test-all` — all tests pass
+- [ ] Run `./test-all.sh` — all tests pass
 - [ ] Check if formatting needs updates (if syntax changed):
   - [ ] Formatter handles new syntax (`compiler/ori_fmt/`)
   - [ ] Formatting tests cover new syntax (`tests/spec/formatting/`)

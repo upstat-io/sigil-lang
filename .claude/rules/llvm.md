@@ -14,8 +14,8 @@ LLVM 17 required. Path in `.cargo/config.toml`.
 ## Commands
 - Build: `cargo bl` (debug), `cargo blr` (release)
 - Clippy: `cargo cll`
-- Tests: `./llvm-test`
-- All: `./test-all`
+- Tests: `./llvm-test.sh`
+- All: `./test-all.sh`
 
 ## Building with LLVM
 ```bash

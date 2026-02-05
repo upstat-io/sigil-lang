@@ -46,12 +46,12 @@ rustc-hash.workspace = true
 # Parallel test execution
 rayon.workspace = true
 
-# Diagnostic derive macros
-ori_macros.workspace = true
+# Temp files for AOT intermediate objects
+tempfile = "3.10"
 
 [dev-dependencies]
 pretty_assertions = "1.4"
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 tempfile = "3.10"
 ori_rt = { path = "../ori_rt" }
 
@@ -69,6 +69,10 @@ harness = false
 
 [[bench]]
 name = "formatter"
+harness = false
+
+[[bench]]
+name = "memory"
 harness = false
 
 [lints]

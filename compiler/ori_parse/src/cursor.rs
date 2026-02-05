@@ -4,7 +4,7 @@
 
 use super::ParseError;
 use ori_diagnostic::ErrorCode;
-use ori_ir::{Name, Span, StringInterner, Token, TokenKind, TokenList};
+use ori_ir::{Name, Span, StringInterner, Token, TokenCapture, TokenKind, TokenList};
 
 /// Cursor for navigating tokens.
 ///
@@ -24,6 +24,12 @@ impl<'a> Cursor<'a> {
             interner,
             pos: 0,
         }
+    }
+
+    /// Get the total number of tokens in the stream.
+    #[inline]
+    pub fn token_count(&self) -> usize {
+        self.tokens.len()
     }
 
     /// Get a reference to the string interner.
@@ -59,23 +65,33 @@ impl<'a> Cursor<'a> {
     }
 
     /// Get the current token.
+    ///
+    /// Invariant: cursor position is always valid (`0..tokens.len()`).
+    /// The last token is always EOF.
+    #[inline]
     pub fn current(&self) -> &Token {
-        self.tokens
-            .get(self.pos)
-            .unwrap_or(&self.tokens[self.tokens.len() - 1])
+        debug_assert!(
+            self.pos < self.tokens.len(),
+            "cursor position out of bounds"
+        );
+        // Direct index - bounds check optimized out in release due to invariant
+        &self.tokens[self.pos]
     }
 
     /// Get the current token's kind.
+    #[inline]
     pub fn current_kind(&self) -> &TokenKind {
         &self.current().kind
     }
 
     /// Get the current token's span.
+    #[inline]
     pub fn current_span(&self) -> Span {
         self.current().span
     }
 
     /// Get the previous token's span.
+    #[inline]
     pub fn previous_span(&self) -> Span {
         if self.pos > 0 {
             self.tokens[self.pos - 1].span
@@ -85,21 +101,25 @@ impl<'a> Cursor<'a> {
     }
 
     /// Check if at end of token stream.
+    #[inline]
     pub fn is_at_end(&self) -> bool {
         matches!(self.current_kind(), TokenKind::Eof)
     }
 
     /// Check if the current token matches the given kind.
+    #[inline]
     pub fn check(&self, kind: &TokenKind) -> bool {
         std::mem::discriminant(self.current_kind()) == std::mem::discriminant(kind)
     }
 
     /// Check if the current token is an identifier.
+    #[inline]
     pub fn check_ident(&self) -> bool {
         matches!(self.current_kind(), TokenKind::Ident(_))
     }
 
     /// Check if the current token is a type keyword.
+    #[inline]
     pub fn check_type_keyword(&self) -> bool {
         matches!(
             self.current_kind(),
@@ -116,6 +136,7 @@ impl<'a> Cursor<'a> {
 
     /// Peek at the next token's kind (one-token lookahead).
     /// Returns `TokenKind::Eof` if at the end of the stream.
+    #[inline]
     pub fn peek_next_kind(&self) -> &TokenKind {
         static EOF: TokenKind = TokenKind::Eof;
         if self.pos + 1 < self.tokens.len() {
@@ -252,16 +273,66 @@ impl<'a> Cursor<'a> {
     }
 
     /// Advance to the next token and return the consumed token.
+    ///
+    /// If already at EOF, returns the EOF token without advancing.
+    #[inline]
     pub fn advance(&mut self) -> &Token {
-        if !self.is_at_end() {
+        let current = self.pos;
+        // Only advance if not at the last token (EOF).
+        // This avoids calling is_at_end() which has overhead.
+        if self.pos + 1 < self.tokens.len() {
             self.pos += 1;
         }
-        &self.tokens[self.pos - 1]
+        &self.tokens[current]
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Token Capture
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// Mark the current position for starting a token capture.
+    ///
+    /// Use with `complete_capture()` to capture a range of tokens:
+    /// ```ignore
+    /// let start = cursor.start_capture();
+    /// // ... parse some tokens ...
+    /// let capture = cursor.complete_capture(start);
+    /// ```
+    #[inline]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "Token count cannot exceed u32::MAX (4 billion tokens would require ~100GB of source)"
+    )]
+    pub fn start_capture(&self) -> u32 {
+        self.pos as u32
+    }
+
+    /// Complete a token capture from a start position.
+    ///
+    /// Returns `TokenCapture::None` if no tokens were consumed.
+    /// Returns `TokenCapture::Range { start, end }` otherwise.
+    #[inline]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "Token count cannot exceed u32::MAX (4 billion tokens would require ~100GB of source)"
+    )]
+    pub fn complete_capture(&self, start: u32) -> TokenCapture {
+        TokenCapture::new(start, self.pos as u32)
+    }
+
+    /// Get the token list reference for accessing captured ranges.
+    #[inline]
+    pub fn tokens(&self) -> &'a TokenList {
+        self.tokens
     }
 
     /// Skip all newline tokens.
+    ///
+    /// Optimized: Uses direct match instead of `check()` to avoid
+    /// `std::mem::discriminant()` overhead on this hot path.
+    #[inline]
     pub fn skip_newlines(&mut self) {
-        while self.check(&TokenKind::Newline) {
+        while matches!(self.current_kind(), TokenKind::Newline) {
             self.advance();
         }
     }
@@ -454,5 +525,47 @@ mod tests {
         assert!(cursor.check_type_keyword()); // bool
         cursor.advance();
         assert!(cursor.check_type_keyword()); // str
+    }
+
+    #[test]
+    fn test_token_capture() {
+        let interner = StringInterner::new();
+        let tokens = ori_lexer::lex("let x = 42", &interner);
+        let tokens = Box::leak(Box::new(tokens));
+        let interner = Box::leak(Box::new(interner));
+        let mut cursor = Cursor::new(tokens, interner);
+
+        // Capture range covering "let x ="
+        let start = cursor.start_capture();
+        cursor.advance(); // let
+        cursor.advance(); // x
+        cursor.advance(); // =
+        let capture = cursor.complete_capture(start);
+
+        assert!(!capture.is_empty());
+        assert_eq!(capture.len(), 3);
+
+        // Verify the captured tokens
+        let captured = cursor.tokens().get_range(capture);
+        assert_eq!(captured.len(), 3);
+        assert!(matches!(captured[0].kind, TokenKind::Let));
+        assert!(matches!(captured[1].kind, TokenKind::Ident(_)));
+        assert!(matches!(captured[2].kind, TokenKind::Eq));
+    }
+
+    #[test]
+    fn test_token_capture_empty() {
+        let interner = StringInterner::new();
+        let tokens = ori_lexer::lex("let", &interner);
+        let tokens = Box::leak(Box::new(tokens));
+        let interner = Box::leak(Box::new(interner));
+        let cursor = Cursor::new(tokens, interner);
+
+        // Capture with no advancement
+        let start = cursor.start_capture();
+        let capture = cursor.complete_capture(start);
+
+        assert!(capture.is_empty());
+        assert_eq!(capture.len(), 0);
     }
 }
