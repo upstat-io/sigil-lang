@@ -59,7 +59,7 @@ For each item, determine how to verify it:
    cargo st tests/spec/path/to/test.ori
 
    # For Rust tests in a module
-   cargo test -p ori_typeck -- module_name
+   cargo test -p ori_types -- module_name
 
    # For LLVM tests
    ./llvm-test.sh

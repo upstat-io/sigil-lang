@@ -53,7 +53,7 @@ paths:
 ## Module Checker
 - `check_module()`: Full module-level type checking
 - Registration passes → signature collection → body checking
-- Salsa-compatible via `TypeCheckResultV2`
+- Salsa-compatible via `TypeCheckResult`
 
 ## Salsa Compatibility
 - All types: `Clone, Eq, PartialEq, Hash, Debug`

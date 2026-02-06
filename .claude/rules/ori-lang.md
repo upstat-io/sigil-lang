@@ -31,7 +31,7 @@ Design docs archived to `archived-design/`. Do not update.
 
 **If changing operator behavior:**
 - Update `operator-rules.md`
-- Verify: `ori_typeck/operators.rs`, `ori_eval/interpreter/`
+- Verify: `ori_types/infer/expr.rs`, `ori_eval/interpreter/`
 
 ## Never Do
 - Examples that don't match spec
