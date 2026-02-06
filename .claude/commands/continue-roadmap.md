@@ -326,7 +326,7 @@ Run an audit when:
 **Section 4: Modules** — Imports, exports, namespaces, extensions
 **Section 5: Type Declarations** — Structs, enums, newtypes, associated functions
 
-Key files: `compiler/ori_typeck/`, `compiler/ori_ir/src/types.rs`
+Key files: `compiler/ori_types/`, `compiler/ori_ir/src/types.rs`
 
 ### Tier 2: Capabilities & Stdlib
 

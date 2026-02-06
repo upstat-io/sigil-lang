@@ -81,7 +81,7 @@ Run these **10 cargo/analysis tools in parallel** using Bash. Send a **single me
 | **tree-dups** | `cargo tree -d 2>&1 \|\| true` | Duplicate dependencies |
 | **tokei** | `tokei compiler/ 2>&1 \|\| true` | Lines of code metrics |
 | **modules-oric** | `cargo modules structure --lib -p oric 2>&1 \|\| true` | oric module structure |
-| **modules-typeck** | `cargo modules structure --lib -p ori_typeck 2>&1 \|\| true` | typeck module structure |
+| **modules-types** | `cargo modules structure --lib -p ori_types 2>&1 \|\| true` | types module structure |
 | **deny** | `cargo deny check 2>&1 \|\| true` | License/advisory checks (if deny.toml exists) |
 
 **Summarize findings:**
@@ -134,7 +134,7 @@ CRATES TO EXAMINE (read lib.rs for each):
 - compiler/ori_ir/
 - compiler/ori_lexer/
 - compiler/ori_parse/
-- compiler/ori_typeck/
+- compiler/ori_types/
 - compiler/ori_eval/
 - compiler/ori_patterns/
 - compiler/ori_llvm/
@@ -186,9 +186,9 @@ Task(
 1. For each crate, grep for 'use ori_' to find cross-crate imports
 2. Build a dependency map showing which crates import which
 3. Check against expected direction:
-   oric → ori_typeck/ori_eval/ori_patterns → ori_parse → ori_lexer → ori_ir/ori_diagnostic
+   oric → ori_types/ori_eval/ori_patterns → ori_parse → ori_lexer → ori_ir/ori_diagnostic
 4. Flag any UPWARD dependencies (lower importing higher)
-5. Flag any unexpected tight coupling (e.g., ori_lexer importing ori_typeck)
+5. Flag any unexpected tight coupling (e.g., ori_lexer importing ori_types)
 
 Also check:
 - Are there types being passed through 3+ crates? (suggests wrong home)
@@ -215,7 +215,7 @@ For each crate in compiler/:
 Focus on:
 - ori_ir (should have clean, well-documented IR types)
 - ori_parse (should expose clear parsing API)
-- ori_typeck (should have documented inference entry points)
+- ori_types (should have documented inference entry points)
 
 Return: CRATE | ITEM | TYPE | HAS_DOCS | PARAM_COUNT | ISSUE"
 )
@@ -432,8 +432,8 @@ HOTSPOTS TO PRIORITIZE: [paste from Phase 1]
 
 DETECTION PATTERNS:
 CRITICAL:
-- Upward dependency: lower crate imports higher (ori_ir → oric, ori_parse → ori_typeck)
-- IO in core: file/network/env ops in ori_typeck, ori_types, ori_ir, ori_parse
+- Upward dependency: lower crate imports higher (ori_ir → oric, ori_parse → ori_types)
+- IO in core: file/network/env ops in ori_types, ori_types, ori_ir, ori_parse
 - Phase bleeding: parser doing type checking, lexer doing parsing
 
 HIGH:
@@ -446,7 +446,7 @@ MEDIUM:
 - Unclear module responsibility
 - Missing module-level doc comments
 
-EXAMINE: Read lib.rs and 2-3 key files from EACH of ori_ir, ori_lexer, ori_parse, ori_typeck, ori_eval, oric.
+EXAMINE: Read lib.rs and 2-3 key files from EACH of ori_ir, ori_lexer, ori_parse, ori_types, ori_eval, oric.
 
 Return: SEVERITY | file:line | issue | fix"
 ```
@@ -471,7 +471,7 @@ HIGH:
 - Missing #[salsa::tracked] on type that should be tracked
 - Query depends on unstable iteration order
 
-EXAMINE: Focus on ori_typeck (primary Salsa user). Read query definitions, tracked structs. Check ori_parse for any Salsa usage.
+EXAMINE: Focus on ori_types (primary Salsa user). Read query definitions, tracked structs. Check ori_parse for any Salsa usage.
 
 Return: SEVERITY | file:line | issue | fix"
 ```
@@ -495,7 +495,7 @@ HIGH:
 - String comparisons where interned ID works
 - Arc<dyn Trait> where &dyn or Box<dyn> suffices
 
-EXAMINE: Focus on ori_ir (IR types), ori_parse (AST construction), ori_typeck (type representations). Look for .clone() calls, String::from(), Arc::clone().
+EXAMINE: Focus on ori_ir (IR types), ori_parse (AST construction), ori_types (type representations). Look for .clone() calls, String::from(), Arc::clone().
 
 Return: SEVERITY | file:line | issue | fix"
 ```
@@ -546,7 +546,7 @@ HIGH:
 - Box<dyn Trait> where &dyn suffices
 - Trait object where generic allows inlining
 
-EXAMINE: Look for trait definitions, dyn usage, large match statements. Focus on ori_patterns (pattern dispatch), ori_typeck (type dispatch).
+EXAMINE: Look for trait definitions, dyn usage, large match statements. Focus on ori_patterns (pattern dispatch), ori_types (type dispatch).
 
 Return: SEVERITY | file:line | issue | fix"
 ```
@@ -574,7 +574,7 @@ Check message phrasing:
 - Question phrasing ('Did you mean?') → should be imperative ('try using')
 - Noun phrase fixes → should be verb phrase ('Replace X with Y')
 
-EXAMINE: Search for Diagnostic, Error, error!, panic!. Read ori_diagnostic crate. Check error construction in ori_typeck, ori_parse.
+EXAMINE: Search for Diagnostic, Error, error!, panic!. Read ori_diagnostic crate. Check error construction in ori_types, ori_parse.
 
 Return: SEVERITY | file:line | issue | fix"
 ```
@@ -622,7 +622,7 @@ HIGH:
 - collect() followed by iter()
 - HashMap in hot path (should be FxHashMap)
 
-EXAMINE: Focus on ori_typeck (inference loops), ori_parse (AST construction), ori_llvm (codegen). Look for nested loops, .clone() in loops, Vec::new() in loops.
+EXAMINE: Focus on ori_types (inference loops), ori_parse (AST construction), ori_llvm (codegen). Look for nested loops, .clone() in loops, Vec::new() in loops.
 
 Return: SEVERITY | file:line | issue | fix"
 ```
@@ -872,7 +872,7 @@ The 10 analysis categories with full detection patterns:
 ### 1. Architecture & Boundaries
 > Phase organization, layer dependencies, invariants, IO isolation
 
-**Dependency direction**: `oric` → `ori_typeck/eval/patterns` → `ori_parse` → `ori_lexer` → `ori_ir/diagnostic`
+**Dependency direction**: `oric` → `ori_types/eval/patterns` → `ori_parse` → `ori_lexer` → `ori_ir/diagnostic`
 
 **IO isolation**: Only `oric` CLI performs IO; core crates are pure.
 
