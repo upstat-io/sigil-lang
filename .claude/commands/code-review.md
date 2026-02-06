@@ -21,7 +21,7 @@ Analyze the Ori compiler for violations of documented patterns and industry best
 | **0** | Automated Tooling | 10 parallel bash | Lint, security, metrics |
 | **1** | Discovery & Inventory | 6 parallel bash | Identify hotspots, largest files, complexity |
 | **2** | Breadth-First Exploration | 5 parallel agents | Survey all crates systematically |
-| **3** | Prior Art Research | 6 parallel agents | Study design patterns from Rust/Go/Zig/Gleam/Elm/Roc |
+| **3** | Prior Art Research | 6 parallel agents | Study design patterns from Rust/Go/Zig/Gleam/Elm/Roc/Swift/Koka/Lean 4 |
 | **4** | Deep Category Analysis | 10 parallel agents | Pattern-specific violations |
 | **5** | Best-of-Breed Synthesis | 1 agent | Combine reference patterns into superior Ori designs |
 
@@ -40,6 +40,9 @@ Ori's design is informed by studying established compilers. Like academic resear
 | **Elm** | `elm/` | Best-in-class error messages, type diffing, progressive hints | `compiler/src/Reporting/{Error,Doc}.hs`, `Error/Type.hs` |
 | **Roc** | `roc/` | Semantic annotations, output abstraction, progressive disclosure | `crates/reporting/src/{report,error/type}.rs` |
 | **TypeScript** | `typescript/` | IDE integration, code fixes, language service | `src/compiler/{checker,diagnosticMessages}.ts`, `src/services/` |
+| **Swift** | `swift/` | ARC optimization, SIL, ownership model, constraint solver | `lib/SILOptimizer/ARC/`, `lib/SIL/`, `lib/Sema/`, `include/swift/AST/Ownership.h` |
+| **Koka** | `koka/` | Algebraic effects, effect inference, evidence passing | `src/Type/{Infer,Operations,Unify}.hs`, `src/Core/{Borrowed,CheckFBIP}.hs` |
+| **Lean 4** | `lean4/` | Reference counting, reset/reuse, borrow inference | `src/Lean/Compiler/IR/{RC,Borrow,ExpandResetReuse}.lean`, `src/Lean/Compiler/LCNF/` |
 
 ### Design Strengths Worth Learning From
 
@@ -52,6 +55,15 @@ Ori's design is informed by studying established compilers. Like academic resear
 - **Rust**: Trait solving, lifetime inference, chalk-style unification
 - **Zig**: Comptime, lazy type resolution, intern pools
 - **TypeScript**: Structural typing, mapped types, conditional types
+
+**ARC & Memory Management:**
+- **Swift**: SIL-level ARC optimization (retain/release elision, copy-on-write, ownership annotations)
+- **Lean 4**: Reset/reuse optimization (destructive updates when RC=1), borrow inference
+- **Koka**: FBIP (functional but in-place) via reuse analysis
+
+**Effect Systems:**
+- **Koka**: Row-polymorphic effects, evidence-passing translation, algebraic effect handlers
+- **Swift**: Structured concurrency (async/await, actors — different model but relevant patterns)
 
 **Architecture:**
 - **Zig**: Single-pass with lazy resolution, minimal memory, no GC
@@ -276,12 +288,15 @@ EXAMINE THESE FILES:
 - ~/projects/reference_repos/lang_repos/rust/compiler/rustc_errors/src/lib.rs (applicability levels)
 - ~/projects/reference_repos/lang_repos/roc/crates/reporting/src/report.rs (progressive disclosure)
 - ~/projects/reference_repos/lang_repos/gleam/compiler-core/src/error.rs (error formatting)
+- ~/projects/reference_repos/lang_repos/swift/lib/AST/DiagnosticEngine.cpp (diagnostic engine)
+- ~/projects/reference_repos/lang_repos/swift/lib/Sema/CSDiagnostics.cpp (constraint solver diagnostics)
 
 STUDY:
 1. How does Elm structure its three-part error messages? (problem/context/hint)
 2. How does Rust define applicability levels for suggestions?
 3. How does Roc implement progressive disclosure (show more on request)?
 4. How does Gleam format error output?
+5. How does Swift diagnose constraint solver failures (type errors)?
 
 Return: SOURCE | DESIGN_PATTERN | APPROACH | EXAMPLE | RELEVANCE_TO_ORI"
 )
@@ -301,12 +316,15 @@ EXAMINE THESE FILES:
 - ~/projects/reference_repos/lang_repos/zig/src/InternPool.zig (type interning)
 - ~/projects/reference_repos/lang_repos/zig/src/Sema.zig (semantic analysis)
 - ~/projects/reference_repos/lang_repos/gleam/compiler-core/src/analyse/infer.rs (HM inference)
+- ~/projects/reference_repos/lang_repos/koka/src/Type/Infer.hs (effect-aware type inference)
+- ~/projects/reference_repos/lang_repos/koka/src/Type/Operations.hs (effect row operations)
 
 STUDY:
 1. How does Rust represent types (TyKind enum, interning)?
 2. How does Zig's InternPool work for deduplication?
 3. How does Gleam implement Hindley-Milner inference?
 4. How do they handle type errors without stopping?
+5. How does Koka infer and propagate effect types?
 
 Return: SOURCE | DESIGN_PATTERN | APPROACH | EXAMPLE | RELEVANCE_TO_ORI"
 )
@@ -325,12 +343,14 @@ EXAMINE THESE FILES:
 - ~/projects/reference_repos/lang_repos/rust/compiler/rustc_middle/src/dep_graph/ (dependency tracking)
 - ~/projects/reference_repos/lang_repos/zig/src/Compilation.zig (compilation model)
 - ~/projects/reference_repos/lang_repos/typescript/src/compiler/builder.ts (incremental builds)
+- ~/projects/reference_repos/lang_repos/lean4/src/Lean/Compiler/LCNF/ (lean compilation pipeline)
 
 STUDY:
 1. How does Rust's query system track dependencies?
 2. How does Zig achieve fast incremental without a query system?
 3. How does TypeScript handle incremental type checking?
 4. What are the tradeoffs between query-based vs rebuild-based?
+5. How does Lean 4 organize its compilation pipeline?
 
 Return: REPO | PATTERN_NAME | HOW_IT_WORKS | TRADEOFFS | ORI_APPLICABILITY"
 )
@@ -374,12 +394,17 @@ EXAMINE THESE FILES:
 - ~/projects/reference_repos/lang_repos/zig/src/Zcu.zig (compilation unit)
 - ~/projects/reference_repos/lang_repos/go/src/cmd/compile/internal/gc/main.go (compilation phases)
 - ~/projects/reference_repos/lang_repos/gleam/compiler-core/src/lib.rs (crate structure)
+- ~/projects/reference_repos/lang_repos/swift/lib/SILOptimizer/ARC/ (ARC optimization passes)
+- ~/projects/reference_repos/lang_repos/lean4/src/Lean/Compiler/IR/RC.lean (reference counting)
+- ~/projects/reference_repos/lang_repos/lean4/src/Lean/Compiler/IR/Borrow.lean (borrow inference)
 
 STUDY:
 1. How does Rust organize compiler passes?
 2. How does Zig achieve single-pass compilation?
 3. How does Go structure its simple multi-pass approach?
 4. How does Gleam organize its functional compiler?
+5. How does Swift optimize ARC at the SIL level (retain/release elision)?
+6. How does Lean 4 implement reset/reuse for RC optimization?
 
 Return: REPO | PATTERN_NAME | HOW_IT_WORKS | PROS_CONS | ORI_APPLICABILITY"
 )
@@ -952,6 +977,15 @@ The 10 analysis categories with full detection patterns:
 - **Zig** (`Sema.zig`): "declared here" notes, reference traces
 - **Gleam** (`error.rs`): Edit distance, extra labels
 - **Roc** (`reporting/`): Progressive disclosure, semantic annotations
+- **Swift** (`CSDiagnostics.cpp`): Constraint solver failure diagnosis, ARC diagnostics
+
+**ARC & memory management:**
+- **Swift** (`lib/SILOptimizer/ARC/`): Retain/release optimization, copy elision, ownership model
+- **Lean 4** (`Compiler/IR/{RC,Borrow,ExpandResetReuse}.lean`): RC insertion, borrow inference, reset/reuse
+- **Koka** (`Core/{Borrowed,CheckFBIP}.hs`): Functional-but-in-place, reuse analysis
+
+**Effect systems:**
+- **Koka** (`Type/{Infer,Operations}.hs`): Row-polymorphic effects, evidence passing, algebraic handlers
 
 ---
 
@@ -1089,7 +1123,7 @@ status: not-started
 
 **Status:** 📋 Planned
 
-Based on prior art study from Rust, Go, Zig, Gleam, Elm, and Roc.
+Based on prior art study from Rust, Go, Zig, Gleam, Elm, Roc, Swift, Koka, and Lean 4.
 
 ---
 

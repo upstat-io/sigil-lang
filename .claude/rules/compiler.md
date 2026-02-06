@@ -3,7 +3,7 @@ paths:
   - "**/compiler/**"
 ---
 
-**NO WORKAROUNDS/HACKS/SHORTCUTS.** Proper fixes only. When unsure, STOP and ask. Fact-check against spec. Consult `~/projects/reference_repos/lang_repos/`.
+**NO WORKAROUNDS/HACKS/SHORTCUTS.** Proper fixes only. When unsure, STOP and ask. Fact-check against spec. Consult `~/projects/reference_repos/lang_repos/` (includes Swift for ARC, Koka for effects, Lean 4 for RC).
 
 **Ori tooling is under construction** — bugs are usually in compiler, not user code. Fix every issue you encounter.
 
@@ -118,4 +118,4 @@ ORI_LOG=ori_types=debug,ori_eval=debug ori run f.ori    # Multiple targets
 
 ## Source of Truth
 1. `docs/ori_lang/0.1-alpha/spec/` — authoritative
-2. `~/lang_repos/` — Rust, Go, TS, Zig, Gleam, Elm, Roc
+2. `~/projects/reference_repos/lang_repos/` — Rust, Go, TS, Zig, Gleam, Elm, Roc, Swift, Koka, Lean 4, Swift, Koka, Lean 4

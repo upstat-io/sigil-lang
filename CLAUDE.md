@@ -8,7 +8,7 @@
 - **Proper fixes only** — If a fix feels hacky, it IS hacky. Find the right solution.
 - **When unsure, STOP and ASK** — Do not guess. Do not assume. Pause and ask the user for guidance.
 - **Fact-check everything** — Verify behavior against the spec. Test your assumptions. Read the code you're modifying.
-- **Consult reference repos** — Check `~/projects/reference_repos/lang_repos/` (Rust, Go, Zig, TypeScript, Gleam, Elm, Roc) for established patterns and idioms.
+- **Consult reference repos** — Check `~/projects/reference_repos/lang_repos/` (Rust, Go, Zig, TypeScript, Gleam, Elm, Roc, Swift, Koka, Lean 4) for established patterns and idioms.
 - **No "temporary" fixes** — There is no such thing. Today's temporary fix is tomorrow's permanent tech debt.
 - **If you can't do it right, say so** — Communicate blockers rather than shipping bad code.
 
@@ -104,6 +104,9 @@ For Ori syntax, types, patterns, and prelude:
 - **gleam** — `compiler-core/src/{error,diagnostic,warning,analyse,exhaustiveness}.rs`
 - **elm** — `compiler/src/Reporting/{Error,Suggest,Doc}.hs`, `Error/{Type,Syntax}.hs`
 - **roc** — `crates/reporting/src/{report,error/{type,canonicalize,parse}}.rs`
+- **swift** — `lib/SILOptimizer/ARC/`, `lib/SIL/`, `lib/Sema/`, `include/swift/AST/Ownership.h`
+- **koka** — `src/Type/{Infer,Operations,Unify}.hs`, `src/Core/{Borrowed,CheckFBIP}.hs`, `src/Compile/`
+- **lean4** — `src/Lean/Compiler/IR/{RC,Borrow,ExpandResetReuse}.lean`, `src/Lean/Compiler/LCNF/`
 
 ## CLI
 
