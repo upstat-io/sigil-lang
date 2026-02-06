@@ -16,6 +16,7 @@ use inkwell::values::{BasicValueEnum, FunctionValue};
 use ori_ir::ast::ExprKind;
 use ori_ir::{ExprArena, ExprId, Name};
 use ori_types::Idx;
+use tracing::{debug, instrument};
 
 use crate::builder::{Builder, LocalStorage, Locals};
 
@@ -28,6 +29,10 @@ impl<'ll> Builder<'_, 'll, '_> {
     /// Lambdas are compiled as closures with captured variables passed as
     /// extra parameters. The closure struct contains the function pointer
     /// and the captured values.
+    #[instrument(
+        skip(self, params, body, arena, expr_types, locals, _parent_function),
+        level = "debug"
+    )]
     pub(crate) fn compile_lambda(
         &self,
         params: ori_ir::ast::ParamRange,
@@ -48,6 +53,12 @@ impl<'ll> Builder<'_, 'll, '_> {
         // Create a unique name for this lambda
         let lambda_id = LAMBDA_COUNTER.fetch_add(1, Ordering::SeqCst);
         let lambda_name = format!("__lambda_{lambda_id}");
+        debug!(
+            name = %lambda_name,
+            params = parameters.len(),
+            captures = captures.len(),
+            "compiling lambda"
+        );
 
         // Build parameter types: regular params + captured values (all as i64)
         let total_params = parameters.len() + captures.len();
@@ -242,7 +253,7 @@ impl<'ll> Builder<'_, 'll, '_> {
 
             ExprKind::Call { func, args } => {
                 self.collect_free_vars(*func, arena, bound, locals, captures, seen);
-                for arg_id in arena.iter_expr_list(*args) {
+                for arg_id in arena.get_expr_list(*args).iter().copied() {
                     self.collect_free_vars(arg_id, arena, bound, locals, captures, seen);
                 }
             }
@@ -261,8 +272,8 @@ impl<'ll> Builder<'_, 'll, '_> {
             } => {
                 self.collect_free_vars(*cond, arena, bound, locals, captures, seen);
                 self.collect_free_vars(*then_branch, arena, bound, locals, captures, seen);
-                if let Some(else_id) = else_branch {
-                    self.collect_free_vars(*else_id, arena, bound, locals, captures, seen);
+                if else_branch.is_present() {
+                    self.collect_free_vars(*else_branch, arena, bound, locals, captures, seen);
                 }
             }
 
@@ -279,8 +290,8 @@ impl<'ll> Builder<'_, 'll, '_> {
                         }
                     }
                 }
-                if let Some(result_id) = result {
-                    self.collect_free_vars(*result_id, arena, bound, locals, captures, seen);
+                if result.is_present() {
+                    self.collect_free_vars(*result, arena, bound, locals, captures, seen);
                 }
             }
 

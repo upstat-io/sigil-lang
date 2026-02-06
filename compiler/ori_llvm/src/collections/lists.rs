@@ -2,8 +2,9 @@
 
 use inkwell::types::BasicType;
 use inkwell::values::{BasicValueEnum, FunctionValue};
-use ori_ir::{ExprArena, ExprList};
+use ori_ir::{ExprArena, ExprRange};
 use ori_types::Idx;
+use tracing::instrument;
 
 use crate::builder::{Builder, Locals};
 use crate::LoopContext;
@@ -11,16 +12,20 @@ use crate::LoopContext;
 impl<'ll> Builder<'_, 'll, '_> {
     /// Compile a list literal.
     /// Lists are represented as { i64 len, i64 cap, ptr data }.
+    #[instrument(
+        skip(self, list, arena, expr_types, locals, function, loop_ctx),
+        level = "trace"
+    )]
     pub(crate) fn compile_list(
         &self,
-        list: ExprList,
+        list: ExprRange,
         arena: &ExprArena,
         expr_types: &[Idx],
         locals: &mut Locals<'ll>,
         function: FunctionValue<'ll>,
         loop_ctx: Option<&LoopContext<'ll>>,
     ) -> Option<BasicValueEnum<'ll>> {
-        let elements: Vec<_> = arena.iter_expr_list(list).collect();
+        let elements: Vec<_> = arena.get_expr_list(list).to_vec();
 
         if elements.is_empty() {
             // Empty list - return struct with zeros

@@ -6,12 +6,18 @@ use inkwell::IntPredicate;
 use ori_ir::ast::patterns::{BindingPattern, FunctionSeq, SeqBinding};
 use ori_ir::ExprArena;
 use ori_types::Idx;
+use tracing::instrument;
 
 use crate::builder::{Builder, Locals};
 use crate::LoopContext;
 
 impl<'ll> Builder<'_, 'll, '_> {
     /// Compile a `FunctionSeq` (run, try, match).
+    #[instrument(
+        skip(self, seq, arena, expr_types, locals, function, loop_ctx),
+        fields(kind = %seq.name()),
+        level = "debug"
+    )]
     pub(crate) fn compile_function_seq(
         &self,
         seq: &FunctionSeq,
@@ -107,9 +113,12 @@ impl<'ll> Builder<'_, 'll, '_> {
                 value,
                 mutable,
                 ..
-            } => self.compile_let(
-                pattern, *value, *mutable, arena, expr_types, locals, function, loop_ctx,
-            ),
+            } => {
+                let pattern = arena.get_binding_pattern(*pattern);
+                self.compile_let(
+                    pattern, *value, *mutable, arena, expr_types, locals, function, loop_ctx,
+                )
+            }
             SeqBinding::Stmt { expr, .. } => {
                 self.compile_expr(*expr, arena, expr_types, locals, function, loop_ctx)
             }
@@ -179,6 +188,7 @@ impl<'ll> Builder<'_, 'll, '_> {
 
                         // Bind the unwrapped value to the pattern (try bindings are immutable unwrap)
                         let ty = inner_val.get_type();
+                        let pattern = arena.get_binding_pattern(*pattern);
                         self.bind_pattern(pattern, inner_val, *mutable, ty, function, locals);
 
                         return Some(inner_val);
@@ -187,6 +197,7 @@ impl<'ll> Builder<'_, 'll, '_> {
 
                 // Not a Result type - bind directly
                 let ty = result_val.get_type();
+                let pattern = arena.get_binding_pattern(*pattern);
                 self.bind_pattern(pattern, result_val, *mutable, ty, function, locals);
                 Some(result_val)
             }
@@ -201,6 +212,7 @@ impl<'ll> Builder<'_, 'll, '_> {
     /// For mutable bindings, creates stack allocation with `alloca`/`store`.
     /// For immutable bindings, uses direct SSA values.
     #[allow(clippy::too_many_lines)] // Pattern matching compilation is inherently cohesive; splitting would reduce clarity
+    #[instrument(skip(self, pattern, value, ty, function, locals), level = "trace")]
     pub(crate) fn bind_pattern(
         &self,
         pattern: &BindingPattern,

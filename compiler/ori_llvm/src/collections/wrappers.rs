@@ -6,7 +6,7 @@
 use inkwell::values::{BasicValueEnum, FunctionValue};
 use ori_ir::{ExprArena, ExprId};
 use ori_types::Idx;
-use tracing::instrument;
+use tracing::{instrument, trace};
 
 use crate::builder::{Builder, Locals};
 use crate::LoopContext;
@@ -42,10 +42,12 @@ impl<'ll> Builder<'_, 'll, '_> {
         if let BasicValueEnum::StructValue(_) = inner_val {
             // Use the actual struct type for the payload
             let inner_type = inner_val.get_type();
+            trace!(inner_type = ?inner_type, "Some: struct payload, preserving type");
             let opt_type = self.cx().option_type(inner_type);
             let struct_val = self.build_struct(opt_type, &[tag.into(), inner_val], "some");
             Some(struct_val.into())
         } else {
+            trace!(inner_type = ?inner_val.get_type(), "Some: scalar payload, coercing to i64");
             // Use standardized Option type with i64 payload
             let opt_type = self.cx().option_type(self.cx().scx.type_i64().into());
 
@@ -64,9 +66,12 @@ impl<'ll> Builder<'_, 'll, '_> {
         // We need to extract the inner type T to build the correct struct.
         let payload_type = if let Some(inner) = self.cx().option_inner_type(type_id) {
             // We know the inner type - use it for the payload
-            self.cx().llvm_type(inner)
+            let llvm_ty = self.cx().llvm_type(inner);
+            trace!(?type_id, ?inner, payload_type = ?llvm_ty, "None: resolved inner type");
+            llvm_ty
         } else {
             // Fall back to i64 if we can't determine inner type
+            trace!(?type_id, "None: unknown inner type, falling back to i64");
             self.cx().scx.type_i64().into()
         };
 
@@ -90,7 +95,7 @@ impl<'ll> Builder<'_, 'll, '_> {
     )]
     pub(crate) fn compile_ok(
         &self,
-        inner: Option<ExprId>,
+        inner: ExprId,
         _type_id: Idx,
         arena: &ExprArena,
         expr_types: &[Idx],
@@ -98,9 +103,9 @@ impl<'ll> Builder<'_, 'll, '_> {
         function: FunctionValue<'ll>,
         loop_ctx: Option<&LoopContext<'ll>>,
     ) -> Option<BasicValueEnum<'ll>> {
-        // Get the inner value (or use unit if None)
-        let inner_val = if let Some(inner_id) = inner {
-            self.compile_expr(inner_id, arena, expr_types, locals, function, loop_ctx)?
+        // Get the inner value (or use unit if absent)
+        let inner_val = if inner.is_present() {
+            self.compile_expr(inner, arena, expr_types, locals, function, loop_ctx)?
         } else {
             // Ok() with no value - use a dummy i64
             self.cx().scx.type_i64().const_int(0, false).into()
@@ -129,7 +134,7 @@ impl<'ll> Builder<'_, 'll, '_> {
     )]
     pub(crate) fn compile_err(
         &self,
-        inner: Option<ExprId>,
+        inner: ExprId,
         _type_id: Idx,
         arena: &ExprArena,
         expr_types: &[Idx],
@@ -137,9 +142,9 @@ impl<'ll> Builder<'_, 'll, '_> {
         function: FunctionValue<'ll>,
         loop_ctx: Option<&LoopContext<'ll>>,
     ) -> Option<BasicValueEnum<'ll>> {
-        // Get the inner value (or use unit if None)
-        let inner_val = if let Some(inner_id) = inner {
-            self.compile_expr(inner_id, arena, expr_types, locals, function, loop_ctx)?
+        // Get the inner value (or use unit if absent)
+        let inner_val = if inner.is_present() {
+            self.compile_expr(inner, arena, expr_types, locals, function, loop_ctx)?
         } else {
             // Err() with no value - use a dummy i64
             self.cx().scx.type_i64().const_int(0, false).into()
