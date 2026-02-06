@@ -1,27 +1,27 @@
 # Performance Baselines
 
-Last updated: 2026-02-04
+Last updated: 2026-02-06
 
 ## Parser Raw Throughput
 
 | Workload | Target (MiB/s) | Minimum | Notes |
 |----------|----------------|---------|-------|
-| 10 functions | 90 | 75 | Small file overhead |
-| 50 functions | 105 | 90 | |
-| 100 functions | 115 | 100 | |
-| 500 functions | 120 | 105 | Steady state |
-| 1000 functions | 120 | 105 | Steady state |
+| 10 functions | 120 | 100 | Small file overhead |
+| 50 functions | 140 | 120 | |
+| 100 functions | 150 | 130 | |
+| 500 functions | 165 | 140 | Steady state |
+| 1000 functions | 160 | 140 | Steady state |
 
 ## Lexer Raw Throughput
 
 | Workload | Target (MiB/s) | Minimum | Notes |
 |----------|----------------|---------|-------|
-| 10 functions | 250 | 220 | |
-| 50 functions | 265 | 240 | |
-| 100 functions | 270 | 245 | |
-| 500 functions | 270 | 245 | Steady state |
-| 1000 functions | 270 | 245 | Steady state |
-| 5000 functions | 270 | 245 | Steady state |
+| 10 functions | 230 | 200 | Small file overhead |
+| 50 functions | 255 | 220 | |
+| 100 functions | 264 | 230 | |
+| 500 functions | 290 | 255 | Steady state |
+| 1000 functions | 286 | 255 | Steady state |
+| 5000 functions | 288 | 255 | Steady state |
 
 ## Salsa Query Overhead
 
@@ -33,7 +33,8 @@ Expected overhead when using Salsa queries vs raw:
 
 | Parser | Throughput | Notes |
 |--------|------------|-------|
-| Ori (current) | ~120 MiB/s | Hand-written recursive descent |
+| Ori parser | ~120-164 MiB/s | Hand-written recursive descent |
+| Ori lexer | ~232-292 MiB/s | Logos DFA + tag array |
 | Go | ~100-150 MiB/s | go/parser |
 | Rust (syn) | ~50-100 MiB/s | Proc-macro parsing |
 | TypeScript | ~200-400 MiB/s | Highly optimized |
@@ -75,3 +76,8 @@ Expected overhead when using Salsa queries vs raw:
 | 2026-02-04 | Cursor optimizations | +13% parser |
 | 2026-02-04 | Pre-allocation | +7% parser |
 | 2026-02-04 | Added memory benchmarks | Baseline captured |
+| 2026-02-06 | `#[cold]` split expect() | +5-8% parser |
+| 2026-02-06 | Branchless advance() | +3-5% parser |
+| 2026-02-06 | Tag-based dispatch (OPER_TABLE, tags Vec) | +10-20% parser, +7-14% lexer |
+| 2026-02-06 | POSTFIX_BITSET fast-exit | +2-3% parser |
+| 2026-02-06 | Direct dispatch in parse_primary() | +2-3% parser |
