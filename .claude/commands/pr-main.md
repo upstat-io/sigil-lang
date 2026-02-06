@@ -43,9 +43,19 @@ git log master..HEAD --oneline
 git diff master..HEAD --stat
 ```
 
-### Step 4: Draft PR Title and Summary
+### Step 4: Check Past PRs for Context
 
-Create a PR title and summary based on the commits:
+**ACTION:** Fetch recent merged PRs to avoid repeating previous summaries:
+
+```bash
+gh pr list --base master --state merged --limit 5 --json number,title,body
+```
+
+Read the titles and summaries. The new PR must only describe **what changed since the last merged PR** — do not re-describe work that was already covered.
+
+### Step 5: Draft PR Title and Summary
+
+Create a PR title and summary based on the commits, informed by what past PRs already covered:
 
 **PR Title:** Short description (under 70 chars), following the pattern:
 - If single commit: Use the commit message subject
@@ -53,8 +63,10 @@ Create a PR title and summary based on the commits:
 
 **PR Summary:** Include:
 - `## Summary` - 1-3 bullet points of key changes
+- Only describe work **not already covered** by a previous PR
+- If a past PR mentioned "Types V2 migration", don't repeat it — focus on what's new
 
-### Step 5: Present PR Details and Get Confirmation
+### Step 6: Present PR Details and Get Confirmation
 
 Show the user:
 1. The branch being merged (e.g., `dev` → `master`)
@@ -65,7 +77,7 @@ Ask: "Shall I create this PR with auto-merge enabled?"
 
 **Do NOT create the PR until user confirms.**
 
-### Step 6: Create PR and Enable Auto-Merge
+### Step 7: Create PR and Enable Auto-Merge
 
 After user confirms:
 
@@ -95,9 +107,10 @@ Before completing, verify:
 
 - [ ] Confirmed not on main/master branch (Step 1)
 - [ ] Changes committed and pushed (Step 2)
-- [ ] PR title and summary drafted (Step 4)
-- [ ] User confirmed before creating PR (Step 5)
-- [ ] PR created and auto-merge enabled (Step 6)
+- [ ] Past PRs checked to avoid repetition (Step 4)
+- [ ] PR title and summary drafted (Step 5)
+- [ ] User confirmed before creating PR (Step 6)
+- [ ] PR created and auto-merge enabled (Step 7)
 
 ---
 
