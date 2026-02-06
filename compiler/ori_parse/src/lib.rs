@@ -10,7 +10,6 @@ pub mod incremental;
 mod outcome;
 mod progress;
 mod recovery;
-mod scratch;
 pub mod series;
 mod snapshot;
 
@@ -201,6 +200,12 @@ impl<'a> Parser<'a> {
     #[inline]
     fn current(&self) -> &Token {
         self.cursor.current()
+    }
+
+    /// Get the discriminant tag of the current token (fast u8 lookup).
+    #[inline]
+    fn current_tag(&self) -> u8 {
+        self.cursor.current_tag()
     }
 
     #[inline]
@@ -476,7 +481,6 @@ impl<'a> Parser<'a> {
     /// }
     /// ```
     #[inline]
-    #[allow(dead_code)] // Will be used for disambiguation in future work
     pub(crate) fn snapshot(&self) -> snapshot::ParserSnapshot {
         snapshot::ParserSnapshot::new(self.cursor.position(), self.context)
     }
@@ -486,7 +490,6 @@ impl<'a> Parser<'a> {
     /// Resets cursor position and context flags to their values when the
     /// snapshot was taken. Does NOT restore arena state.
     #[inline]
-    #[allow(dead_code)] // Will be used for disambiguation in future work
     pub(crate) fn restore(&mut self, snapshot: snapshot::ParserSnapshot) {
         self.cursor.set_position(snapshot.cursor_pos);
         self.context = snapshot.context;
