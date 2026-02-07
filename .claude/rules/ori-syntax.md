@@ -153,9 +153,9 @@ Bottom type (uninhabited); coerces to any `T`
 
 ## Keywords
 
-**Reserved**: `break continue def do else extern false for if impl in let loop match pub self Self suspend then trait true type unsafe use uses void where with yield`
+**Reserved**: `as break continue def div do else extend extension extern false for if impl in let loop match pub self Self suspend tests then trait true type unsafe use uses void where with yield`
 **Reserved (future)**: `asm inline static union view` (reserved for future low-level features)
-**Context-sensitive**: `by cache catch for max parallel recurse run spawn timeout try with without`
+**Context-sensitive**: `args body by cache catch collect default expr filter find fold from map max nursery on_error over parallel pre_check post_check recurse retry run spawn timeout try validate without`
 **Built-in names**: `int float str byte len is_empty is_some is_none is_ok is_err assert assert_eq assert_ne assert_some assert_none assert_ok assert_err assert_panics assert_panics_with compare min max print panic todo unreachable dbg compile_error`
 
 ## Prelude
