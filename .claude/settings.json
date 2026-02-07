@@ -2,7 +2,18 @@
   "permissions": {
     "deny": [
       "Bash(*--no-verify*)",
-      "Bash(*--no-gpg-sign*)"
+      "Bash(*--no-gpg-sign*)",
+      "Bash(*git stash*)",
+      "Bash(*git reset --hard*)",
+      "Bash(*git clean*-f*)",
+      "Bash(*git checkout .*)",
+      "Bash(*git checkout -- .*)",
+      "Bash(*git restore .*)",
+      "Bash(*git push*--force*)",
+      "Bash(*git push*-f)",
+      "Bash(*git push*-f *)",
+      "Bash(*git branch -D*)",
+      "Bash(*git rebase*)"
     ]
   }
 }
