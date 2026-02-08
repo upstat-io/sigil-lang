@@ -83,9 +83,25 @@ Replace all `[x]` with `[ ]` in the body (after the YAML frontmatter).
 **Only change:**
 - `- [x]` → `- [ ]`
 
-### Step 3: Update Overview
+### Step 3: Record Zero Reset in Overview
 
-Update `plans/roadmap/00-overview.md` if it has any completion statistics.
+Append an entry to the **Zero Reset Log** section in `plans/roadmap/00-overview.md`.
+
+If the section doesn't exist yet, add it at the end of the file:
+
+```markdown
+---
+
+## Zero Reset Log
+
+| Date | Notes |
+|------|-------|
+| YYYY-MM-DD HH:MM UTC | (reason if given, otherwise blank) |
+```
+
+If it already exists, append a new row to the table with the current UTC timestamp.
+
+Also update any completion statistics in the overview if present.
 
 ### Step 4: Report Summary
 
@@ -111,7 +127,8 @@ Next step: Run /verify-roadmap to systematically verify each item
 
 - This command does NOT verify whether features work
 - This command does NOT modify any code or tests
-- This command ONLY modifies `plans/roadmap/section-*.md` files
+- This command ONLY modifies `plans/roadmap/section-*.md` and `00-overview.md`
+- Each zero reset is logged with a UTC timestamp in the overview's Zero Reset Log
 - After running this, use `/verify-roadmap` to systematically verify and re-mark items
 
 ---
