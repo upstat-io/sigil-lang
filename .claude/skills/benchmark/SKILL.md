@@ -14,16 +14,17 @@ Run performance benchmarks for the Ori compiler with duration level: **$ARGUMENT
 
 | Level | Samples | Use Case |
 |-------|---------|----------|
-| `short` | ~50 samples, 2s warmup | Quick sanity check (~30s) |
-| `medium` | ~100 samples (default) | Standard benchmarking (~2min) |
-| `long` | ~300 samples, extended | Release validation (~5min) |
+| `short` | ~50 samples, 2s warmup | Quick sanity check (~1min) |
+| `medium` | ~100 samples (default) | Standard benchmarking (~3min) |
+| `long` | ~300 samples, extended | Release validation (~8min) |
 | `memory` | Single iteration | Heap allocation profiling |
 
 ## Benchmark Suites
 
-### Throughput Benchmarks
+### Throughput Benchmarks (3 tiers)
+- `lexer_core/raw/throughput/*` — Raw scanner throughput (MiB/s) — **apples-to-apples with published lexer benchmarks**
+- `lexer/raw/throughput/*` — Cooked lexer throughput (MiB/s) — includes keyword resolution, literal parsing, interning
 - `parser/raw/throughput/*` — Raw parser throughput (MiB/s)
-- `lexer/raw/throughput/*` — Raw lexer throughput (MiB/s)
 
 ### Memory Benchmarks
 - `memory/lexer/*` — Lexer heap allocations
@@ -32,27 +33,31 @@ Run performance benchmarks for the Ori compiler with duration level: **$ARGUMENT
 
 ## Instructions
 
-1. Build release profile first
-2. Run benchmarks based on duration level
-3. Report throughput numbers with comparison to baseline
-4. Highlight any regressions (>5% slower or >20% more memory)
+1. Run benchmarks based on duration level
+2. **IMPORTANT: Run ALL benchmarks SEQUENTIALLY, not in parallel.** CPU-intensive benchmarks running concurrently compete for resources and skew results. Run one bench at a time, waiting for it to complete before starting the next.
+3. Order: lexer_core first, then parser, then lexer (cooked)
+4. Report throughput numbers with comparison to baseline
+5. Highlight any regressions (>5% slower or >20% more memory)
 
 ## Benchmark Commands
 
 For **short** duration:
 ```bash
+cargo bench -p oric --bench lexer_core -- "raw/throughput" --noplot --warm-up-time 2 --sample-size 50
 cargo bench -p oric --bench parser -- "raw/throughput" --noplot --warm-up-time 2 --sample-size 50
 cargo bench -p oric --bench lexer -- "raw/throughput" --noplot --warm-up-time 2 --sample-size 50
 ```
 
 For **medium** duration:
 ```bash
+cargo bench -p oric --bench lexer_core -- "raw/throughput" --noplot
 cargo bench -p oric --bench parser -- "raw/throughput" --noplot
 cargo bench -p oric --bench lexer -- "raw/throughput" --noplot
 ```
 
 For **long** duration:
 ```bash
+cargo bench -p oric --bench lexer_core -- "raw/throughput" --noplot --sample-size 300
 cargo bench -p oric --bench parser -- "raw" --noplot --sample-size 300
 cargo bench -p oric --bench lexer -- "raw" --noplot --sample-size 300
 ```
@@ -73,20 +78,27 @@ For throughput benchmarks, report as:
 ```
 ## Benchmark Results ($ARGUMENTS)
 
+### Lexer Core (Raw Scanner) Throughput
+| Workload | Throughput | vs Baseline |
+|----------|------------|-------------|
+| 10 funcs | XX MiB/s   | +X% / -X%   |
+| ...      | ...        | ...         |
+
 ### Parser Throughput
 | Workload | Throughput | vs Baseline |
 |----------|------------|-------------|
 | 10 funcs | XX MiB/s   | +X% / -X%   |
 | ...      | ...        | ...         |
 
-### Lexer Throughput
+### Lexer (Cooked) Throughput
 | Workload | Throughput | vs Baseline |
 |----------|------------|-------------|
 | ...      | ...        | ...         |
 
 ### Summary
+- Lexer core: XX MiB/s average (~X GiB/s at steady state)
 - Parser: XX MiB/s average
-- Lexer: XX MiB/s average
+- Lexer (cooked): XX MiB/s average
 - Status: OK / REGRESSION DETECTED
 ```
 
