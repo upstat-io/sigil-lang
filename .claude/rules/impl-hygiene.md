@@ -5,8 +5,6 @@ paths:
 
 # Implementation Hygiene Rules
 
-Extracted from reference compilers: Rust (`rustc`), Zig (`Sema/Parse/Tokenizer`), Go (`go/scanner/parser`), Gleam (`compiler-core`), Swift (`SILOptimizer/ARC`), Lean 4 (`Compiler/IR`), Koka (`Type/Core`).
-
 **Implementation hygiene is NOT architecture** (design decisions are made) **and NOT code hygiene** (surface style). It's about whether the implementation faithfully and cleanly realizes the architecture — tight joints, correct flow, no leaks.
 
 ## Phase Boundary Discipline

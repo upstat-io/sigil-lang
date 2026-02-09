@@ -48,7 +48,7 @@ Read EVERY `.rs` file in the target. For files > 500 lines, read in segments. Do
 For each file, check every rule category from `code-hygiene.md`:
 
 **File Organization:**
-- [ ] `//!` module doc present?
+- [ ] Module doc comment present?
 - [ ] Sections in correct order? (mods → imports → types → impls → fns → tests)
 - [ ] Imports in 3 groups with blank-line separators?
 

@@ -5,8 +5,6 @@ paths:
 
 # Code Hygiene Rules
 
-Extracted from reference compilers: Rust (`rustc_lexer`), Go (`go/scanner`), Zig (`Tokenizer.zig`), Gleam (`parse/lexer.rs`), Roc (`parse/`).
-
 ## File Organization (top to bottom)
 
 1. `//!` module docs
