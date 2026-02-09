@@ -8,7 +8,7 @@ allowed-tools: Read, Grep, Glob, Task, Bash
 
 Analyze the Ori compiler for violations of documented patterns and industry best practices.
 
-**This is a thorough, sprawling review.** Expect 20-30 minutes for full execution. The review systematically examines ALL crates, identifies systemic patterns, and synthesizes **best-of-breed designs** informed by prior art from established compilers.
+**This is a thorough, sprawling review.** Expect 15-20 minutes for full execution. The review systematically examines ALL crates, identifies systemic patterns, and synthesizes **best-of-breed designs** informed by prior art from established compilers.
 
 > *"Good artists borrow, great artists steal."* — Picasso (misattributed)
 >
@@ -21,7 +21,7 @@ Analyze the Ori compiler for violations of documented patterns and industry best
 | **0** | Automated Tooling | 10 parallel bash | Lint, security, metrics |
 | **1** | Discovery & Inventory | 6 parallel bash | Identify hotspots, largest files, complexity |
 | **2** | Breadth-First Exploration | 5 parallel agents | Survey all crates systematically |
-| **3** | Prior Art Research | 6 parallel agents | Study design patterns from Rust/Go/Zig/Gleam/Elm/Roc/Swift/Koka/Lean 4 |
+| **3** | Prior Art Reference | Read prior-art-ref.md (~2 sec) | Design patterns from Rust/Go/Zig/Gleam/Elm/Roc/Swift/Koka/Lean 4 |
 | **4** | Deep Category Analysis | 10 parallel agents | Pattern-specific violations |
 | **5** | Best-of-Breed Synthesis | 1 agent | Combine reference patterns into superior Ori designs |
 
@@ -124,7 +124,7 @@ Run these **6 discovery commands in parallel** to identify hotspots. Send a **si
 3. Files with 500+ lines = **split candidates**
 4. Files with multiple TODO/FIXME = **tech debt hotspots**
 
-**Pass hotspot list to Phase 2 and 3 agents** so they prioritize examining these files.
+**Pass hotspot list to Phase 2 and 4 agents** so they prioritize examining these files.
 
 ---
 
@@ -267,172 +267,20 @@ Return: CRATE | PUB_FNS | TEST_FNS | COVERAGE_ESTIMATE | GAPS"
 
 ---
 
-## Phase 3: Prior Art Research (after Phase 2)
+## Phase 3: Prior Art Reference (pre-cooked)
 
-Launch **6 parallel Explore agents** to study design patterns from established compilers. Send a **single message with 6 Task tool calls**.
+Read `prior-art-ref.md` from this skill directory. This contains pre-extracted design patterns from all 10 reference compilers, organized by domain:
 
-These agents examine prior art in `~/projects/reference_repos/lang_repos/` to understand proven approaches that can inform Ori's unique design. This is standard practice in language design—every RFC and proposal cites prior art.
+1. **Error Messages** — Elm, Rust, Roc, Gleam, Swift patterns
+2. **Type Systems** — Rust, Zig, Gleam, Koka patterns
+3. **Incremental Compilation** — Rust, Zig, TypeScript, Lean 4 patterns
+4. **Code Fixes & Suggestions** — Rust, TypeScript, Gleam patterns
+5. **Compiler Architecture** — Rust, Zig, Go, Gleam, Swift, Lean 4 patterns
+6. **Test Infrastructure** — Rust, Zig, Gleam, Elm patterns
 
-### Agent 3A: Error Message Design Study
+Pass relevant sections to Phase 4 agents as context and to Phase 5 synthesis.
 
-```
-Task(
-  subagent_type: "Explore",
-  description: "Prior Art: Error Messages",
-  prompt: "Study error message design patterns from established compilers to inform Ori's approach.
-
-EXAMINE THESE FILES:
-- ~/projects/reference_repos/lang_repos/elm/compiler/src/Reporting/Error/Type.hs (type error messages)
-- ~/projects/reference_repos/lang_repos/elm/compiler/src/Reporting/Doc.hs (document formatting)
-- ~/projects/reference_repos/lang_repos/rust/compiler/rustc_errors/src/diagnostic.rs (diagnostic structure)
-- ~/projects/reference_repos/lang_repos/rust/compiler/rustc_errors/src/lib.rs (applicability levels)
-- ~/projects/reference_repos/lang_repos/roc/crates/reporting/src/report.rs (progressive disclosure)
-- ~/projects/reference_repos/lang_repos/gleam/compiler-core/src/error.rs (error formatting)
-- ~/projects/reference_repos/lang_repos/swift/lib/AST/DiagnosticEngine.cpp (diagnostic engine)
-- ~/projects/reference_repos/lang_repos/swift/lib/Sema/CSDiagnostics.cpp (constraint solver diagnostics)
-
-STUDY:
-1. How does Elm structure its three-part error messages? (problem/context/hint)
-2. How does Rust define applicability levels for suggestions?
-3. How does Roc implement progressive disclosure (show more on request)?
-4. How does Gleam format error output?
-5. How does Swift diagnose constraint solver failures (type errors)?
-
-Return: SOURCE | DESIGN_PATTERN | APPROACH | EXAMPLE | RELEVANCE_TO_ORI"
-)
-```
-
-### Agent 3B: Type System Design Study
-
-```
-Task(
-  subagent_type: "Explore",
-  description: "Prior Art: Type Systems",
-  prompt: "Study type system implementation approaches from established compilers.
-
-EXAMINE THESE FILES:
-- ~/projects/reference_repos/lang_repos/rust/compiler/rustc_middle/src/ty/mod.rs (type representation)
-- ~/projects/reference_repos/lang_repos/rust/compiler/rustc_infer/src/infer/mod.rs (inference)
-- ~/projects/reference_repos/lang_repos/zig/src/InternPool.zig (type interning)
-- ~/projects/reference_repos/lang_repos/zig/src/Sema.zig (semantic analysis)
-- ~/projects/reference_repos/lang_repos/gleam/compiler-core/src/analyse/infer.rs (HM inference)
-- ~/projects/reference_repos/lang_repos/koka/src/Type/Infer.hs (effect-aware type inference)
-- ~/projects/reference_repos/lang_repos/koka/src/Type/Operations.hs (effect row operations)
-
-STUDY:
-1. How does Rust represent types (TyKind enum, interning)?
-2. How does Zig's InternPool work for deduplication?
-3. How does Gleam implement Hindley-Milner inference?
-4. How do they handle type errors without stopping?
-5. How does Koka infer and propagate effect types?
-
-Return: SOURCE | DESIGN_PATTERN | APPROACH | EXAMPLE | RELEVANCE_TO_ORI"
-)
-```
-
-### Agent 3C: Incremental Compilation Study
-
-```
-Task(
-  subagent_type: "Explore",
-  description: "Prior Art: Incremental",
-  prompt: "Study incremental compilation approaches from established compilers.
-
-EXAMINE THESE FILES:
-- ~/projects/reference_repos/lang_repos/rust/compiler/rustc_query_system/src/ (query system)
-- ~/projects/reference_repos/lang_repos/rust/compiler/rustc_middle/src/dep_graph/ (dependency tracking)
-- ~/projects/reference_repos/lang_repos/zig/src/Compilation.zig (compilation model)
-- ~/projects/reference_repos/lang_repos/typescript/src/compiler/builder.ts (incremental builds)
-- ~/projects/reference_repos/lang_repos/lean4/src/Lean/Compiler/LCNF/ (lean compilation pipeline)
-
-STUDY:
-1. How does Rust's query system track dependencies?
-2. How does Zig achieve fast incremental without a query system?
-3. How does TypeScript handle incremental type checking?
-4. What are the tradeoffs between query-based vs rebuild-based?
-5. How does Lean 4 organize its compilation pipeline?
-
-Return: REPO | PATTERN_NAME | HOW_IT_WORKS | TRADEOFFS | ORI_APPLICABILITY"
-)
-```
-
-### Agent 3D: Code Fix Design Study
-
-```
-Task(
-  subagent_type: "Explore",
-  description: "Prior Art: Code Fixes",
-  prompt: "Study code fix and suggestion approaches from established compilers.
-
-EXAMINE THESE FILES:
-- ~/projects/reference_repos/lang_repos/rust/compiler/rustc_errors/src/diagnostic.rs (suggestions)
-- ~/projects/reference_repos/lang_repos/typescript/src/services/codeFixProvider.ts (code fixes)
-- ~/projects/reference_repos/lang_repos/typescript/src/services/textChanges.ts (text edits)
-- ~/projects/reference_repos/lang_repos/gleam/compiler-core/src/error.rs (did-you-mean)
-
-STUDY:
-1. How does Rust structure multi-part suggestions?
-2. How does TypeScript provide rich code actions?
-3. How does Gleam compute edit distance for suggestions?
-4. How do they indicate confidence (auto-applicable vs uncertain)?
-
-Return: SOURCE | DESIGN_PATTERN | APPROACH | EXAMPLE | RELEVANCE_TO_ORI"
-)
-```
-
-### Agent 3E: Compiler Architecture Study
-
-```
-Task(
-  subagent_type: "Explore",
-  description: "Prior Art: Architecture",
-  prompt: "Study compiler architecture approaches from established implementations.
-
-EXAMINE THESE FILES:
-- ~/projects/reference_repos/lang_repos/rust/compiler/rustc_driver/src/lib.rs (compiler driver)
-- ~/projects/reference_repos/lang_repos/zig/src/main.zig (entry point)
-- ~/projects/reference_repos/lang_repos/zig/src/Zcu.zig (compilation unit)
-- ~/projects/reference_repos/lang_repos/go/src/cmd/compile/internal/gc/main.go (compilation phases)
-- ~/projects/reference_repos/lang_repos/gleam/compiler-core/src/lib.rs (crate structure)
-- ~/projects/reference_repos/lang_repos/swift/lib/SILOptimizer/ARC/ (ARC optimization passes)
-- ~/projects/reference_repos/lang_repos/lean4/src/Lean/Compiler/IR/RC.lean (reference counting)
-- ~/projects/reference_repos/lang_repos/lean4/src/Lean/Compiler/IR/Borrow.lean (borrow inference)
-
-STUDY:
-1. How does Rust organize compiler passes?
-2. How does Zig achieve single-pass compilation?
-3. How does Go structure its simple multi-pass approach?
-4. How does Gleam organize its functional compiler?
-5. How does Swift optimize ARC at the SIL level (retain/release elision)?
-6. How does Lean 4 implement reset/reuse for RC optimization?
-
-Return: REPO | PATTERN_NAME | HOW_IT_WORKS | PROS_CONS | ORI_APPLICABILITY"
-)
-```
-
-### Agent 3F: Test Infrastructure Study
-
-```
-Task(
-  subagent_type: "Explore",
-  description: "Prior Art: Testing",
-  prompt: "Study compiler testing approaches from established implementations.
-
-EXAMINE THESE DIRECTORIES:
-- ~/projects/reference_repos/lang_repos/rust/tests/ui/ (UI tests structure)
-- ~/projects/reference_repos/lang_repos/zig/test/ (test organization)
-- ~/projects/reference_repos/lang_repos/gleam/compiler-core/src/ (inline tests)
-- ~/projects/reference_repos/lang_repos/elm/tests/ (test structure)
-
-STUDY:
-1. How does Rust organize UI tests (compile-fail, run-pass)?
-2. How does Rust handle expected error annotations?
-3. How does Zig test compiler behavior?
-4. How does Gleam test error messages?
-
-Return: REPO | PATTERN_NAME | HOW_IT_WORKS | EXAMPLE | ORI_APPLICABILITY"
-)
-```
+To regenerate: `/regen-prior-art-ref`
 
 ---
 
@@ -440,38 +288,47 @@ Return: REPO | PATTERN_NAME | HOW_IT_WORKS | EXAMPLE | ORI_APPLICABILITY"
 
 Launch **10 parallel Explore agents** (one per category). Send a **single message with 10 Task tool calls**.
 
-**IMPORTANT**: Include BOTH the hotspot list from Phase 1 AND relevant insights from Phase 3. Agents should evaluate Ori's implementation informed by what we've learned from prior art.
+**IMPORTANT**: Include BOTH the hotspot list from Phase 1 AND relevant prior art sections from prior-art-ref.md. Agents should evaluate Ori's implementation informed by what we've learned from prior art.
 
 Each agent should:
 1. **Read at least 10-15 actual files** (not just grep)
 2. **Examine hotspot files first** (from Phase 1)
-3. **Consider prior art insights** (from Phase 3) when suggesting improvements
+3. **Consider prior art insights** (see prior-art-ref.md sections relevant to this category) when suggesting improvements
 4. Return findings with: severity, location (`file:line`), issue, fix, prior_art_insight
 
-### Agent 4.1: Architecture & Boundaries
+### Agent 4.1: Architecture & Implementation Hygiene
 
 ```
-prompt: "Search for Architecture & Boundaries violations.
+prompt: "Search for Architecture & Implementation Hygiene violations per .claude/rules/impl-hygiene.md.
 
 HOTSPOTS TO PRIORITIZE: [paste from Phase 1]
+PRIOR ART: See prior-art-ref.md section 5 (Compiler Architecture) for reference patterns.
 
 DETECTION PATTERNS:
+
 CRITICAL:
 - Upward dependency: lower crate imports higher (ori_ir → oric, ori_parse → ori_types)
 - IO in core: file/network/env ops in ori_types, ori_types, ori_ir, ori_parse
 - Phase bleeding: parser doing type checking, lexer doing parsing
+- Errors swallowed at phase boundary (lexer errors dropped by parser)
+- Backward data flow (later phase calling back into earlier phase)
 
 HIGH:
 - Missing phase boundary documentation
 - Implicit coupling between modules
 - Framework types (Salsa) leaking into pure logic
-- Mixed abstraction levels in single function
+- Unnecessary .clone() at phase boundaries (should move)
+- Raw integer IDs crossing boundaries without newtypes
+- Phase state leaking into output types (parser cursor in AST nodes)
+- Allocation in hot token path (String::from per token)
 
 MEDIUM:
 - Unclear module responsibility
 - Missing module-level doc comments
+- Error types not phase-scoped (generic Error instead of LexError/ParseError)
+- Metadata mixed with semantic data in AST
 
-EXAMINE: Read lib.rs and 2-3 key files from EACH of ori_ir, ori_lexer, ori_parse, ori_types, ori_eval, oric.
+EXAMINE: Read lib.rs and 2-3 key files from EACH of ori_ir, ori_lexer, ori_parse, ori_types, ori_eval, oric. Trace data flow at crate boundaries.
 
 Return: SEVERITY | file:line | issue | fix"
 ```
@@ -482,6 +339,7 @@ Return: SEVERITY | file:line | issue | fix"
 prompt: "Search for Salsa & Incremental violations.
 
 HOTSPOTS TO PRIORITIZE: [paste from Phase 1]
+PRIOR ART: See prior-art-ref.md section 3 (Incremental Compilation) for reference patterns.
 
 DETECTION PATTERNS:
 CRITICAL:
@@ -507,6 +365,7 @@ Return: SEVERITY | file:line | issue | fix"
 prompt: "Search for Memory & Allocation violations.
 
 HOTSPOTS TO PRIORITIZE: [paste from Phase 1]
+PRIOR ART: See prior-art-ref.md section 2 (Type Systems — Zig InternPool pattern) for reference patterns.
 
 DETECTION PATTERNS:
 CRITICAL:
@@ -582,6 +441,7 @@ Return: SEVERITY | file:line | issue | fix"
 prompt: "Search for Diagnostics violations.
 
 HOTSPOTS TO PRIORITIZE: [paste from Phase 1]
+PRIOR ART: See prior-art-ref.md section 1 (Error Messages) for reference patterns.
 
 DETECTION PATTERNS:
 CRITICAL:
@@ -610,6 +470,7 @@ Return: SEVERITY | file:line | issue | fix"
 prompt: "Search for Testing violations.
 
 HOTSPOTS TO PRIORITIZE: [paste from Phase 1]
+PRIOR ART: See prior-art-ref.md section 6 (Test Infrastructure) for reference patterns.
 
 DETECTION PATTERNS:
 CRITICAL:
@@ -652,31 +513,41 @@ EXAMINE: Focus on ori_types (inference loops), ori_parse (AST construction), ori
 Return: SEVERITY | file:line | issue | fix"
 ```
 
-### Agent 4.9: Code Style
+### Agent 4.9: Code Style & Hygiene
 
 ```
-prompt: "Search for Code Style violations.
+prompt: "Search for Code Style & Hygiene violations per .claude/rules/code-hygiene.md.
 
 HOTSPOTS TO PRIORITIZE: [paste from Phase 1]
 
 DETECTION PATTERNS:
+
 CRITICAL:
-- #[allow(clippy::...)] without comment
+- #[allow(clippy::...)] without reason = '...' (prefer #[expect] when possible)
 - Duplicated logic across modules
 - God module: 1000+ lines, multiple concerns
 - Hidden side effects
+- Dead pub items (pub but unused outside crate)
 
 HIGH:
-- Function >50 lines
+- Function >50 lines (target <30; dispatch tables/large matches exempt)
 - File >500 lines without single purpose
 - Growing match statement (OCP violation)
+- Manual trait impl that duplicates derive behavior (PartialEq, Eq, Hash, Debug)
+- Missing //! module doc on file
+- Missing /// on pub items
 
 MEDIUM:
-- Banner comments instead of doc comments
+- Decorative banner comments (// ───, // ===, // ***, // ---)
 - Comment explains 'what' not 'why'
-- Dead/commented code
+- Dead/commented-out code
+- File organization out of order (should be: mod decls → imports → type aliases → types → inherent impls → trait impls → free fns → tests)
+- Imports not in 3 groups (external → crate:: → super::) with blank-line separators
+- Impl block methods out of order (constructors → accessors → predicates → operations → conversions → private helpers)
+- Naming violations: functions missing verb prefix, variables not scope-scaled
+- Struct/enum fields not ordered (primary data → secondary → config → flags last)
 
-EXAMINE: Read the largest files. Check for long functions. Look for #[allow] attributes. Search for duplicated patterns.
+EXAMINE: Read the largest files. Check for long functions. Look for #[allow] attributes. Search for duplicated patterns. Check file/impl ordering. Check naming conventions.
 
 Return: SEVERITY | file:line | issue | fix"
 ```
@@ -718,10 +589,12 @@ Launch **1 final Explore agent** to synthesize all findings AND propose best-of-
 Task(
   subagent_type: "Explore",
   description: "Synthesize: Best-of-Breed",
-  prompt: "You have findings from 21 parallel analyses (5 breadth + 6 reference + 10 category). Synthesize into systemic insights AND propose best-of-breed designs.
+  prompt: "You have findings from 16 parallel analyses (5 breadth + 1 prior art doc + 10 category). Synthesize into systemic insights AND propose best-of-breed designs.
 
 FINDINGS FROM PREVIOUS PHASES:
-[Paste summaries from Phase 2, Phase 3, and Phase 4 agents]
+[Paste summaries from Phase 2 and Phase 4 agents]
+
+PRIOR ART: Read prior-art-ref.md for reference patterns from all 10 compilers.
 
 PART A: ISSUE SYNTHESIS
 
@@ -828,10 +701,10 @@ After all phases complete:
 2. **Output only a brief summary** to the user:
 
 ```
-✅ Code review complete.
+Code review complete.
 
-📊 Health Score: X/10
-📁 Plan written to: plans/cr_MMDDYYYY_##/
+Health Score: X/10
+Plan written to: plans/cr_MMDDYYYY_##/
 
 Quick Stats:
 - Critical: N issues
@@ -894,12 +767,16 @@ git log --oneline --since="6 months ago" --name-only | grep '\.rs$' | sort | uni
 
 The 10 analysis categories with full detection patterns:
 
-### 1. Architecture & Boundaries
-> Phase organization, layer dependencies, invariants, IO isolation
+### 1. Architecture & Implementation Hygiene
+> Full rules in `.claude/rules/impl-hygiene.md`. Phase boundaries, data flow, error propagation, abstraction discipline.
 
 **Dependency direction**: `oric` → `ori_types/eval/patterns` → `ori_parse` → `ori_lexer` → `ori_ir/diagnostic`
 
 **IO isolation**: Only `oric` CLI performs IO; core crates are pure.
+
+**Phase boundaries**: One-way data flow, minimal crossing types, clean ownership transfer.
+
+**Error propagation**: Accumulate across phases, phase-scoped types, upstream errors propagated not swallowed.
 
 ### 2. Salsa & Incremental
 > Query design, derives, determinism, caching granularity
@@ -950,10 +827,18 @@ The 10 analysis categories with full detection patterns:
 
 **Iterators over indexing**: Bounds checks eliminated.
 
-### 9. Code Style
-> DRY/SOLID, file organization, documentation
+### 9. Code Style & Hygiene
+> Full rules in `.claude/rules/code-hygiene.md`. DRY/SOLID, file organization, naming, comments, visibility.
 
-**Functions < 50 lines**: Target < 30.
+**Functions**: Target < 30 lines, max 50 (dispatch tables exempt).
+
+**File organization**: mod decls → imports (3 groups) → types → impls → free fns → tests.
+
+**Impl ordering**: constructors → accessors → predicates → operations → conversions → private helpers.
+
+**Comments**: `//!` on every file, `///` on all pub items, WHY not WHAT, no decorative banners.
+
+**Derive vs manual**: Derive when standard; manual only when behavior differs.
 
 **No dead code**: If you opened the file, you own it.
 
@@ -969,6 +854,8 @@ The 10 analysis categories with full detection patterns:
 ## References
 
 - Ori guidelines: `.claude/rules/compiler.md`
+- Code hygiene rules: `.claude/rules/code-hygiene.md` (file org, naming, comments, derive, visibility, style)
+- Implementation hygiene rules: `.claude/rules/impl-hygiene.md` (phase boundaries, data flow, error propagation, type discipline)
 
 **Diagnostic patterns:**
 - **Rust** (`rustc_errors`): Applicability levels, imperative suggestions
@@ -1083,7 +970,7 @@ issue_count: {N}
 
 # Section 01: Critical Issues
 
-**Status:** 📋 Planned
+**Status:** Planned
 **Count:** {N} issues
 
 ---
@@ -1121,7 +1008,7 @@ status: not-started
 
 # Section 04: Design Proposals
 
-**Status:** 📋 Planned
+**Status:** Planned
 
 Based on prior art study from Rust, Go, Zig, Gleam, Elm, Roc, Swift, Koka, and Lean 4.
 
