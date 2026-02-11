@@ -1,12 +1,14 @@
 ---
 name: code-hygiene-review
 description: Review code for hygiene violations and generate a fix plan. NOT refactoring — purely surface cleanliness.
-allowed-tools: Read, Grep, Glob, Task, Bash, EnterPlanMode
+allowed-tools: Read, Grep, Glob, Bash, EnterPlanMode
 ---
 
 # Code Hygiene Review
 
 Review code for hygiene violations against `.claude/rules/code-hygiene.md` and generate a plan to fix them.
+
+**IMPORTANT: Work sequentially. Do NOT spawn subagents or use the Task tool.** Read each file yourself, one at a time, directly in the main conversation. This ensures full context is maintained across files and findings are consistent.
 
 **Hygiene is NOT refactoring.** No behavior changes, no API changes, no moving things between modules. Just making existing code clean:
 - Dead code, unused imports, stale comments
