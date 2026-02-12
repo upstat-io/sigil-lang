@@ -1,14 +1,12 @@
 ---
 name: code-hygiene-review
 description: Review code for hygiene violations and generate a fix plan. NOT refactoring — purely surface cleanliness.
-allowed-tools: Read, Grep, Glob, Bash, EnterPlanMode
+allowed-tools: Read, Grep, Glob, Bash, Task, Edit, Write
 ---
 
 # Code Hygiene Review
 
-Review code for hygiene violations against `.claude/rules/code-hygiene.md` and generate a plan to fix them.
-
-**IMPORTANT: Work sequentially. Do NOT spawn subagents or use the Task tool.** Read each file yourself, one at a time, directly in the main conversation. This ensures full context is maintained across files and findings are consistent.
+Review code for hygiene violations against `.claude/rules/code-hygiene.md` and fix them.
 
 **Hygiene is NOT refactoring.** No behavior changes, no API changes, no moving things between modules. Just making existing code clean:
 - Dead code, unused imports, stale comments
@@ -32,110 +30,141 @@ If no argument: ask the user what to review.
 
 ### Step 1: Load Rules
 
-Read `.claude/rules/code-hygiene.md` to have the full rule set in context.
+Read `.claude/rules/code-hygiene.md` to have the full rule set in context. You will embed these rules verbatim into each agent's prompt (agents cannot read rule files themselves).
 
-### Step 2: Inventory Target
+### Step 2: Build File Inventory
 
-For the target path, get a complete file list with line counts:
-```bash
-find {target} -name "*.rs" -exec wc -l {} \; | sort -rn
+Use Glob to find all `*.rs` files in the target path. This is the complete file list. Print the total count for the user.
+
+### Step 3: Distribute Files Across 10 Agents
+
+Divide the file list into 10 roughly equal groups using round-robin distribution (file 1 → agent 1, file 2 → agent 2, ... file 11 → agent 1, etc.). This balances work across agents regardless of file size ordering.
+
+### Step 4: Spawn 10 Agents in Parallel
+
+Launch exactly 10 Task agents **in a single message** (all 10 tool calls in one response) using `subagent_type: "general-purpose"` and `model: "sonnet"`. Each agent runs in the background (`run_in_background: true`).
+
+Each agent's prompt MUST include:
+
+1. **The complete hygiene rules** (embed the full content of `code-hygiene.md` directly — agents cannot read rule files)
+2. **The exact list of files** this agent is responsible for
+3. **The processing instructions** (see below)
+4. **The audit checklist** (see below)
+
+#### Agent Instructions Template
+
 ```
+You are a code hygiene fixer. You will process a list of files ONE AT A TIME, in order.
 
-### Step 3: Read All Files
+## CRITICAL: One File At A Time
 
-Read EVERY `.rs` file in the target. For files > 500 lines, read in segments. Do NOT skip test modules — they have hygiene rules too (but relaxed: section banners OK in tests).
+You MUST process files sequentially. For EACH file in your list:
+1. Read the file (ONE file only — never read multiple files at once)
+2. Audit it against every hygiene rule below
+3. Apply ALL fixes to that file using Edit/Write tools
+4. Confirm the file is complete and clean
+5. ONLY THEN move to the next file
 
-### Step 4: Audit Each File
+DO NOT read ahead. DO NOT read files that are not in your list.
+DO NOT read your next file until you have finished fixing the current one.
+Each file is completely independent — you do not need context from any other file for this task.
+Code cleanup is internal to each file.
 
-For each file, check every rule category from `code-hygiene.md`:
+## Your Files (process in this exact order)
+
+{numbered list of files for this agent}
+
+## Hygiene Rules
+
+{full content of code-hygiene.md}
+
+## Audit Checklist
+
+For each file, check and fix:
 
 **File Organization:**
-- [ ] Module doc comment present?
-- [ ] Sections in correct order? (mods → imports → types → impls → fns → tests)
-- [ ] Imports in 3 groups with blank-line separators?
+- Module doc comment present?
+- Sections in correct order? (mods → imports → types → impls → fns → tests)
+- Imports in 3 groups with blank-line separators?
 
 **Impl Block Ordering:**
-- [ ] Constructors first?
-- [ ] Accessors before predicates before operations before helpers?
-- [ ] pub before private within groups?
+- Constructors first?
+- Accessors before predicates before operations before helpers?
+- pub before private within groups?
 
 **Naming:**
-- [ ] Function names follow verb-prefix conventions?
-- [ ] Variable names scope-scaled? (no `token_kind_result` in a 3-line scope, no `t` in a 50-line function)
-- [ ] Standard abbreviations used consistently?
+- Function names follow verb-prefix conventions?
+- Variable names scope-scaled? (no `token_kind_result` in a 3-line scope, no `t` in a 50-line function)
+- Standard abbreviations used consistently?
 
 **Struct/Enum Fields:**
-- [ ] Primary data first, flags last?
-- [ ] Inline comments where purpose isn't obvious?
+- Primary data first, flags last?
+- Inline comments where purpose isn't obvious?
 
 **Comments:**
-- [ ] No decorative banners? (`───`, `===`, `***`, `---`)
-- [ ] No comments restating code?
-- [ ] No commented-out code?
-- [ ] `///` on all pub items?
-- [ ] WHY comments, not WHAT?
+- No decorative banners? (`───`, `===`, `***`, `---`)
+- No comments restating code?
+- No commented-out code?
+- `///` on all pub items?
+- WHY comments, not WHAT?
 
 **Derive vs Manual:**
-- [ ] Any manual trait impls that duplicate derive behavior?
+- Any manual trait impls that duplicate derive behavior?
 
 **Visibility:**
-- [ ] Any dead pub items? (pub but unused outside crate)
-- [ ] Any dead code? (unused functions, imports, variants)
+- Any dead pub items? (pub but unused outside crate)
+- Any dead code? (unused functions, imports, variants)
 
 **Style:**
-- [ ] All `#[allow(clippy)]` have `reason`?
-- [ ] Functions under 50 lines? (note: dispatch tables exempt)
-- [ ] No dead/commented-out code?
+- All `#[allow(clippy)]` have `reason`?
+- Functions under 50 lines? (note: dispatch tables exempt)
+- No dead/commented-out code?
 
-### Step 5: Compile Findings
+## Fixing Rules
 
-Organize findings by file, categorized as:
+- **No behavior changes** — Hygiene is purely cosmetic/organizational
+- **No refactoring** — Don't extract functions, move modules, or change APIs
+- **Test code is relaxed** — Section banners (`// === Section ===`) are OK in `#[cfg(test)]` modules
+- **Dispatch tables exempt** — Large match statements mapping tokens/tags are not "long functions"
+- **Be precise with edits** — Use Edit tool with exact old_string matches. Do not rewrite entire files unless necessary.
+- **If unsure, skip it** — When something is a judgment call and the current code is reasonable, leave it alone
 
-- **FIX** — Clear violation, mechanical fix (dead code, banner comment, missing doc)
-- **IMPROVE** — Suboptimal but not wrong (ordering, naming, derive-vs-manual)
-- **NOTE** — Observation, not actionable (acceptable exceptions, context for reviewer)
+## Output Format
 
-### Step 6: Generate Plan
+After processing ALL your files, return a summary of what you did:
 
-Use **EnterPlanMode** to create a fix plan. The plan should:
+### {filepath}
+- Fixed: {brief description of each fix applied}
+- OR: CLEAN (no changes needed)
 
-1. List every FIX and IMPROVE finding with `file:line` references
-2. Group by file (not by rule category — easier to fix file-by-file)
-3. Estimate the scope: "N files, ~M changes"
-4. Order: fixes that might affect other files first (dead pub removal), then file-local fixes
+Report the total count: N files processed, M files modified, K files clean.
+```
 
-### Plan Format
+### Step 5: Monitor and Collect Results
 
-The plan should be structured as:
+Wait for all 10 agents to complete by reading each agent's output file. Compile a summary of all changes made across all agents.
+
+### Step 6: Verify No Regressions
+
+After all agents have finished:
+1. Run `./clippy-all.sh` to verify no regressions
+2. Run `./test-all.sh` to verify no behavior changes
+3. If any failures, investigate and fix them
+
+### Step 7: Report
+
+Present the user with a consolidated summary:
 
 ```
 ## Hygiene Review: {target}
 
-**Scope:** N files, ~M findings (X fix, Y improve)
+**Scope:** N files reviewed across 10 agents
+**Results:** M files modified, K files already clean
 
-### {filename}
+### Changes by file
+{merged summaries from all agents, listing only modified files}
 
-1. **[FIX]** `line:NN` — {description}
-2. **[IMPROVE]** `line:NN` — {description}
-...
-
-### {next filename}
-...
-
-### Execution Order
-
-1. Dead pub removal (may affect other crates)
-2. File-by-file hygiene (independent, can parallelize)
-3. Run `./clippy-all.sh` to verify no regressions
-4. Run `./test-all.sh` to verify no behavior changes
+### Verification
+- clippy: PASS/FAIL
+- tests: PASS/FAIL
 ```
-
-## Important Rules
-
-1. **No behavior changes** — Hygiene fixes must be purely cosmetic/organizational
-2. **No refactoring** — Don't extract functions, move modules, or change APIs
-3. **Test code is relaxed** — Section banners (`// === Section ===`) are OK in `#[cfg(test)]` modules
-4. **Dispatch tables exempt** — Large match statements mapping tokens/tags are not "long functions"
-5. **Read the code** — Don't grep-audit. Read every file to understand context before flagging
-6. **Be specific** — Every finding must have `file:line` and a concrete fix description
-7. **Don't over-flag** — If something is a judgment call and the current code is reasonable, it's a NOTE not a FIX

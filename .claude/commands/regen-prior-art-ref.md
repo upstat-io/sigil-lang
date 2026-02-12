@@ -6,7 +6,7 @@ allowed-tools: Read, Grep, Glob, Task, Bash, Write
 
 # Regenerate Prior Art Reference
 
-Regenerate `.claude/skills/code-review/prior-art-ref.md` by studying design patterns from all 10 reference compiler repos.
+Regenerate `.claude/skills/design-pattern-review/prior-art-ref.md` by studying design patterns from all 10 reference compiler repos.
 
 ## Step 1: Validate Reference Repos
 
@@ -181,7 +181,7 @@ For each compiler extract in telegraphic bullet-point style:
 
 ## Step 3: Synthesize Results
 
-Take all 6 agent results and compress into ~200-250 lines in `.claude/skills/code-review/prior-art-ref.md`.
+Take all 6 agent results and compress into ~200-250 lines in `.claude/skills/design-pattern-review/prior-art-ref.md`.
 
 Format:
 
@@ -224,12 +224,12 @@ Rules:
 
 ## Step 4: Write and Report
 
-Write the synthesized file to `.claude/skills/code-review/prior-art-ref.md`.
+Write the synthesized file to `.claude/skills/design-pattern-review/prior-art-ref.md`.
 
 Report to user:
 ```
 Prior art reference regenerated.
-  File: .claude/skills/code-review/prior-art-ref.md
+  File: .claude/skills/design-pattern-review/prior-art-ref.md
   Date: {YYYY-MM-DD}
   Domains: 6 (errors, types, incremental, fixes, architecture, testing)
   Sources: 10 repos studied
