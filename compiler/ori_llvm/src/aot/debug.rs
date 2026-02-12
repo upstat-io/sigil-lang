@@ -38,19 +38,22 @@
 //! di.finalize();
 //! ```
 
+use ori_types::{Idx, Pool};
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::path::Path;
 
+use inkwell::basic_block::BasicBlock;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::debug_info::{
-    AsDIScope, DIBasicType, DICompileUnit, DICompositeType, DIFile, DIFlags, DIFlagsConstants,
-    DILexicalBlock, DIScope, DISubprogram, DISubroutineType, DIType, DWARFEmissionKind,
-    DWARFSourceLanguage, DebugInfoBuilder as InkwellDIBuilder,
+    AsDIScope, DIBasicType, DICompileUnit, DICompositeType, DIExpression, DIFile, DIFlags,
+    DIFlagsConstants, DILexicalBlock, DILocalVariable, DILocation, DIScope, DISubprogram,
+    DISubroutineType, DIType, DWARFEmissionKind, DWARFSourceLanguage,
+    DebugInfoBuilder as InkwellDIBuilder,
 };
 use inkwell::module::{FlagBehavior, Module};
-use inkwell::values::FunctionValue;
+use inkwell::values::{AsValueRef, BasicValueEnum, FunctionValue, InstructionValue, PointerValue};
 
 /// Debug information detail level.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -316,12 +319,15 @@ fn basic_type_creation_error(name: &str) -> DebugInfoError {
 struct TypeCache<'ctx> {
     /// Primitive type cache (int, float, bool, etc.).
     primitives: FxHashMap<&'static str, DIBasicType<'ctx>>,
+    /// Composite type cache for deduplication (keyed by type pool `Idx`).
+    composites: FxHashMap<u32, DIType<'ctx>>,
 }
 
 impl TypeCache<'_> {
     fn new() -> Self {
         Self {
             primitives: FxHashMap::default(),
+            composites: FxHashMap::default(),
         }
     }
 }
@@ -1055,6 +1061,196 @@ impl<'ctx> DebugInfoBuilder<'ctx> {
         builder.unset_current_debug_location();
     }
 
+    // -- Variable Debug Info --
+
+    /// Create a debug info entry for a local (auto) variable.
+    ///
+    /// Used for `let` bindings and other locally-scoped variables.
+    ///
+    /// # Arguments
+    ///
+    /// * `scope` - The scope containing this variable
+    /// * `name` - Variable name as it appears in source
+    /// * `line` - Line number where variable is defined
+    /// * `ty` - Debug type of the variable
+    pub fn create_auto_variable(
+        &self,
+        scope: DIScope<'ctx>,
+        name: &str,
+        line: u32,
+        ty: DIType<'ctx>,
+    ) -> DILocalVariable<'ctx> {
+        self.inner.create_auto_variable(
+            scope,
+            name,
+            self.file(),
+            line,
+            ty,
+            true, // always_preserve: keep even if optimized away
+            DIFlags::ZERO,
+            0, // align_in_bits: 0 lets LLVM use type's natural alignment
+        )
+    }
+
+    /// Create a debug info entry for a function parameter variable.
+    ///
+    /// Parameter numbers are 1-indexed (first param = 1).
+    ///
+    /// # Arguments
+    ///
+    /// * `scope` - The function scope (`DISubprogram`)
+    /// * `name` - Parameter name
+    /// * `arg_no` - Parameter position (1-indexed)
+    /// * `line` - Line number of the function definition
+    /// * `ty` - Debug type of the parameter
+    pub fn create_parameter_variable(
+        &self,
+        scope: DIScope<'ctx>,
+        name: &str,
+        arg_no: u32,
+        line: u32,
+        ty: DIType<'ctx>,
+    ) -> DILocalVariable<'ctx> {
+        self.inner.create_parameter_variable(
+            scope,
+            name,
+            arg_no,
+            self.file(),
+            line,
+            ty,
+            true, // always_preserve
+            DIFlags::ZERO,
+        )
+    }
+
+    /// Create a debug location (line/column/scope).
+    pub fn create_debug_location(
+        &self,
+        line: u32,
+        column: u32,
+        scope: DIScope<'ctx>,
+    ) -> DILocation<'ctx> {
+        self.inner
+            .create_debug_location(self.context, line, column, scope, None)
+    }
+
+    /// Create an empty debug expression (no address transformations).
+    pub fn create_expression(&self) -> DIExpression<'ctx> {
+        self.inner.create_expression(Vec::new())
+    }
+
+    /// Emit a `llvm.dbg.declare` intrinsic for a mutable binding (alloca).
+    ///
+    /// Associates an alloca with a debug variable so debuggers can
+    /// inspect the variable at its stack address.
+    pub fn emit_dbg_declare(
+        &self,
+        alloca: PointerValue<'ctx>,
+        var: DILocalVariable<'ctx>,
+        loc: DILocation<'ctx>,
+        block: BasicBlock<'ctx>,
+    ) -> InstructionValue<'ctx> {
+        let expr = self.create_expression();
+        self.inner
+            .insert_declare_at_end(alloca, Some(var), Some(expr), loc, block)
+    }
+
+    /// Emit a `llvm.dbg.value` intrinsic for an immutable binding (SSA value).
+    ///
+    /// Associates an SSA value with a debug variable so debuggers can
+    /// inspect the variable's value.
+    pub fn emit_dbg_value(
+        &self,
+        value: BasicValueEnum<'ctx>,
+        var: DILocalVariable<'ctx>,
+        loc: DILocation<'ctx>,
+        insert_before: InstructionValue<'ctx>,
+    ) -> InstructionValue<'ctx> {
+        let expr = self.create_expression();
+        self.inner
+            .insert_dbg_value_before(value, var, Some(expr), loc, insert_before)
+    }
+
+    /// Emit a `llvm.dbg.value` intrinsic at the end of a basic block.
+    ///
+    /// Like [`emit_dbg_value`], but appends to the block instead of
+    /// inserting before a specific instruction. Uses the LLVM C API
+    /// `LLVMDIBuilderInsertDbgValueAtEnd` which inkwell doesn't wrap.
+    pub fn emit_dbg_value_at_end(
+        &self,
+        value: BasicValueEnum<'ctx>,
+        var: DILocalVariable<'ctx>,
+        loc: DILocation<'ctx>,
+        block: BasicBlock<'ctx>,
+    ) {
+        use llvm_sys::debuginfo::LLVMDIBuilderInsertDbgValueAtEnd;
+
+        let expr = self.create_expression();
+        unsafe {
+            LLVMDIBuilderInsertDbgValueAtEnd(
+                self.inner.as_mut_ptr(),
+                value.as_value_ref(),
+                var.as_mut_ptr(),
+                expr.as_mut_ptr(),
+                loc.as_mut_ptr(),
+                block.as_mut_ptr(),
+            );
+        }
+    }
+
+    // -- Composite Type Cache --
+
+    /// Cache a composite debug type by its type pool index.
+    pub fn cache_composite_type(&self, idx: u32, ty: DIType<'ctx>) {
+        self.type_cache.borrow_mut().composites.insert(idx, ty);
+    }
+
+    /// Look up a cached composite debug type.
+    pub fn get_cached_composite(&self, idx: u32) -> Option<DIType<'ctx>> {
+        self.type_cache.borrow().composites.get(&idx).copied()
+    }
+
+    // -- ARC-specific Types --
+
+    /// Create debug info for an ARC heap allocation: `RC<T> = { strong_count: i64, data: T }`.
+    ///
+    /// This represents the heap layout of a reference-counted value.
+    /// The 8-byte `strong_count` header precedes the actual data.
+    ///
+    /// # Errors
+    ///
+    /// Returns `DebugInfoError::BasicTypeCreation` if LLVM fails to create
+    /// the underlying int type for `strong_count`.
+    pub fn create_rc_heap_type(
+        &self,
+        inner_type: DIType<'ctx>,
+        inner_name: &str,
+        inner_size_bits: u64,
+    ) -> Result<DICompositeType<'ctx>, DebugInfoError> {
+        let int_ty = self.int_type()?.as_type();
+
+        let fields = [
+            FieldInfo {
+                name: "strong_count",
+                ty: int_ty,
+                size_bits: 64,
+                offset_bits: 0,
+                line: 0,
+            },
+            FieldInfo {
+                name: "data",
+                ty: inner_type,
+                size_bits: inner_size_bits,
+                offset_bits: 64, // 8-byte header
+                line: 0,
+            },
+        ];
+
+        let total_size = 64 + inner_size_bits;
+        let type_name = format!("RC<{inner_name}>");
+        Ok(self.create_struct_type(&type_name, 0, total_size, 64, &fields))
+    }
+
     // -- Finalization --
 
     /// Finalize the debug info.
@@ -1241,6 +1437,162 @@ impl<'ctx> DebugContext<'ctx> {
         &self.builder
     }
 
+    /// Get the debug level.
+    #[must_use]
+    pub fn level(&self) -> DebugLevel {
+        self.builder.level()
+    }
+
+    // -- Variable Debug Info Convenience --
+
+    /// Emit `llvm.dbg.declare` for a mutable binding (alloca).
+    ///
+    /// Creates the auto variable and declare intrinsic in one call.
+    /// Uses the current scope and creates a debug location from `span_start`.
+    pub fn emit_declare_for_alloca(
+        &self,
+        alloca: PointerValue<'ctx>,
+        name: &str,
+        ty: DIType<'ctx>,
+        span_start: u32,
+        block: BasicBlock<'ctx>,
+    ) {
+        let (line, col) = self.line_map.offset_to_line_col(span_start);
+        let scope = self.builder.current_scope();
+        let var = self.builder.create_auto_variable(scope, name, line, ty);
+        let loc = self.builder.create_debug_location(line, col, scope);
+        self.builder.emit_dbg_declare(alloca, var, loc, block);
+    }
+
+    /// Emit `llvm.dbg.value` for an immutable binding (SSA value).
+    ///
+    /// Creates the auto variable and value intrinsic in one call.
+    /// Uses the current scope and creates a debug location from `span_start`.
+    ///
+    /// `insert_before` is the instruction before which the dbg.value is placed.
+    pub fn emit_value_for_binding(
+        &self,
+        value: BasicValueEnum<'ctx>,
+        name: &str,
+        ty: DIType<'ctx>,
+        span_start: u32,
+        insert_before: InstructionValue<'ctx>,
+    ) {
+        let (line, col) = self.line_map.offset_to_line_col(span_start);
+        let scope = self.builder.current_scope();
+        let var = self.builder.create_auto_variable(scope, name, line, ty);
+        let loc = self.builder.create_debug_location(line, col, scope);
+        self.builder.emit_dbg_value(value, var, loc, insert_before);
+    }
+
+    /// Emit `llvm.dbg.value` for an immutable binding at the end of a block.
+    ///
+    /// Like [`emit_value_for_binding`], but appends to the block instead
+    /// of requiring an `insert_before` instruction. Useful when emitting
+    /// debug info at binding time before any subsequent instructions exist.
+    pub fn emit_value_for_binding_at_end(
+        &self,
+        value: BasicValueEnum<'ctx>,
+        name: &str,
+        ty: DIType<'ctx>,
+        span_start: u32,
+        block: BasicBlock<'ctx>,
+    ) {
+        let (line, col) = self.line_map.offset_to_line_col(span_start);
+        let scope = self.builder.current_scope();
+        let var = self.builder.create_auto_variable(scope, name, line, ty);
+        let loc = self.builder.create_debug_location(line, col, scope);
+        self.builder.emit_dbg_value_at_end(value, var, loc, block);
+    }
+
+    /// Emit parameter debug info (`DW_TAG_formal_parameter`).
+    ///
+    /// Creates a `DILocalVariable` with parameter semantics and emits
+    /// `llvm.dbg.value` at the end of the given block.
+    ///
+    /// `arg_no` is 1-based (DWARF convention: first parameter is arg 1).
+    pub fn emit_param_debug_info(
+        &self,
+        value: BasicValueEnum<'ctx>,
+        name: &str,
+        arg_no: u32,
+        ty: DIType<'ctx>,
+        block: BasicBlock<'ctx>,
+    ) {
+        let scope = self.builder.current_scope();
+        let loc = self.builder.create_debug_location(0, 0, scope);
+        let var = self
+            .builder
+            .create_parameter_variable(scope, name, arg_no, 0, ty);
+        self.builder.emit_dbg_value_at_end(value, var, loc, block);
+    }
+
+    /// Resolve an Ori type (`Idx`) to its DWARF debug type (`DIType`).
+    ///
+    /// Dispatches on the Pool's tag for the given type index, calling
+    /// the appropriate `DebugInfoBuilder` type method. Falls back to
+    /// `int_type()` with a warning for unmapped types.
+    ///
+    /// This bridges the gap between the type pool (used everywhere in
+    /// codegen) and the debug info builder (which has per-type methods).
+    pub fn resolve_debug_type(&self, idx: Idx, pool: &Pool) -> Option<DIType<'ctx>> {
+        use ori_types::Tag;
+
+        if idx == Idx::NONE {
+            tracing::warn!("resolve_debug_type called with Idx::NONE, using int fallback");
+            return self.builder.int_type().ok().map(|t| t.as_type());
+        }
+
+        let tag = pool.tag(idx);
+        match tag {
+            Tag::Int => self.builder.int_type().ok().map(|t| t.as_type()),
+            Tag::Float => self.builder.float_type().ok().map(|t| t.as_type()),
+            Tag::Bool => self.builder.bool_type().ok().map(|t| t.as_type()),
+            Tag::Char => self.builder.char_type().ok().map(|t| t.as_type()),
+            Tag::Byte => self.builder.byte_type().ok().map(|t| t.as_type()),
+            Tag::Unit | Tag::Never => self.builder.void_type().ok().map(|t| t.as_type()),
+            Tag::Str => self.builder.string_type().ok().map(|t| t.as_type()),
+            Tag::Duration | Tag::Size => {
+                // Duration and Size are represented as i64 (nanoseconds / bytes)
+                self.builder.int_type().ok().map(|t| t.as_type())
+            }
+            Tag::Ordering => self.builder.byte_type().ok().map(|t| t.as_type()),
+            Tag::List => {
+                // List element type — use int as placeholder for element debug type
+                let elem_di = self.builder.int_type().unwrap().as_type();
+                self.builder.list_type(elem_di).ok().map(|t| t.as_type())
+            }
+            Tag::Option => {
+                // Option payload — use int as placeholder for payload debug type
+                let payload_di = self.builder.int_type().ok().map(|t| t.as_type());
+                if let Some(pdi) = payload_di {
+                    self.builder.option_type(pdi, 64).ok().map(|t| t.as_type())
+                } else {
+                    self.builder.int_type().ok().map(|t| t.as_type())
+                }
+            }
+            Tag::Range => {
+                // Range is {i64, i64, i1} — show as int for now
+                self.builder.int_type().ok().map(|t| t.as_type())
+            }
+            Tag::Function => {
+                // Function pointer — show as ptr
+                let void_di = self.builder.void_type().ok().map(|t| t.as_type());
+                if let Some(vdi) = void_di {
+                    Some(self.builder.create_pointer_type("fn_ptr", vdi, 64))
+                } else {
+                    self.builder.int_type().ok().map(|t| t.as_type())
+                }
+            }
+            _ => {
+                // Unmapped types: Map, Set, Result, Tuple, Struct, Enum, Channel,
+                // Named, Applied, Alias, Var, etc.
+                tracing::warn!(?tag, "unmapped type for debug info, falling back to int");
+                self.builder.int_type().ok().map(|t| t.as_type())
+            }
+        }
+    }
+
     /// Finalize debug info (must be called before emission).
     pub fn finalize(&self) {
         self.builder.finalize();
@@ -1261,5 +1613,253 @@ mod tests {
             DWARFEmissionKind::LineTablesOnly
         );
         assert_eq!(DebugLevel::Full.to_emission_kind(), DWARFEmissionKind::Full);
+    }
+
+    /// Helper: create a DebugInfoBuilder with Full level for testing.
+    fn make_test_di<'ctx>(module: &Module<'ctx>, context: &'ctx Context) -> DebugInfoBuilder<'ctx> {
+        DebugInfoBuilder::new(
+            module,
+            context,
+            DebugInfoConfig::development(),
+            "test.ori",
+            "/tmp",
+        )
+        .expect("DebugInfoBuilder::new should succeed for Full level")
+    }
+
+    #[test]
+    fn create_auto_variable_produces_valid_metadata() {
+        let ctx = Context::create();
+        let module = ctx.create_module("test_auto_var");
+        let di = make_test_di(&module, &ctx);
+
+        let int_ty = di.int_type().unwrap().as_type();
+        let scope = di.compile_unit().as_debug_info_scope();
+        let var = di.create_auto_variable(scope, "x", 1, int_ty);
+
+        // The variable should be non-null (valid metadata)
+        assert!(!var.as_mut_ptr().is_null());
+
+        di.finalize();
+        assert!(
+            module.verify().is_ok(),
+            "module should verify after finalize"
+        );
+    }
+
+    #[test]
+    fn create_parameter_variable_produces_valid_metadata() {
+        let ctx = Context::create();
+        let module = ctx.create_module("test_param_var");
+        let di = make_test_di(&module, &ctx);
+
+        let int_ty = di.int_type().unwrap().as_type();
+        let scope = di.compile_unit().as_debug_info_scope();
+        let var = di.create_parameter_variable(scope, "a", 1, 10, int_ty);
+
+        assert!(!var.as_mut_ptr().is_null());
+
+        di.finalize();
+        assert!(
+            module.verify().is_ok(),
+            "module should verify after finalize"
+        );
+    }
+
+    #[test]
+    fn emit_dbg_declare_on_alloca_passes_verify() {
+        let ctx = Context::create();
+        let module = ctx.create_module("test_dbg_declare");
+        let di = make_test_di(&module, &ctx);
+        let builder = ctx.create_builder();
+
+        // Create a simple function with an alloca
+        let void_ty = ctx.void_type();
+        let fn_ty = void_ty.fn_type(&[], false);
+        let func = module.add_function("test_fn", fn_ty, None);
+
+        // Create and attach DISubprogram
+        let subprogram = di.create_simple_function("test_fn", 1).unwrap();
+        di.attach_function(func, subprogram);
+
+        let entry = ctx.append_basic_block(func, "entry");
+        builder.position_at_end(entry);
+
+        // Alloca for a local variable
+        let i64_ty = ctx.i64_type();
+        let alloca = builder.build_alloca(i64_ty, "x").unwrap();
+
+        // Emit dbg.declare
+        let scope = subprogram.as_debug_info_scope();
+        let int_di_ty = di.int_type().unwrap().as_type();
+        let var = di.create_auto_variable(scope, "x", 2, int_di_ty);
+        let loc = di.create_debug_location(2, 5, scope);
+        di.emit_dbg_declare(alloca, var, loc, entry);
+
+        // Set a location and return
+        di.set_location(&builder, 3, 1, scope);
+        builder.build_return(None).unwrap();
+
+        di.finalize();
+        assert!(
+            module.verify().is_ok(),
+            "module with dbg.declare should verify"
+        );
+    }
+
+    #[test]
+    fn create_rc_heap_type_produces_two_field_struct() {
+        let ctx = Context::create();
+        let module = ctx.create_module("test_rc_type");
+        let di = make_test_di(&module, &ctx);
+
+        let int_ty = di.int_type().unwrap().as_type();
+        let rc_type = di.create_rc_heap_type(int_ty, "int", 64).unwrap();
+
+        // RC<int> = { strong_count: i64, data: int }
+        // Total size should be 128 bits (64 + 64)
+        assert!(!rc_type.as_type().as_mut_ptr().is_null());
+
+        di.finalize();
+        assert!(
+            module.verify().is_ok(),
+            "module should verify after finalize"
+        );
+    }
+
+    #[test]
+    fn composite_type_cache_deduplicates() {
+        let ctx = Context::create();
+        let module = ctx.create_module("test_composite_cache");
+        let di = make_test_di(&module, &ctx);
+
+        let int_ty = di.int_type().unwrap().as_type();
+
+        // Cache a composite type at index 42
+        di.cache_composite_type(42, int_ty);
+        assert!(di.get_cached_composite(42).is_some());
+        assert!(di.get_cached_composite(99).is_none());
+
+        di.finalize();
+    }
+
+    #[test]
+    fn debug_context_set_location_from_offset() {
+        let ctx = Context::create();
+        let module = ctx.create_module("test_dc_location");
+        let builder = ctx.create_builder();
+
+        // Source: "let x = 42\nlet y = 99\n"
+        let source = "let x = 42\nlet y = 99\n";
+        let dc = DebugContext::new(
+            &module,
+            &ctx,
+            DebugInfoConfig::development(),
+            std::path::Path::new("/tmp/test.ori"),
+            source,
+        )
+        .expect("DebugContext::new should succeed for Full level");
+
+        // Create a function so we have a scope and can build instructions
+        let void_ty = ctx.void_type();
+        let fn_ty = void_ty.fn_type(&[], false);
+        let func = module.add_function("test_fn", fn_ty, None);
+        let subprogram = dc.create_function_at_offset("test_fn", 0).unwrap();
+        dc.di().attach_function(func, subprogram);
+
+        let entry = ctx.append_basic_block(func, "entry");
+        builder.position_at_end(entry);
+
+        // Enter function scope and set location
+        dc.enter_function(subprogram);
+        dc.set_location_from_offset_in_current_scope(&builder, 0); // "let x" at offset 0
+        dc.set_location_from_offset_in_current_scope(&builder, 12); // "let y" at offset 12
+        dc.exit_function();
+
+        // Set location for return
+        dc.set_location_from_offset(&builder, 0, subprogram.as_debug_info_scope());
+        builder.build_return(None).unwrap();
+
+        dc.finalize();
+        assert!(
+            module.verify().is_ok(),
+            "module with debug locations should verify"
+        );
+    }
+
+    #[test]
+    fn debug_context_emit_declare_for_alloca_convenience() {
+        let ctx = Context::create();
+        let module = ctx.create_module("test_dc_declare");
+        let builder = ctx.create_builder();
+
+        let source = "let mut x = 42\n";
+        let dc = DebugContext::new(
+            &module,
+            &ctx,
+            DebugInfoConfig::development(),
+            std::path::Path::new("/tmp/test.ori"),
+            source,
+        )
+        .expect("DebugContext::new should succeed");
+
+        let void_ty = ctx.void_type();
+        let fn_ty = void_ty.fn_type(&[], false);
+        let func = module.add_function("test_fn", fn_ty, None);
+        let subprogram = dc.create_function_at_offset("test_fn", 0).unwrap();
+        dc.di().attach_function(func, subprogram);
+
+        let entry = ctx.append_basic_block(func, "entry");
+        builder.position_at_end(entry);
+        dc.enter_function(subprogram);
+
+        // Alloca + convenience declare
+        let i64_ty = ctx.i64_type();
+        let alloca = builder.build_alloca(i64_ty, "x").unwrap();
+        let int_di_ty = dc.di().int_type().unwrap().as_type();
+        dc.emit_declare_for_alloca(alloca, "x", int_di_ty, 0, entry);
+
+        // Return with location
+        dc.set_location_from_offset_in_current_scope(&builder, 0);
+        builder.build_return(None).unwrap();
+
+        dc.exit_function();
+        dc.finalize();
+        assert!(
+            module.verify().is_ok(),
+            "module with convenience dbg.declare should verify"
+        );
+    }
+
+    #[test]
+    fn line_map_offset_to_line_col() {
+        let source = "let x = 42\nlet y = 99\nlet z = 0\n";
+        let map = LineMap::new(source);
+
+        // "let x = 42\n" = 11 chars (0..10), line 2 starts at offset 11
+        // "let y = 99\n" = 11 chars (11..21), line 3 starts at offset 22
+        assert_eq!(map.offset_to_line_col(0), (1, 1)); // 'l' in "let x"
+        assert_eq!(map.offset_to_line_col(4), (1, 5)); // 'x' in "let x"
+        assert_eq!(map.offset_to_line_col(11), (2, 1)); // start of line 2
+        assert_eq!(map.offset_to_line_col(15), (2, 5)); // 'y' in "let y"
+        assert_eq!(map.offset_to_line_col(22), (3, 1)); // start of line 3
+        assert_eq!(map.line_count(), 4); // 3 newlines + initial line
+    }
+
+    #[test]
+    fn debug_none_level_returns_none_builder() {
+        let ctx = Context::create();
+        let module = ctx.create_module("test_none_level");
+        let di = DebugInfoBuilder::new(
+            &module,
+            &ctx,
+            DebugInfoConfig::new(DebugLevel::None),
+            "test.ori",
+            "/tmp",
+        );
+        assert!(
+            di.is_none(),
+            "DebugInfoBuilder::new should return None for DebugLevel::None"
+        );
     }
 }

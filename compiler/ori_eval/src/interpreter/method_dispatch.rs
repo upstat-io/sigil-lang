@@ -1,40 +1,30 @@
 //! Method dispatch methods for the Interpreter.
 
+use ori_ir::Name;
+
+use crate::errors::{
+    all_requires_list, any_requires_list, collect_requires_range, filter_entries_not_implemented,
+    filter_entries_requires_map, filter_requires_collection, find_requires_list,
+    fold_requires_collection, map_entries_not_implemented, map_entries_requires_map,
+    map_requires_collection, wrong_arg_count, wrong_function_args,
+};
+use crate::exec::call::bind_captures_iter;
+use crate::methods::{dispatch_builtin_method, DispatchCtx};
+use crate::{EvalError, EvalResult, Mutability, UserMethod, Value};
+
 use super::resolvers::{CollectionMethod, MethodResolution};
 use super::Interpreter;
-use crate::{
-    // Error factories for collection methods
-    all_requires_list,
-    any_requires_list,
-    collect_requires_range,
-    dispatch_builtin_method,
-    filter_entries_not_implemented,
-    filter_entries_requires_map,
-    filter_requires_collection,
-    find_requires_list,
-    fold_requires_collection,
-    map_entries_not_implemented,
-    map_entries_requires_map,
-    map_requires_collection,
-    wrong_arg_count,
-    wrong_function_args,
-    EvalError,
-    EvalResult,
-    Mutability,
-    UserMethod,
-    Value,
-};
-use ori_ir::{ExprArena, Name};
 
 impl Interpreter<'_> {
     /// Evaluate a method call using the Chain of Responsibility pattern.
     ///
     /// Methods are resolved in priority order:
-    /// 0. Associated functions on type references (e.g., `Duration.from_seconds`)
-    /// 1. User-defined methods from impl blocks (priority 0)
-    /// 2. Derived methods from `#[derive(...)]` (priority 1)
-    /// 3. Collection methods requiring interpreter (priority 2)
-    /// 4. Built-in methods in `MethodRegistry` (priority 3)
+    /// 0. Print methods (invoked via `PatternExecutor` for the Print capability)
+    /// 1. Associated functions on type references (e.g., `Duration.from_seconds`)
+    /// 2. User-defined methods from impl blocks (priority 0)
+    /// 3. Derived methods from `#[derive(...)]` (priority 1)
+    /// 4. Collection methods requiring interpreter (priority 2)
+    /// 5. Built-in methods in `MethodRegistry` (priority 3)
     #[tracing::instrument(level = "debug", skip(self, receiver, args))]
     pub fn eval_method_call(
         &mut self,
@@ -42,6 +32,20 @@ impl Interpreter<'_> {
         method: Name,
         args: Vec<Value>,
     ) -> EvalResult {
+        self.mode_state.count_method_call();
+
+        // Handle print methods (invoked via PatternExecutor for the Print capability).
+        // Pre-interned Name comparison avoids string lookup on every method call.
+        let pn = self.print_names;
+        if method == pn.println || method == pn.builtin_println {
+            self.handle_println(&args);
+            return Ok(Value::Void);
+        }
+        if method == pn.print || method == pn.builtin_print {
+            self.handle_print(&args);
+            return Ok(Value::Void);
+        }
+
         // Handle associated function calls on type references
         if let Value::TypeRef { type_name } = &receiver {
             // First check user-defined associated functions in the registry
@@ -53,13 +57,15 @@ impl Interpreter<'_> {
                 .cloned();
 
             if let Some(ref method_def) = user_method {
-                return self.eval_associated_function(method_def, &args);
+                return self.eval_associated_function(method_def, &args, method);
             }
 
             // Fall back to built-in associated functions (Duration, Size)
-            let type_name_str = self.interner.lookup(*type_name);
-            let method_str = self.interner.lookup(method);
-            return crate::methods::dispatch_associated_function(type_name_str, method_str, args);
+            let ctx = DispatchCtx {
+                names: &self.builtin_method_names,
+                interner: self.interner,
+            };
+            return crate::methods::dispatch_associated_function(*type_name, method, args, &ctx);
         }
 
         // Handle callable struct fields: if a struct has a field with the method name
@@ -69,10 +75,7 @@ impl Interpreter<'_> {
             if let Some(field_value) = s.get_field(method) {
                 // Check if the field is callable
                 match &field_value {
-                    Value::Function(_)
-                    | Value::MemoizedFunction(_)
-                    | Value::MultiClauseFunction(_)
-                    | Value::FunctionVal(_, _) => {
+                    Value::Function(_) | Value::MemoizedFunction(_) | Value::FunctionVal(_, _) => {
                         return self.eval_call(field_value, &args);
                     }
                     _ => {
@@ -90,7 +93,7 @@ impl Interpreter<'_> {
         // Execute based on resolution type
         match resolution {
             MethodResolution::User(user_method) => {
-                self.eval_user_method(receiver, &user_method, &args)
+                self.eval_user_method(receiver, &user_method, &args, method)
             }
             MethodResolution::Derived(derived_info) => {
                 self.eval_derived_method(receiver, &derived_info, &args)
@@ -99,15 +102,16 @@ impl Interpreter<'_> {
                 self.eval_collection_method(receiver, collection_method, &args)
             }
             MethodResolution::Builtin => {
-                let method_name = self.interner.lookup(method);
-                dispatch_builtin_method(receiver, method_name, args, self.interner)
+                let ctx = DispatchCtx {
+                    names: &self.builtin_method_names,
+                    interner: self.interner,
+                };
+                dispatch_builtin_method(receiver, method, args, &ctx)
             }
             MethodResolution::NotFound => {
-                // This shouldn't happen as BuiltinResolver always returns Builtin,
-                // but if it does, fall back to dispatch_builtin_method which will
-                // produce an appropriate error
-                let method_name = self.interner.lookup(method);
-                dispatch_builtin_method(receiver, method_name, args, self.interner)
+                let method_str = self.interner.lookup(method);
+                let type_str = self.interner.lookup(type_name);
+                Err(crate::errors::no_such_method(method_str, type_str).into())
             }
         }
     }
@@ -138,41 +142,41 @@ impl Interpreter<'_> {
             CollectionMethod::Map => match receiver {
                 Value::List(items) => self.eval_list_map(items.as_ref(), args),
                 Value::Range(range) => self.eval_range_map(&range, args),
-                _ => Err(map_requires_collection()),
+                _ => Err(map_requires_collection().into()),
             },
             CollectionMethod::Filter => match receiver {
                 Value::List(items) => self.eval_list_filter(items.as_ref(), args),
                 Value::Range(range) => self.eval_range_filter(&range, args),
-                _ => Err(filter_requires_collection()),
+                _ => Err(filter_requires_collection().into()),
             },
             CollectionMethod::Fold => match receiver {
                 Value::List(items) => self.eval_list_fold(items.as_ref(), args),
                 Value::Range(range) => self.eval_range_fold(&range, args),
-                _ => Err(fold_requires_collection()),
+                _ => Err(fold_requires_collection().into()),
             },
             CollectionMethod::Find => match receiver {
                 Value::List(items) => self.eval_list_find(items.as_ref(), args),
-                _ => Err(find_requires_list()),
+                _ => Err(find_requires_list().into()),
             },
             CollectionMethod::Collect => match receiver {
                 Value::Range(range) => self.eval_range_collect(&range, args),
-                _ => Err(collect_requires_range()),
+                _ => Err(collect_requires_range().into()),
             },
             CollectionMethod::Any => match receiver {
                 Value::List(items) => self.eval_list_any(items.as_ref(), args),
-                _ => Err(any_requires_list()),
+                _ => Err(any_requires_list().into()),
             },
             CollectionMethod::All => match receiver {
                 Value::List(items) => self.eval_list_all(items.as_ref(), args),
-                _ => Err(all_requires_list()),
+                _ => Err(all_requires_list().into()),
             },
             CollectionMethod::MapEntries => match receiver {
-                Value::Map(_) => Err(map_entries_not_implemented()),
-                _ => Err(map_entries_requires_map()),
+                Value::Map(_) => Err(map_entries_not_implemented().into()),
+                _ => Err(map_entries_requires_map().into()),
             },
             CollectionMethod::FilterEntries => match receiver {
-                Value::Map(_) => Err(filter_entries_not_implemented()),
-                _ => Err(filter_entries_requires_map()),
+                Value::Map(_) => Err(filter_entries_not_implemented().into()),
+                _ => Err(filter_entries_requires_map().into()),
             },
         }
     }
@@ -372,6 +376,26 @@ impl Interpreter<'_> {
         self.fold_iterator(range.iter().map(Value::int), args[0].clone(), &args[1])
     }
 
+    /// Handle a `println` method call via the print handler.
+    fn handle_println(&self, args: &[Value]) {
+        if let Some(msg) = args.first() {
+            match msg {
+                Value::Str(s) => self.print_handler.println(s),
+                other => self.print_handler.println(&other.display_value()),
+            }
+        }
+    }
+
+    /// Handle a `print` method call via the print handler.
+    fn handle_print(&self, args: &[Value]) {
+        if let Some(msg) = args.first() {
+            match msg {
+                Value::Str(s) => self.print_handler.print(s),
+                other => self.print_handler.print(&other.display_value()),
+            }
+        }
+    }
+
     /// Get the concrete type name for a value as an interned Name.
     ///
     /// For struct values, returns the struct's `type_name` directly.
@@ -407,9 +431,7 @@ impl Interpreter<'_> {
             | Value::Newtype { type_name, .. }
             | Value::NewtypeConstructor { type_name }
             | Value::TypeRef { type_name } => *type_name,
-            Value::Function(_) | Value::MemoizedFunction(_) | Value::MultiClauseFunction(_) => {
-                names.function
-            }
+            Value::Function(_) | Value::MemoizedFunction(_) => names.function,
             Value::FunctionVal(_, _) => names.function_val,
             Value::ModuleNamespace(_) => names.module,
             Value::Error(_) => names.error,
@@ -426,39 +448,13 @@ impl Interpreter<'_> {
         receiver: Value,
         method: &UserMethod,
         args: &[Value],
+        method_name: Name,
     ) -> EvalResult {
-        // Check recursion limit before making the call (WASM only)
-        self.check_recursion_limit()?;
-
         // Method params include 'self' as first parameter
         if method.params.len() != args.len() + 1 {
-            return Err(wrong_function_args(method.params.len() - 1, args.len()));
+            return Err(wrong_function_args(method.params.len() - 1, args.len()).into());
         }
-
-        // Create new environment with captures
-        let mut call_env = self.env.child();
-        call_env.push_scope();
-
-        // Bind captured variables (dereference Arc to iterate HashMap)
-        for (name, value) in method.captures.iter() {
-            call_env.define(*name, value.clone(), Mutability::Immutable);
-        }
-
-        // Bind 'self' to receiver (first parameter)
-        if let Some(&self_param) = method.params.first() {
-            call_env.define(self_param, receiver, Mutability::Immutable);
-        }
-
-        // Bind remaining parameters
-        for (param, arg) in method.params.iter().skip(1).zip(args.iter()) {
-            call_env.define(*param, arg.clone(), Mutability::Immutable);
-        }
-
-        // Evaluate method body using the method's arena (arena threading pattern).
-        // The scope is popped automatically via RAII when call_interpreter drops.
-        let func_arena: &ExprArena = &method.arena;
-        let mut call_interpreter = self.create_function_interpreter(func_arena, call_env);
-        call_interpreter.eval(method.body)
+        self.eval_method_body(Some(receiver), method, args, method_name)
     }
 
     /// Evaluate an associated function (no `self` parameter).
@@ -469,38 +465,61 @@ impl Interpreter<'_> {
         &mut self,
         method: &UserMethod,
         args: &[Value],
+        method_name: Name,
     ) -> EvalResult {
-        // Check recursion limit before making the call (WASM only)
-        self.check_recursion_limit()?;
-
         // Associated functions don't have 'self', so params == args
         if method.params.len() != args.len() {
-            return Err(wrong_function_args(method.params.len(), args.len()));
+            return Err(wrong_function_args(method.params.len(), args.len()).into());
         }
+        self.eval_method_body(None, method, args, method_name)
+    }
 
-        // Create new environment with captures
+    /// Shared helper for evaluating a method/associated function body.
+    ///
+    /// When `receiver` is `Some`, binds it as `self` (first param) and zips
+    /// remaining params with `args`. When `None`, zips all params with `args`.
+    fn eval_method_body(
+        &mut self,
+        receiver: Option<Value>,
+        method: &UserMethod,
+        args: &[Value],
+        method_name: Name,
+    ) -> EvalResult {
+        self.check_recursion_limit()?;
+
         let mut call_env = self.env.child();
         call_env.push_scope();
 
-        // Bind captured variables
-        for (name, value) in method.captures.iter() {
-            call_env.define(*name, value.clone(), Mutability::Immutable);
-        }
+        bind_captures_iter(&mut call_env, method.captures.iter());
 
-        // Bind all parameters directly to arguments (no self)
-        for (param, arg) in method.params.iter().zip(args.iter()) {
+        // Bind self + remaining params, or all params directly
+        let param_args: &[Name] = if let Some(recv) = receiver {
+            if let Some(&self_param) = method.params.first() {
+                call_env.define(self_param, recv, Mutability::Immutable);
+            }
+            &method.params[1..]
+        } else {
+            &method.params
+        };
+
+        for (param, arg) in param_args.iter().zip(args.iter()) {
             call_env.define(*param, arg.clone(), Mutability::Immutable);
         }
 
-        // Evaluate function body using the method's arena
-        let func_arena: &ExprArena = &method.arena;
-        let mut call_interpreter = self.create_function_interpreter(func_arena, call_env);
-        call_interpreter.eval(method.body)
-    }
+        // Evaluate body via canonical IR.
+        // The scope is popped automatically via RAII when call_interpreter drops.
+        let mut call_interpreter = self.create_function_interpreter(
+            &method.arena,
+            call_env,
+            method_name,
+            method.canon.clone(),
+        );
 
-    // NOTE: Derived method evaluation has been moved to `derived_methods.rs`
-    // for better separation of concerns. The method `eval_derived_method`
-    // and its helpers are now in that module.
+        let result = call_interpreter.eval_can(method.can_body);
+        self.mode_state
+            .merge_child_counters(&call_interpreter.mode_state);
+        result
+    }
 }
 
 #[cfg(test)]

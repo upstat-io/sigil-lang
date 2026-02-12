@@ -13,8 +13,8 @@ use rustc_hash::FxHashMap;
 
 use super::ModuleChecker;
 use crate::{
-    FieldDef, Idx, ImplEntry, ImplMethodDef, TraitAssocTypeDef, TraitEntry, TraitMethodDef,
-    TypeCheckError, VariantDef, VariantFields, Visibility, WhereConstraint,
+    EnumVariant, FieldDef, Idx, ImplEntry, ImplMethodDef, TraitAssocTypeDef, TraitEntry,
+    TraitMethodDef, TypeCheckError, VariantDef, VariantFields, Visibility, WhereConstraint,
 };
 
 // ============================================================================
@@ -35,7 +35,7 @@ pub fn register_builtin_types(checker: &mut ModuleChecker<'_>) {
     let equal_name = checker.interner().intern("Equal");
     let greater_name = checker.interner().intern("Greater");
 
-    let ordering_idx = checker.pool_mut().named(ordering_name);
+    let ordering_idx = Idx::ORDERING;
 
     let variants = vec![
         VariantDef {
@@ -54,6 +54,25 @@ pub fn register_builtin_types(checker: &mut ModuleChecker<'_>) {
             span: Span::DUMMY,
         },
     ];
+
+    // Create Pool enum entry for Ordering (used by TypeRegistry for variant definitions).
+    // No set_resolution: Idx::ORDERING is a pre-interned primitive and should not have
+    // a resolution entry. Variant lookup returns Idx::ORDERING directly.
+    let pool_variants = vec![
+        EnumVariant {
+            name: less_name,
+            field_types: vec![],
+        },
+        EnumVariant {
+            name: equal_name,
+            field_types: vec![],
+        },
+        EnumVariant {
+            name: greater_name,
+            field_types: vec![],
+        },
+    ];
+    let _enum_idx = checker.pool_mut().enum_type(ordering_name, &pool_variants);
 
     checker.type_registry_mut().register_enum(
         ordering_name,
@@ -103,6 +122,13 @@ fn register_type_decl(checker: &mut ModuleChecker<'_>, decl: &ori_ir::TypeDecl) 
                 })
                 .collect();
 
+            // Create Pool struct entry BEFORE moving field_defs to TypeRegistry.
+            // Extract (Name, Idx) pairs for the Pool's compact representation.
+            let pool_fields: Vec<(ori_ir::Name, Idx)> =
+                field_defs.iter().map(|f| (f.name, f.ty)).collect();
+            let struct_idx = checker.pool_mut().struct_type(decl.name, &pool_fields);
+            checker.pool_mut().set_resolution(idx, struct_idx);
+
             checker.type_registry_mut().register_struct(
                 decl.name,
                 idx,
@@ -143,6 +169,27 @@ fn register_type_decl(checker: &mut ModuleChecker<'_>, decl: &ori_ir::TypeDecl) 
                     }
                 })
                 .collect();
+
+            // Create Pool enum entry BEFORE moving variant_defs to TypeRegistry.
+            // Extract variant info for the Pool's compact representation.
+            let pool_variants: Vec<EnumVariant> = variant_defs
+                .iter()
+                .map(|v| {
+                    let field_types = match &v.fields {
+                        VariantFields::Unit => vec![],
+                        VariantFields::Tuple(types) => types.clone(),
+                        VariantFields::Record(field_defs) => {
+                            field_defs.iter().map(|f| f.ty).collect()
+                        }
+                    };
+                    EnumVariant {
+                        name: v.name,
+                        field_types,
+                    }
+                })
+                .collect();
+            let enum_idx = checker.pool_mut().enum_type(decl.name, &pool_variants);
+            checker.pool_mut().set_resolution(idx, enum_idx);
 
             checker.type_registry_mut().register_enum(
                 decl.name,
@@ -294,7 +341,17 @@ pub(super) fn resolve_parsed_type_simple(
                 }
             }
 
-            // No type args — bare named type
+            // No type args — check for pre-interned primitives before falling
+            // through to pool.named(). Without this, struct fields like
+            // `order: Ordering` would get a fresh Named Idx instead of Idx::ORDERING,
+            // causing the same duality bug that affected register_builtin_types.
+            let name_str = checker.interner().lookup(*name);
+            match name_str {
+                "Ordering" | "ordering" => return Idx::ORDERING,
+                "Duration" | "duration" => return Idx::DURATION,
+                "Size" | "size" => return Idx::SIZE,
+                _ => {}
+            }
             checker.pool_mut().named(*name)
         }
 
@@ -825,6 +882,7 @@ fn infer_const_type(checker: &mut ModuleChecker<'_>, value_id: ori_ir::ExprId) -
 
 #[cfg(test)]
 #[expect(clippy::unwrap_used, reason = "Tests use unwrap for brevity")]
+#[expect(clippy::expect_used, reason = "Tests use expect for clarity")]
 mod tests {
     use super::*;
     use ori_ir::{ExprArena, StringInterner};
@@ -845,6 +903,53 @@ mod tests {
         let entry = entry.unwrap();
         assert!(
             matches!(entry.kind, crate::TypeKind::Enum { ref variants } if variants.len() == 3)
+        );
+
+        // The registered idx must match the pre-interned Idx::ORDERING primitive.
+        // Without this, return type annotations (-> Ordering) resolve to Idx::ORDERING
+        // but variant constructors (Less, Equal, Greater) return the Named idx, causing
+        // unification failures.
+        assert_eq!(entry.idx, Idx::ORDERING);
+    }
+
+    #[test]
+    fn ordering_variant_returns_pre_interned_idx() {
+        let arena = ExprArena::new();
+        let interner = StringInterner::new();
+        let mut checker = ModuleChecker::new(&arena, &interner);
+
+        register_builtin_types(&mut checker);
+
+        // When looking up a variant like `Less`, the returned type_entry.idx must
+        // be Idx::ORDERING so that it unifies with return type annotations.
+        let less_name = interner.intern("Less");
+        let (type_entry, variant_def) = checker
+            .type_registry()
+            .lookup_variant_def(less_name)
+            .expect("Less variant should be registered");
+
+        assert_eq!(type_entry.idx, Idx::ORDERING);
+        assert!(matches!(variant_def.fields, crate::VariantFields::Unit));
+    }
+
+    #[test]
+    fn ordering_lookup_by_pre_interned_idx() {
+        let arena = ExprArena::new();
+        let interner = StringInterner::new();
+        let mut checker = ModuleChecker::new(&arena, &interner);
+
+        register_builtin_types(&mut checker);
+
+        // Looking up by Idx::ORDERING must find the enum with 3 variants.
+        // This is the idx that return type annotations resolve to.
+        let entry = checker
+            .type_registry()
+            .get_by_idx(Idx::ORDERING)
+            .expect("Ordering should be findable by Idx::ORDERING");
+
+        assert!(
+            matches!(entry.kind, crate::TypeKind::Enum { ref variants } if variants.len() == 3),
+            "Idx::ORDERING should map to an enum with 3 variants"
         );
     }
 

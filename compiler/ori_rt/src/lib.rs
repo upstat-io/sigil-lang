@@ -11,7 +11,7 @@
 //! # Function Categories
 //!
 //! - **Memory**: `ori_alloc`, `ori_free`, `ori_realloc`
-//! - **Reference Counting**: `ori_rc_new`, `ori_rc_inc`, `ori_rc_dec`
+//! - **Reference Counting**: `ori_rc_alloc`, `ori_rc_inc`, `ori_rc_dec`, `ori_rc_free`
 //! - **Strings**: `ori_str_concat`, `ori_str_eq`, etc.
 //! - **Collections**: `ori_list_new`, `ori_list_free`, etc.
 //! - **I/O**: `ori_print`, `ori_print_int`, etc.
@@ -40,6 +40,18 @@
 
 use std::cell::{Cell, RefCell};
 use std::ffi::CStr;
+use std::panic;
+
+/// Ori panic payload for stack unwinding (AOT mode).
+///
+/// Wrapped in `std::panic::panic_any` so the Itanium EH ABI
+/// unwinds through LLVM-generated `invoke`/`landingpad` pairs,
+/// giving cleanup handlers a chance to release RC'd resources.
+///
+/// The entry point wrapper catches this with `catch_unwind`.
+pub struct OriPanic {
+    pub message: String,
+}
 
 /// Ori string representation: { i64 len, *const u8 data }
 #[repr(C)]
@@ -87,22 +99,28 @@ pub struct OriResult<T> {
     pub value: T,
 }
 
-/// Reference-counted object header.
-///
-/// Layout in memory:
-/// ```text
-/// +------------+--------+------+
-/// | refcount   | size   | data |
-/// | (i64)      | (i64)  | ...  |
-/// +------------+--------+------+
-/// ```
-#[repr(C)]
-pub struct RcHeader {
-    /// Current reference count. When this reaches 0, the object is freed.
-    pub refcount: i64,
-    /// Size of the data following the header (for deallocation).
-    pub size: i64,
-}
+// ── Reference Counting (V2: 8-byte header, data-pointer style) ───────────
+//
+// Heap layout for RC'd objects:
+//
+//   +──────────────────+───────────────────────────────+
+//   | strong_count: i64 | data bytes ...               |
+//   +──────────────────+───────────────────────────────+
+//   ^                   ^
+//   base (ptr - 8)      data_ptr (returned by ori_rc_alloc)
+//
+// The data pointer points directly to user data, NOT to the header.
+// strong_count lives at `data_ptr - 8`.
+//
+// Advantages:
+// - Data pointer can be passed to C FFI without adjustment
+// - Single pointer on stack (no separate header pointer)
+// - 8 bytes smaller than old 16-byte RcHeader (no size field)
+// - Size tracked at compile time via TypeInfo, not at runtime
+//
+// When refcount reaches zero, a type-specialized drop function handles:
+// 1. Decrementing reference counts of RC'd child fields
+// 2. Calling ori_rc_free(data_ptr, size, align) to release memory
 
 // ── setjmp/longjmp JIT recovery ──────────────────────────────────────────
 
@@ -295,99 +313,116 @@ pub extern "C" fn ori_realloc(
     unsafe { std::alloc::realloc(ptr, old_layout, new_size) }
 }
 
-/// Create a new reference-counted object.
+/// Allocate a new reference-counted object.
 ///
-/// Allocates memory for the header + data, initializes refcount to 1.
-/// Returns a pointer to the `RcHeader`, or null on failure.
+/// Allocates `size + 8` bytes with the given alignment, initializes
+/// `strong_count` to 1, and returns a pointer to the data area.
+///
+/// Layout: `[strong_count: i64 | data bytes ...]`
+///          ^                    ^
+///          base (ptr - 8)       returned data_ptr
+///
+/// Returns null on allocation failure.
 #[no_mangle]
-pub extern "C" fn ori_rc_new(size: usize) -> *mut RcHeader {
-    let header_size = std::mem::size_of::<RcHeader>();
-    let total_size = header_size + size;
-    let align = std::mem::align_of::<RcHeader>().max(8);
+pub extern "C" fn ori_rc_alloc(size: usize, align: usize) -> *mut u8 {
+    let align = align.max(8); // Minimum 8-byte alignment for strong_count
+    let total_size = size + 8;
 
-    let ptr = ori_alloc(total_size, align);
-    if ptr.is_null() {
+    let base = ori_alloc(total_size, align);
+    if base.is_null() {
         return std::ptr::null_mut();
     }
 
-    // SAFETY: ptr is valid and properly aligned for RcHeader
-    let header = ptr.cast::<RcHeader>();
+    // Initialize strong_count to 1
+    // SAFETY: base is valid and 8-byte aligned
     unsafe {
-        (*header).refcount = 1;
-        (*header).size = size as i64;
+        base.cast::<i64>().write(1);
     }
 
-    header
+    // Return data pointer (8 bytes past the strong_count)
+    // SAFETY: base is valid for total_size bytes, so base + 8 is valid
+    unsafe { base.add(8) }
 }
 
-/// Increment the reference count.
+/// Increment the reference count of an RC'd object.
 ///
-/// # Safety
-/// `ptr` must be a valid pointer returned by `ori_rc_new`.
+/// `data_ptr` points to the data area. `strong_count` is at `data_ptr - 8`.
 #[no_mangle]
-pub extern "C" fn ori_rc_inc(ptr: *mut RcHeader) {
-    if ptr.is_null() {
+pub extern "C" fn ori_rc_inc(data_ptr: *mut u8) {
+    if data_ptr.is_null() {
         return;
     }
 
-    // SAFETY: Caller guarantees ptr is valid
+    // SAFETY: data_ptr was returned by ori_rc_alloc, so data_ptr - 8 is valid
     unsafe {
-        (*ptr).refcount += 1;
+        let rc_ptr = data_ptr.sub(8).cast::<i64>();
+        *rc_ptr += 1;
     }
 }
 
-/// Decrement the reference count. Frees the object if count reaches 0.
+/// Decrement the reference count. If it reaches zero, call the drop function.
 ///
-/// # Safety
-/// `ptr` must be a valid pointer returned by `ori_rc_new`.
+/// `data_ptr` points to the data area. `strong_count` is at `data_ptr - 8`.
+///
+/// `drop_fn` is a type-specialized function generated at compile time that:
+/// 1. Decrements reference counts of any RC'd child fields
+/// 2. Calls `ori_rc_free(data_ptr, size, align)` to release the memory
+///
+/// If `drop_fn` is null, the memory is leaked when refcount reaches zero.
+/// This should not happen in well-formed programs — every RC type must have
+/// a drop function.
 #[no_mangle]
-pub extern "C" fn ori_rc_dec(ptr: *mut RcHeader) {
-    if ptr.is_null() {
+pub extern "C" fn ori_rc_dec(data_ptr: *mut u8, drop_fn: Option<extern "C" fn(*mut u8)>) {
+    if data_ptr.is_null() {
         return;
     }
 
-    // SAFETY: Caller guarantees ptr is valid
-    let should_free = unsafe {
-        (*ptr).refcount -= 1;
-        (*ptr).refcount <= 0
+    // SAFETY: data_ptr was returned by ori_rc_alloc, so data_ptr - 8 is valid
+    let should_drop = unsafe {
+        let rc_ptr = data_ptr.sub(8).cast::<i64>();
+        *rc_ptr -= 1;
+        *rc_ptr <= 0
     };
 
-    if should_free {
-        let header_size = std::mem::size_of::<RcHeader>();
-        let data_size = unsafe { (*ptr).size as usize };
-        let total_size = header_size + data_size;
-        let align = std::mem::align_of::<RcHeader>().max(8);
-
-        ori_free(ptr.cast(), total_size, align);
+    if should_drop {
+        if let Some(f) = drop_fn {
+            f(data_ptr);
+        }
     }
 }
 
-/// Get the current reference count.
+/// Free a reference-counted allocation unconditionally.
 ///
-/// # Safety
-/// `ptr` must be a valid pointer returned by `ori_rc_new`.
+/// Deallocates from `data_ptr - 8` with total size `size + 8`.
+/// Typically called as the last step of a type-specialized drop function.
+///
+/// `size` and `align` are the data size and alignment (same values passed
+/// to `ori_rc_alloc`). The 8-byte header is accounted for internally.
 #[no_mangle]
-pub extern "C" fn ori_rc_count(ptr: *const RcHeader) -> i64 {
-    if ptr.is_null() {
+pub extern "C" fn ori_rc_free(data_ptr: *mut u8, size: usize, align: usize) {
+    if data_ptr.is_null() {
+        return;
+    }
+
+    // SAFETY: data_ptr was returned by ori_rc_alloc, so data_ptr - 8 is the base
+    let base = unsafe { data_ptr.sub(8) };
+    let total_size = size + 8;
+    let align = align.max(8);
+
+    ori_free(base, total_size, align);
+}
+
+/// Get the current reference count (for testing and debugging).
+///
+/// `data_ptr` points to the data area. `strong_count` is at `data_ptr - 8`.
+#[no_mangle]
+pub extern "C" fn ori_rc_count(data_ptr: *const u8) -> i64 {
+    if data_ptr.is_null() {
         return 0;
     }
 
-    // SAFETY: Caller guarantees ptr is valid
-    unsafe { (*ptr).refcount }
-}
-
-/// Get a pointer to the data following the header.
-///
-/// # Safety
-/// `ptr` must be a valid pointer returned by `ori_rc_new`.
-#[no_mangle]
-pub extern "C" fn ori_rc_data(ptr: *mut RcHeader) -> *mut u8 {
-    if ptr.is_null() {
-        return std::ptr::null_mut();
-    }
-
-    // SAFETY: Data immediately follows the header
-    unsafe { ptr.add(1).cast() }
+    // SAFETY: data_ptr was returned by ori_rc_alloc, so data_ptr - 8 is valid
+    unsafe { *data_ptr.sub(8).cast::<i64>() }
 }
 
 /// Print a string to stdout.
@@ -424,8 +459,11 @@ pub extern "C" fn ori_print_bool(b: bool) {
 
 /// Panic with a message.
 ///
-/// In JIT mode, sets thread-local panic state and `longjmp`s back to the
-/// test runner. In AOT mode, prints to stderr and terminates.
+/// Dispatch order:
+/// 1. Store panic state (for JIT test assertions)
+/// 2. If user `@panic` handler registered and not re-entrant: call trampoline
+/// 3. If JIT mode: `longjmp` back to test runner
+/// 4. AOT default: print to stderr and `exit(1)`
 #[no_mangle]
 pub extern "C" fn ori_panic(s: *const OriStr) {
     let msg = if s.is_null() {
@@ -441,6 +479,9 @@ pub extern "C" fn ori_panic(s: *const OriStr) {
     PANIC_OCCURRED.with(|p| *p.borrow_mut() = true);
     PANIC_MESSAGE.with(|m| *m.borrow_mut() = Some(msg.clone()));
 
+    // Call user @panic handler if registered (AOT only, not re-entrant)
+    call_panic_trampoline(&msg);
+
     // In JIT mode, longjmp back to the test runner instead of terminating
     if is_jit_mode() {
         let buf = JIT_RECOVERY_BUF.with(|b| b.get());
@@ -450,15 +491,16 @@ pub extern "C" fn ori_panic(s: *const OriStr) {
         }
     }
 
-    // AOT path: print and terminate
+    // AOT path: unwind via Rust panic infrastructure.
+    // LLVM invoke/landingpad in the caller will catch this and run
+    // RC cleanup before re-raising or terminating.
     eprintln!("ori panic: {msg}");
-    std::process::exit(1);
+    panic::panic_any(OriPanic { message: msg });
 }
 
 /// Panic with a C string message.
 ///
-/// In JIT mode, sets panic state and `longjmp`s back to the test runner.
-/// In AOT mode, prints to stderr and terminates.
+/// Same dispatch order as `ori_panic`: user handler → JIT longjmp → unwind.
 #[no_mangle]
 pub extern "C" fn ori_panic_cstr(s: *const i8) {
     let msg = if s.is_null() {
@@ -472,6 +514,9 @@ pub extern "C" fn ori_panic_cstr(s: *const i8) {
     PANIC_OCCURRED.with(|p| *p.borrow_mut() = true);
     PANIC_MESSAGE.with(|m| *m.borrow_mut() = Some(msg.clone()));
 
+    // Call user @panic handler if registered (AOT only, not re-entrant)
+    call_panic_trampoline(&msg);
+
     // In JIT mode, longjmp back to the test runner instead of terminating
     if is_jit_mode() {
         let buf = JIT_RECOVERY_BUF.with(|b| b.get());
@@ -481,9 +526,9 @@ pub extern "C" fn ori_panic_cstr(s: *const i8) {
         }
     }
 
-    // AOT path: print and terminate
+    // AOT path: unwind via Rust panic infrastructure
     eprintln!("ori panic: {msg}");
-    std::process::exit(1);
+    panic::panic_any(OriPanic { message: msg });
 }
 
 /// Assert that a condition is true.
@@ -702,12 +747,183 @@ pub extern "C" fn ori_max_int(a: i64, b: i64) -> i64 {
     a.max(b)
 }
 
-/// Allocate memory for a closure struct.
+/// Convert C `argc`/`argv` to an Ori `[str]` list.
 ///
-/// Used when a closure has captures and needs to be boxed for returning.
-/// The size should be the total size of the closure struct in bytes.
+/// Skips `argv[0]` (program name) per the Ori spec: `@main(args)` receives
+/// only user-supplied arguments. Returns `OriList { len, cap, data }` by value.
+///
+/// Each element is an `OriStr { len: i64, data: *const u8 }` (16 bytes).
+/// String data is copied to owned allocations so the caller doesn't depend
+/// on the lifetime of the original `argv` strings.
 #[no_mangle]
-pub extern "C" fn ori_closure_box(size: i64) -> *mut u8 {
-    let size = size.max(8) as usize;
-    ori_alloc(size, 8)
+pub extern "C" fn ori_args_from_argv(argc: i32, argv: *const *const i8) -> OriList {
+    // Empty list if no user args or null argv
+    if argc <= 1 || argv.is_null() {
+        return OriList {
+            len: 0,
+            cap: 0,
+            data: std::ptr::null_mut(),
+        };
+    }
+
+    let count = (argc - 1) as usize; // skip argv[0]
+                                     // Allocate contiguous array for OriStr elements (16 bytes each)
+    let layout = std::alloc::Layout::array::<OriStr>(count)
+        .unwrap_or_else(|_| std::alloc::Layout::new::<u8>());
+    // SAFETY: Layout is valid (count > 0, OriStr has standard alignment)
+    let data = unsafe { std::alloc::alloc(layout) };
+    if data.is_null() {
+        return OriList {
+            len: 0,
+            cap: 0,
+            data: std::ptr::null_mut(),
+        };
+    }
+
+    let elements = data.cast::<OriStr>();
+    for i in 0..count {
+        // SAFETY: argv is valid for argc entries; we access argv[i+1]
+        let c_str = unsafe { CStr::from_ptr(*argv.add(i + 1)) };
+        let bytes = c_str.to_bytes();
+        let len = bytes.len();
+
+        // Copy string data to owned allocation
+        let str_data = if len > 0 {
+            let str_layout = std::alloc::Layout::array::<u8>(len)
+                .unwrap_or_else(|_| std::alloc::Layout::new::<u8>());
+            // SAFETY: Layout is valid
+            let ptr = unsafe { std::alloc::alloc(str_layout) };
+            if !ptr.is_null() {
+                // SAFETY: bytes and ptr are valid for len bytes
+                unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, len) };
+            }
+            ptr
+        } else {
+            std::ptr::null_mut()
+        };
+
+        // SAFETY: elements[i] is within the allocated array
+        unsafe {
+            elements.add(i).write(OriStr {
+                len: len as i64,
+                data: str_data,
+            });
+        }
+    }
+
+    OriList {
+        len: count as i64,
+        cap: count as i64,
+        data: data.cast::<u8>(),
+    }
+}
+
+// ── Panic handler registration ──────────────────────────────────────────
+
+/// Type for the panic trampoline function.
+///
+/// The trampoline is an LLVM-generated function that receives raw C values
+/// and constructs the Ori `PanicInfo` struct before calling the user's
+/// `@panic` handler. Signature:
+/// `(msg_ptr, msg_len, file_ptr, file_len, line, col) -> void`
+type PanicTrampoline = extern "C" fn(*const u8, i64, *const u8, i64, i64, i64);
+
+/// Global panic trampoline function pointer.
+///
+/// Set by `ori_register_panic_handler` during `main()` initialization.
+/// Called by `ori_panic`/`ori_panic_cstr` before default behavior.
+///
+/// # Safety
+///
+/// Access is limited to single-threaded AOT initialization (`main()` before
+/// spawning threads). Thread-local `IN_PANIC_HANDLER` provides re-entrancy
+/// protection.
+static mut ORI_PANIC_TRAMPOLINE: Option<PanicTrampoline> = None;
+
+thread_local! {
+    /// Re-entrancy guard: prevents infinite recursion if the user's `@panic`
+    /// handler itself panics.
+    static IN_PANIC_HANDLER: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Call the user's panic trampoline if registered and not re-entrant.
+///
+/// The trampoline receives raw C values (message pointer, length, empty
+/// file/location) and constructs the Ori `PanicInfo` struct in LLVM IR
+/// before calling the user's `@panic` function.
+///
+/// If the handler returns normally, we proceed with default behavior.
+/// If the handler itself panics (re-entrancy), we skip it to avoid loops.
+fn call_panic_trampoline(msg: &str) {
+    // SAFETY: Read of global set during single-threaded main() init
+    let trampoline = unsafe { ORI_PANIC_TRAMPOLINE };
+    let Some(trampoline) = trampoline else {
+        return;
+    };
+
+    // Re-entrancy guard: if @panic handler panics, skip it
+    let already_in_handler = IN_PANIC_HANDLER.with(|h| h.get());
+    if already_in_handler {
+        return;
+    }
+
+    IN_PANIC_HANDLER.with(|h| h.set(true));
+
+    let msg_ptr = msg.as_ptr();
+    let msg_len = msg.len() as i64;
+    // Empty file/location — populated when debug info infrastructure arrives (Section 13)
+    let empty_ptr = b"\0".as_ptr();
+    trampoline(msg_ptr, msg_len, empty_ptr, 0, 0, 0);
+
+    IN_PANIC_HANDLER.with(|h| h.set(false));
+}
+
+/// Register a panic trampoline function.
+///
+/// Called from the generated `main()` wrapper when the user defines `@panic`.
+/// The trampoline is an LLVM-generated function that bridges C values to Ori
+/// `PanicInfo` struct construction.
+#[no_mangle]
+pub extern "C" fn ori_register_panic_handler(handler: *const ()) {
+    if handler.is_null() {
+        return;
+    }
+    // SAFETY: Called once during single-threaded main() initialization
+    unsafe {
+        ORI_PANIC_TRAMPOLINE = Some(std::mem::transmute::<*const (), PanicTrampoline>(handler));
+    }
+}
+
+// ── AOT entry point wrapper ─────────────────────────────────────────────
+
+/// Wrap an AOT `@main` call with `catch_unwind` to handle Ori panics.
+///
+/// The LLVM-generated `main()` calls this instead of calling `@main` directly.
+/// This catches the `OriPanic` payload from `panic_any` and converts it to
+/// `exit(1)`, preventing the Rust runtime from printing an ugly panic message.
+///
+/// `main_fn` is a function pointer to the user's compiled `@main` (void → void
+/// or void → int variant).
+///
+/// Returns 0 on success, 1 on panic.
+#[no_mangle]
+pub extern "C" fn ori_run_main(main_fn: extern "C" fn()) -> i32 {
+    let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        main_fn();
+    }));
+
+    match result {
+        Ok(()) => 0,
+        Err(payload) => {
+            // Check if this is our structured OriPanic
+            if payload.downcast_ref::<OriPanic>().is_some() {
+                // Message already printed by ori_panic/ori_panic_cstr
+                1
+            } else {
+                // Unknown panic (shouldn't happen in well-formed programs)
+                eprintln!("ori panic: unexpected error");
+                1
+            }
+        }
+    }
 }

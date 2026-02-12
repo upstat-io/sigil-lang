@@ -11,6 +11,8 @@ members = [
     "compiler/ori_eval",
     "compiler/ori_fmt",
     "compiler/ori_macros",
+    "compiler/ori_arc",
+    "compiler/ori_canon",
     "compiler/ori_stack",
     "compiler/oric",
 ]
@@ -41,12 +43,15 @@ dashmap = "6.1"
 parking_lot = "0.12"
 crossbeam = "0.8"
 rustc-hash = "2.1"
+smallvec = { version = "1", features = ["const_generics"] }
 stacker = "0.1"
 proptest = "1.4"
 bitflags = "2.6"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "registry"] }
 tracing-tree = "0.4"
+serde = { version = "1", features = ["derive"] }
+bincode = "1"
 
 # Internal crates (workspace members only; excluded crates use path deps directly)
 ori_ir = { path = "compiler/ori_ir" }
@@ -59,6 +64,8 @@ ori_patterns = { path = "compiler/ori_patterns" }
 ori_eval = { path = "compiler/ori_eval" }
 ori_fmt = { path = "compiler/ori_fmt" }
 ori_macros = { path = "compiler/ori_macros" }
+ori_arc = { path = "compiler/ori_arc" }
+ori_canon = { path = "compiler/ori_canon" }
 ori_stack = { path = "compiler/ori_stack" }
 
 # Workspace-wide lint configuration

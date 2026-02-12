@@ -10,26 +10,30 @@
 #![allow(clippy::single_char_pattern, clippy::uninlined_format_args)]
 
 use ori_ir::BinaryOp;
-use ori_patterns::{ControlFlow, EvalError, Value};
+use ori_patterns::{ControlAction, EvalError, Value};
 
-// Import all error factory functions
+// Import shared error factory functions from ori_patterns
 use ori_patterns::{
-    all_requires_list, any_requires_list, await_not_supported, binary_type_mismatch,
-    cannot_access_field, cannot_assign_immutable, cannot_get_length, cannot_index,
-    collect_requires_range, collection_too_large, default_requires_type_context, division_by_zero,
-    expected_list, expected_struct, expected_tuple, field_assignment_not_implemented,
-    filter_entries_not_implemented, filter_entries_requires_map, filter_requires_collection,
-    find_requires_list, fold_requires_collection, for_pattern_requires_list, for_requires_iterable,
-    hash_outside_index, index_assignment_not_implemented, index_out_of_bounds, integer_overflow,
+    all_requires_list, any_requires_list, binary_type_mismatch, cannot_access_field,
+    cannot_get_length, cannot_index, collect_requires_range, collection_too_large,
+    division_by_zero, expected_list, expected_struct, expected_tuple, filter_entries_requires_map,
+    filter_requires_collection, find_requires_list, fold_requires_collection,
+    for_pattern_requires_list, for_requires_iterable, index_out_of_bounds, integer_overflow,
     invalid_assignment_target, invalid_binary_op_for, invalid_literal_pattern, invalid_tuple_field,
-    key_not_found, list_pattern_too_long, map_entries_not_implemented, map_entries_requires_map,
-    map_key_not_hashable, map_requires_collection, missing_struct_field, modulo_by_zero,
-    no_field_on_struct, no_member_in_module, no_such_method, non_exhaustive_match,
-    non_integer_in_index, not_callable, operator_not_supported_in_index, parse_error,
-    propagated_error_message, range_bound_not_int, recursion_limit_exceeded, self_outside_method,
-    tuple_index_out_of_bounds, tuple_pattern_mismatch, unbounded_range_end, undefined_const,
-    undefined_function, undefined_variable, unknown_pattern, wrong_arg_count, wrong_arg_type,
-    wrong_function_args,
+    key_not_found, list_pattern_too_long, map_entries_requires_map, map_key_not_hashable,
+    map_requires_collection, missing_struct_field, modulo_by_zero, no_field_on_struct,
+    no_member_in_module, no_such_method, non_exhaustive_match, non_integer_in_index, not_callable,
+    operator_not_supported_in_index, parse_error, propagated_error_message, range_bound_not_int,
+    recursion_limit_exceeded, self_outside_method, tuple_index_out_of_bounds,
+    tuple_pattern_mismatch, unbounded_range_end, undefined_const, undefined_function,
+    undefined_variable, unknown_pattern, wrong_arg_count, wrong_arg_type, wrong_function_args,
+};
+
+// Import eval-specific error constructors from ori_eval
+use ori_eval::errors::{
+    await_not_supported, cannot_assign_immutable, default_requires_type_context,
+    field_assignment_not_implemented, filter_entries_not_implemented, hash_outside_index,
+    index_assignment_not_implemented, map_entries_not_implemented,
 };
 
 // -- EvalError basic functionality --
@@ -38,44 +42,57 @@ use ori_patterns::{
 fn test_eval_error_new() {
     let err = EvalError::new("test message");
     assert_eq!(err.message, "test message");
-    assert!(err.propagated_value.is_none());
-    assert!(err.control_flow.is_none());
+}
+
+// -- ControlAction tests --
+
+#[test]
+fn test_control_action_break() {
+    let action = ControlAction::Break(Value::int(42));
+    assert!(!action.is_error());
+    if let ControlAction::Break(v) = action {
+        assert_eq!(v, Value::int(42));
+    } else {
+        panic!("expected ControlAction::Break");
+    }
 }
 
 #[test]
-fn test_eval_error_propagate() {
-    let value = Value::int(42);
-    let err = EvalError::propagate(value.clone(), "propagated error");
-    assert_eq!(err.message, "propagated error");
-    assert_eq!(err.propagated_value, Some(value));
-    assert!(err.control_flow.is_none());
-}
-
-// -- ControlFlow tests --
-
-#[test]
-fn test_control_flow_break() {
-    let err = EvalError::break_with(Value::int(42));
-    assert!(err.message.contains("break"));
-    assert!(err.is_control_flow());
-    assert_eq!(err.control_flow, Some(ControlFlow::Break(Value::int(42))));
+fn test_control_action_continue() {
+    let action = ControlAction::Continue(Value::Void);
+    assert!(!action.is_error());
+    if let ControlAction::Continue(v) = action {
+        assert!(matches!(v, Value::Void));
+    } else {
+        panic!("expected ControlAction::Continue");
+    }
 }
 
 #[test]
-fn test_control_flow_continue() {
-    let err = EvalError::continue_signal();
-    assert_eq!(err.message, "continue");
-    assert!(err.is_control_flow());
-    assert_eq!(err.control_flow, Some(ControlFlow::Continue(Value::Void)));
+fn test_control_action_propagate() {
+    let action = ControlAction::Propagate(Value::int(42));
+    assert!(!action.is_error());
+    if let ControlAction::Propagate(v) = action {
+        assert_eq!(v, Value::int(42));
+    } else {
+        panic!("expected ControlAction::Propagate");
+    }
 }
 
 #[test]
-fn test_is_control_flow() {
-    let regular_err = EvalError::new("error");
-    assert!(!regular_err.is_control_flow());
+fn test_control_action_error() {
+    let action = ControlAction::from(EvalError::new("error"));
+    assert!(action.is_error());
 
-    let break_err = EvalError::break_with(Value::Void);
-    assert!(break_err.is_control_flow());
+    let err = action.into_eval_error();
+    assert_eq!(err.message, "error");
+}
+
+#[test]
+fn test_control_action_from_eval_error() {
+    let err = EvalError::new("test");
+    let action: ControlAction = err.into();
+    assert!(action.is_error());
 }
 
 // -- Binary Operation Errors --
@@ -119,7 +136,11 @@ fn test_recursion_limit_exceeded() {
     let err = recursion_limit_exceeded(200);
     assert!(err.message.contains("recursion"));
     assert!(err.message.contains("200"));
-    assert!(err.message.contains("WASM"));
+    assert!(err.message.contains("limit"));
+    assert_eq!(
+        err.kind,
+        ori_patterns::EvalErrorKind::StackOverflow { depth: 200 }
+    );
 }
 
 // -- Method Call Errors --

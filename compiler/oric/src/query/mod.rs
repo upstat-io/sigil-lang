@@ -1,7 +1,31 @@
-//! Salsa Queries - Computed values that are cached
+//! Salsa Queries — Computed values that are cached and incrementally revalidated.
 //!
 //! Queries are functions that compute values from inputs or other queries.
 //! Salsa automatically caches results and invalidates when dependencies change.
+//!
+//! # Query Pipeline & Early Cutoff
+//!
+//! ```text
+//! SourceFile (#[salsa::input])
+//!     ↓ file.text(db)
+//! lex_result(db, file)     — tokens + errors; early cutoff on LexResult equality
+//!     ↓
+//! tokens(db, file)         — position-independent equality enables cutoff
+//!     ↓                      even when spans shift (whitespace edits)
+//! parsed(db, file)         — early cutoff on AST equality
+//!     ↓
+//! typed(db, file)          — early cutoff on TypeCheckResult equality
+//!     ↓
+//! [codegen boundary — NOT a Salsa query]
+//!     ↓
+//! ARC analysis → LLVM emission → object file (managed by ArtifactCache)
+//! ```
+//!
+//! Codegen is not a Salsa query because LLVM types are lifetime-bound to an
+//! LLVM `Context` and cannot satisfy `Clone + Eq + Hash`. The Salsa/ArtifactCache
+//! boundary is at `typed()`: function content hashes are computed from the
+//! `TypeCheckResult` and used as cache keys for ARC IR and object artifacts.
+//! See `commands/compile_common.rs` for the back-end caching strategy.
 
 use crate::db::Db;
 use crate::eval::{EvalOutput, Evaluator, ModuleEvalResult};
@@ -182,6 +206,20 @@ pub fn typed(db: &dyn Db, file: SourceFile) -> TypeCheckResult {
 #[salsa::tracked]
 pub fn evaluated(db: &dyn Db, file: SourceFile) -> ModuleEvalResult {
     tracing::debug!(path = %file.path(db).display(), "evaluating");
+
+    // Check for lexer errors first — the parser silently skips TokenKind::Error
+    // tokens without emitting parse errors, so a file of pure lexer errors
+    // (e.g., `"unterminated`) would pass parse_result.has_errors() and proceed
+    // to evaluation with an empty module.
+    let lex_errs = lex_errors(db, file);
+    if !lex_errs.is_empty() {
+        return ModuleEvalResult::failure(format!(
+            "{} lexer error{} found",
+            lex_errs.len(),
+            if lex_errs.len() == 1 { "" } else { "s" }
+        ));
+    }
+
     let parse_result = parsed(db, file);
 
     // Check for parse errors
@@ -193,7 +231,7 @@ pub fn evaluated(db: &dyn Db, file: SourceFile) -> ModuleEvalResult {
     let file_path = file.path(db);
 
     // Type check (returns result + pool)
-    let (type_result, _pool) =
+    let (type_result, pool) =
         typeck::type_check_with_imports_and_pool(db, &parse_result, file_path);
 
     // Check for type errors using the error guarantee
@@ -205,14 +243,26 @@ pub fn evaluated(db: &dyn Db, file: SourceFile) -> ModuleEvalResult {
         ));
     }
 
-    // Create evaluator with type information (Idx-based)
+    // Canonicalize: AST + types → self-contained canonical IR.
+    // This produces a CanonResult with all ExprArena references resolved.
+    // Functions carry the SharedCanonResult so the evaluator can dispatch
+    // on CanExpr (Part B2) instead of ExprKind.
+    let canon_result = ori_canon::lower_module(
+        &parse_result.module,
+        &parse_result.arena,
+        &type_result,
+        &pool,
+        interner,
+    );
+    let shared_canon = ori_ir::canon::SharedCanonResult::new(canon_result);
+
+    // Create evaluator with type information and canonical IR
     let mut evaluator = Evaluator::builder(interner, &parse_result.arena, db)
-        .expr_types(&type_result.typed.expr_types)
-        .pattern_resolutions(&type_result.typed.pattern_resolutions)
+        .canon(shared_canon.clone())
         .build();
     evaluator.register_prelude();
 
-    if let Err(e) = evaluator.load_module(&parse_result, file_path) {
+    if let Err(e) = evaluator.load_module(&parse_result, file_path, Some(&shared_canon)) {
         return ModuleEvalResult::failure(format!("module error: {e}"));
     }
 
@@ -222,19 +272,25 @@ pub fn evaluated(db: &dyn Db, file: SourceFile) -> ModuleEvalResult {
         // Call main with no arguments
         match evaluator.eval_call_value(&main_func, &[]) {
             Ok(value) => ModuleEvalResult::success(EvalOutput::from_value(&value, interner)),
-            Err(e) => ModuleEvalResult::failure(e.message),
+            Err(e) => ModuleEvalResult::runtime_error(&e.into_eval_error()),
         }
     } else {
         // No main function - try to evaluate first function only if it has no parameters
         if let Some(func) = parse_result.module.functions.first() {
             let params = parse_result.arena.get_params(func.params);
             if params.is_empty() {
-                // Zero-argument function - safe to call
-                match evaluator.eval(func.body) {
+                // Zero-argument function - safe to call.
+                let Some(can_id) = shared_canon.root_for(func.name) else {
+                    return ModuleEvalResult::failure(
+                        "internal error: function has no canonical root".to_string(),
+                    );
+                };
+                let result = evaluator.eval_can(can_id);
+                match result {
                     Ok(value) => {
                         ModuleEvalResult::success(EvalOutput::from_value(&value, interner))
                     }
-                    Err(e) => ModuleEvalResult::failure(e.message),
+                    Err(e) => ModuleEvalResult::runtime_error(&e.into_eval_error()),
                 }
             } else {
                 // Function requires arguments - can't run without @main

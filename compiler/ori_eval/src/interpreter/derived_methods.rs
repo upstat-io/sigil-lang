@@ -7,11 +7,11 @@
 //! - `#[derive(Printable)]` -> `to_string` method
 //! - `#[derive(Default)]` -> `default` method
 
+use crate::errors::{default_requires_type_context, wrong_function_args};
+use crate::{EvalResult, Value};
+use ori_ir::{DerivedMethodInfo, DerivedTrait};
+
 use super::Interpreter;
-use crate::{
-    default_requires_type_context, wrong_function_args, DerivedMethodInfo, DerivedTrait,
-    EvalResult, Value,
-};
 
 impl Interpreter<'_> {
     /// Evaluate a derived method (from `#[derive(...)]`).
@@ -52,7 +52,7 @@ impl Interpreter<'_> {
     ) -> EvalResult {
         // eq takes one argument: the other value to compare
         if args.len() != 1 {
-            return Err(wrong_function_args(1, args.len()));
+            return Err(wrong_function_args(1, args.len()).into());
         }
 
         let other = &args[0];
@@ -214,6 +214,6 @@ impl Interpreter<'_> {
         // Default is a static method that doesn't take self.
         // For now, return an error since we'd need type information
         // to construct the default struct.
-        Err(default_requires_type_context())
+        Err(default_requires_type_context().into())
     }
 }

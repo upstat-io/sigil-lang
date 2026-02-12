@@ -6,9 +6,10 @@
 use wasm_bindgen::prelude::*;
 use ori_ir::{SharedArena, SharedInterner};
 use ori_eval::{
-    buffer_handler, collect_extend_methods, collect_impl_methods, process_derives,
-    register_module_functions, register_newtype_constructors, register_variant_constructors,
-    InterpreterBuilder, UserMethodRegistry, Value, DEFAULT_MAX_CALL_DEPTH,
+    buffer_handler, collect_extend_methods_with_config, collect_impl_methods_with_config,
+    process_derives, register_module_functions, register_newtype_constructors,
+    register_variant_constructors, EvalMode, InterpreterBuilder, MethodCollectionConfig,
+    UserMethodRegistry, Value,
 };
 use serde::Serialize;
 
@@ -63,7 +64,8 @@ pub fn run_ori(source: &str, max_call_depth: Option<usize>) -> String {
 /// Get the default maximum call depth for WASM.
 #[wasm_bindgen]
 pub fn default_max_call_depth() -> usize {
-    DEFAULT_MAX_CALL_DEPTH
+    // EvalMode::Interpret returns Some(200) on WASM
+    EvalMode::Interpret.max_recursion_depth().unwrap_or(200)
 }
 
 fn run_ori_internal(source: &str, max_call_depth: Option<usize>) -> RunResult {
@@ -79,7 +81,7 @@ fn run_ori_internal(source: &str, max_call_depth: Option<usize>) -> RunResult {
         let errors: Vec<String> = parse_result
             .errors
             .iter()
-            .map(|e| format!("At {}: {}", e.span, e.message))
+            .map(|e| format!("At {}: {}", e.span(), e.message()))
             .collect();
         return RunResult {
             success: false,
@@ -112,11 +114,23 @@ fn run_ori_internal(source: &str, max_call_depth: Option<usize>) -> RunResult {
         };
     }
 
-    // Create interpreter with the parse result's arena and buffer print handler
+    // Canonicalize: AST + types → self-contained canonical IR
+    let canon_result = ori_canon::lower_module(
+        &parse_result.module,
+        &parse_result.arena,
+        &type_result,
+        &pool,
+        &interner,
+    );
+    let shared_canon = ori_ir::canon::SharedCanonResult::new(canon_result);
+
+    // Create interpreter with the parse result's arena and buffer print handler.
+    // EvalMode::Interpret on WASM enforces a 200-depth recursion limit.
+    let _ = max_call_depth; // Reserved for future per-session depth override
     let print_handler = buffer_handler();
     let mut interpreter = InterpreterBuilder::new(&interner, &parse_result.arena)
         .print_handler(print_handler.clone())
-        .max_call_depth(max_call_depth.unwrap_or(DEFAULT_MAX_CALL_DEPTH))
+        .canon(shared_canon.clone())
         .build();
 
     // Register built-in function_val functions (int, str, float, byte)
@@ -126,11 +140,15 @@ fn run_ori_internal(source: &str, max_call_depth: Option<usize>) -> RunResult {
     let shared_arena = SharedArena::new(parse_result.arena.clone());
 
     // Build user method registry from impl and extend blocks
-    // Wrap captures in Arc once for efficient sharing across all collect_* calls
     let mut user_methods = UserMethodRegistry::new();
-    let captures = std::sync::Arc::new(interpreter.env().capture());
-    collect_impl_methods(&parse_result.module, &shared_arena, &captures, &mut user_methods);
-    collect_extend_methods(&parse_result.module, &shared_arena, &captures, &mut user_methods);
+    let config = MethodCollectionConfig {
+        module: &parse_result.module,
+        arena: &shared_arena,
+        captures: std::sync::Arc::new(interpreter.env().capture()),
+        canon: Some(&shared_canon),
+    };
+    collect_impl_methods_with_config(&config, &mut user_methods);
+    collect_extend_methods_with_config(&config, &mut user_methods);
 
     // Process derived traits (Eq, Clone, Hashable, Printable, Default)
     process_derives(
@@ -140,10 +158,10 @@ fn run_ori_internal(source: &str, max_call_depth: Option<usize>) -> RunResult {
     );
 
     // Merge the collected methods into the interpreter's registry
-    interpreter.user_method_registry.write().merge(user_methods);
+    interpreter.user_method_registry().write().merge(user_methods);
 
     // Register all functions from the module into the environment
-    register_module_functions(&parse_result.module, &shared_arena, interpreter.env_mut());
+    register_module_functions(&parse_result.module, &shared_arena, interpreter.env_mut(), Some(&shared_canon));
 
     // Register variant constructors from sum type declarations
     register_variant_constructors(&parse_result.module, interpreter.env_mut());
@@ -151,13 +169,9 @@ fn run_ori_internal(source: &str, max_call_depth: Option<usize>) -> RunResult {
     // Register newtype constructors from type declarations
     register_newtype_constructors(&parse_result.module, interpreter.env_mut());
 
-    // Find @main function and evaluate it
+    // Find @main function's canonical root and evaluate it
     let main_name = interner.intern("main");
-    let main_func = parse_result.module.functions
-        .iter()
-        .find(|f| f.name == main_name);
-
-    let Some(main_func) = main_func else {
+    let Some(can_id) = shared_canon.root_for(main_name) else {
         return RunResult {
             success: false,
             output: String::new(),
@@ -167,8 +181,8 @@ fn run_ori_internal(source: &str, max_call_depth: Option<usize>) -> RunResult {
         };
     };
 
-    // Evaluate the main function's body
-    match interpreter.eval(main_func.body) {
+    // Evaluate main via canonical path
+    match interpreter.eval_can(can_id) {
         Ok(value) => {
             let output = format_value(&value);
             let printed = interpreter.get_print_output();
@@ -187,7 +201,7 @@ fn run_ori_internal(source: &str, max_call_depth: Option<usize>) -> RunResult {
                 success: false,
                 output: String::new(),
                 printed,
-                error: Some(e.message),
+                error: Some(e.into_eval_error().message),
                 error_type: Some("runtime".to_string()),
             }
         }
@@ -249,7 +263,7 @@ fn format_ori_internal(source: &str, max_width: Option<usize>) -> FormatResult {
         let errors: Vec<String> = parse_result
             .errors
             .iter()
-            .map(|e| e.message.clone())
+            .map(|e| e.message().to_string())
             .collect();
         return FormatResult {
             success: false,

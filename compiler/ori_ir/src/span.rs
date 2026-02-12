@@ -45,6 +45,7 @@ impl std::error::Error for SpanError {}
 /// # Salsa Compatibility
 /// Has all required traits: Copy, Clone, Eq, `PartialEq`, Hash, Debug, Default
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Default)]
+#[cfg_attr(feature = "cache", derive(serde::Serialize, serde::Deserialize))]
 #[repr(C)]
 pub struct Span {
     pub start: u32,
@@ -81,6 +82,15 @@ impl Span {
     #[inline]
     pub fn from_range(range: std::ops::Range<usize>) -> Self {
         Self::try_from_range(range).unwrap_or_else(|e| panic!("{}", e))
+    }
+
+    /// Create a point span (zero-length).
+    #[inline]
+    pub const fn point(offset: u32) -> Span {
+        Span {
+            start: offset,
+            end: offset,
+        }
     }
 
     /// Length of the span in bytes.
@@ -124,15 +134,6 @@ impl Span {
         Span {
             start: self.start,
             end: self.end.max(end),
-        }
-    }
-
-    /// Create a point span (zero-length).
-    #[inline]
-    pub const fn point(offset: u32) -> Span {
-        Span {
-            start: offset,
-            end: offset,
         }
     }
 

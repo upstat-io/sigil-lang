@@ -12,52 +12,10 @@
 //! Uses [`Idx`] (pool-based) instead of `TypeId` (legacy interning).
 
 use ori_diagnostic::ErrorGuaranteed;
-use ori_ir::{Name, Span};
+use ori_ir::{ExprId, Name, PatternKey, PatternResolution, Span};
 
 use crate::registry::TypeEntry;
 use crate::{Idx, TypeCheckError};
-
-/// Key identifying a match pattern in the AST.
-///
-/// Used to look up whether a `Binding` pattern was resolved to a unit variant
-/// by the type checker. Keys are either top-level arm patterns (indexed by
-/// the arm's absolute position in the arena) or nested patterns (indexed by
-/// their `MatchPatternId`).
-///
-/// # Salsa Compatibility
-///
-/// Derives all traits required for Salsa query results plus `Ord` for sorted
-/// storage and binary search in `TypedModule::pattern_resolutions`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum PatternKey {
-    /// Top-level arm pattern. Value = `ArmRange.start + arm_index`.
-    Arm(u32),
-    /// Nested pattern stored via `MatchPatternId`. Value = `MatchPatternId::raw()`.
-    Nested(u32),
-}
-
-/// Type-checker resolution of an ambiguous `Binding` pattern.
-///
-/// When the parser encounters `Pending` in a match arm, it creates
-/// `MatchPattern::Binding("Pending")` because it lacks type context.
-/// The type checker resolves this to a `UnitVariant` if the name matches
-/// a unit variant of the scrutinee's enum type.
-///
-/// # Invariant
-///
-/// If a `PatternKey` has no entry in `pattern_resolutions`, the `Binding`
-/// is a normal variable binding (the common case). Only resolved patterns
-/// are stored.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum PatternResolution {
-    /// This `Binding` is actually a unit variant of the scrutinee's enum type.
-    UnitVariant {
-        /// The enum type's name (e.g., `Status`).
-        type_name: Name,
-        /// The variant's index in declaration order (= tag value in LLVM).
-        variant_index: u8,
-    },
-}
 
 /// Type-checked module.
 ///
@@ -108,6 +66,13 @@ pub struct TypedModule {
     /// Only patterns that were resolved are stored — unresolved bindings are
     /// normal variable bindings and have no entry.
     pub pattern_resolutions: Vec<(PatternKey, PatternResolution)>,
+
+    /// Impl method signatures for codegen.
+    ///
+    /// Each entry maps a method name to its resolved `FunctionSig`. Codegen
+    /// needs these to compute ABI (calling convention, sret, parameter passing)
+    /// for impl methods, which are compiled separately from top-level functions.
+    pub impl_sigs: Vec<(Name, FunctionSig)>,
 }
 
 impl TypedModule {
@@ -124,6 +89,7 @@ impl TypedModule {
             types: Vec::new(),
             errors: Vec::new(),
             pattern_resolutions: Vec::new(),
+            impl_sigs: Vec::new(),
         }
     }
 
@@ -236,6 +202,13 @@ pub struct FunctionSig {
     ///
     /// A call is valid if `required_params <= num_args <= param_types.len()`.
     pub required_params: usize,
+
+    /// Default expressions for each parameter (parallel to `param_names`/`param_types`).
+    ///
+    /// `Some(expr_id)` if the parameter has a default value expression in the source AST,
+    /// `None` if the parameter is required. Used by the canonicalizer to fill in omitted
+    /// arguments when desugaring `CallNamed` to positional `Call`.
+    pub param_defaults: Vec<Option<ExprId>>,
 }
 
 /// A where-clause constraint on a function.
@@ -271,6 +244,7 @@ impl FunctionSig {
             where_clauses: Vec::new(),
             generic_param_mapping: Vec::new(),
             required_params,
+            param_defaults: Vec::new(),
         }
     }
 
@@ -420,6 +394,7 @@ mod tests {
             where_clauses: vec![],
             generic_param_mapping: vec![None],
             required_params: 1,
+            param_defaults: vec![],
         };
 
         assert!(sig.is_generic());

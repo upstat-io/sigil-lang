@@ -18,7 +18,10 @@ use super::read_file;
 ///
 /// Accumulates all errors (parse and type) before exiting, giving the user
 /// a complete picture of issues rather than stopping at the first error.
-pub fn run_file(path: &str) {
+///
+/// When `profile` is true, enables performance counters and prints a report
+/// to stderr after evaluation completes.
+pub fn run_file(path: &str, profile: bool) {
     let content = read_file(path);
     let db = CompilerDb::new();
     let file = SourceFile::new(&db, PathBuf::from(path), content);
@@ -48,11 +51,8 @@ pub fn run_file(path: &str) {
         let source = file.text(&db);
         let mut queue = DiagnosticQueue::new();
         for error in &parse_result.errors {
-            queue.add_with_source_and_severity(
-                error.to_diagnostic(),
-                source.as_str(),
-                error.severity,
-            );
+            let (diag, severity) = error.to_queued_diagnostic();
+            queue.add_with_source_and_severity(diag, source.as_str(), severity);
         }
         for diag in queue.flush() {
             emitter.emit(&diag);
@@ -82,23 +82,134 @@ pub fn run_file(path: &str) {
     }
 
     // Evaluate only if no errors
-    let eval_result = evaluated(&db, file);
+    if profile {
+        eval_with_profile(&db, &parse_result, file, path, &mut emitter);
+    } else {
+        let eval_result = evaluated(&db, file);
+        report_eval_result(&eval_result, &db, file, path, &mut emitter);
+    }
+}
+
+/// Report evaluation results, using enriched diagnostics for runtime errors.
+fn report_eval_result(
+    eval_result: &oric::eval::ModuleEvalResult,
+    db: &oric::CompilerDb,
+    file: oric::SourceFile,
+    path: &str,
+    emitter: &mut TerminalEmitter<std::io::Stderr>,
+) {
     if eval_result.is_failure() {
-        let error_msg = eval_result
-            .error
-            .unwrap_or_else(|| "unknown runtime error".to_string());
-        eprintln!("error: runtime error in '{path}': {error_msg}");
+        // Use enriched diagnostics when we have a structured error snapshot
+        if let Some(ref snapshot) = eval_result.eval_error {
+            let source = file.text(db);
+            let diag = oric::problem::eval::snapshot_to_diagnostic(snapshot, source.as_str(), path);
+            emitter.emit(&diag);
+            emitter.flush();
+        } else {
+            let error_msg = eval_result
+                .error
+                .as_deref()
+                .unwrap_or("unknown runtime error");
+            eprintln!("error: runtime error in '{path}': {error_msg}");
+        }
         std::process::exit(1);
     }
 
     // Print the result if it's not void
-    if let Some(result) = eval_result.result {
+    if let Some(ref result) = eval_result.result {
         use oric::EvalOutput;
         match result {
             EvalOutput::Void => {}
             _ => println!("{}", result.display(db.interner())),
         }
     }
+}
+
+/// Evaluate with profiling enabled — bypasses Salsa query to access counters.
+fn eval_with_profile(
+    db: &oric::CompilerDb,
+    parse_result: &oric::parser::ParseOutput,
+    file: oric::SourceFile,
+    path: &str,
+    emitter: &mut TerminalEmitter<std::io::Stderr>,
+) {
+    use oric::eval::{EvalOutput, Evaluator, ModuleEvalResult};
+    use oric::Db;
+
+    let interner = db.interner();
+    let file_path = file.path(db);
+
+    // Type check (returns result + pool)
+    let (type_result, pool) =
+        oric::typeck::type_check_with_imports_and_pool(db, parse_result, file_path);
+
+    if type_result.has_errors() {
+        let error_count = type_result.errors().len();
+        let result = ModuleEvalResult::failure(format!(
+            "{error_count} type error{} found",
+            if error_count == 1 { "" } else { "s" }
+        ));
+        report_eval_result(&result, db, file, path, emitter);
+        return;
+    }
+
+    // Canonicalize: AST + types → self-contained canonical IR.
+    let canon_result = ori_canon::lower_module(
+        &parse_result.module,
+        &parse_result.arena,
+        &type_result,
+        &pool,
+        interner,
+    );
+    let shared_canon = ori_ir::canon::SharedCanonResult::new(canon_result);
+
+    // Create evaluator with profiling enabled
+    let mut evaluator = Evaluator::builder(interner, &parse_result.arena, db)
+        .canon(shared_canon.clone())
+        .build();
+    evaluator.register_prelude();
+    evaluator.enable_counters();
+
+    if let Err(e) = evaluator.load_module(parse_result, file_path, Some(&shared_canon)) {
+        let result = ModuleEvalResult::failure(format!("module error: {e}"));
+        report_eval_result(&result, db, file, path, emitter);
+        return;
+    }
+
+    // Evaluate main function or first zero-arg function
+    let main_name = interner.intern("main");
+    let eval_result = if let Some(main_func) = evaluator.env().lookup(main_name) {
+        match evaluator.eval_call_value(&main_func, &[]) {
+            Ok(value) => ModuleEvalResult::success(EvalOutput::from_value(&value, interner)),
+            Err(e) => ModuleEvalResult::runtime_error(&e.into_eval_error()),
+        }
+    } else if let Some(func) = parse_result.module.functions.first() {
+        let params = parse_result.arena.get_params(func.params);
+        if params.is_empty() {
+            match shared_canon.root_for(func.name) {
+                Some(can_id) => match evaluator.eval_can(can_id) {
+                    Ok(value) => {
+                        ModuleEvalResult::success(EvalOutput::from_value(&value, interner))
+                    }
+                    Err(e) => ModuleEvalResult::runtime_error(&e.into_eval_error()),
+                },
+                None => ModuleEvalResult::failure(
+                    "internal error: function has no canonical root".to_string(),
+                ),
+            }
+        } else {
+            ModuleEvalResult::success(EvalOutput::Void)
+        }
+    } else {
+        ModuleEvalResult::default()
+    };
+
+    // Print counters report to stderr before result
+    if let Some(report) = evaluator.counters_report() {
+        eprintln!("{report}");
+    }
+
+    report_eval_result(&eval_result, db, file, path, emitter);
 }
 
 /// Run an Ori source file using AOT compilation.
@@ -178,44 +289,37 @@ pub fn run_file_compiled(path: &str) {
     let db = CompilerDb::new();
     let file = SourceFile::new(&db, PathBuf::from(path), content.clone());
 
-    let Some((parse_result, type_result, pool)) = check_source(&db, file, path) else {
+    let Some((parse_result, type_result, pool, canon_result)) = check_source(&db, file, path)
+    else {
         std::process::exit(1)
     };
 
     // Configure target (native)
-    let target = match ori_llvm::aot::TargetConfig::native() {
-        Ok(t) => t,
-        Err(e) => {
-            eprintln!("error: failed to initialize native target: {e}");
-            std::process::exit(1);
-        }
-    };
+    let target = ori_llvm::aot::TargetConfig::native()
+        .unwrap_or_else(|e| crate::problem::codegen::report_codegen_error(e));
 
     // Generate LLVM IR (shared with build_file)
     let context = Context::create();
-    let llvm_module = compile_to_llvm(&context, &db, &parse_result, &type_result, &pool, path);
+    let llvm_module = compile_to_llvm(
+        &context,
+        &db,
+        &parse_result,
+        &type_result,
+        &pool,
+        &canon_result,
+        path,
+    );
 
     // Configure module for target
-    let emitter = match ObjectEmitter::new(&target) {
-        Ok(e) => e,
-        Err(e) => {
-            eprintln!("error: failed to create object emitter: {e}");
-            std::process::exit(1);
-        }
-    };
+    let emitter = ObjectEmitter::new(&target)
+        .unwrap_or_else(|e| crate::problem::codegen::report_codegen_error(e));
 
     if let Err(e) = emitter.configure_module(&llvm_module) {
-        eprintln!("error: failed to configure module: {e}");
-        std::process::exit(1);
-    }
-
-    // Run optimization passes (O2 for good performance)
-    let opt_config = ori_llvm::aot::OptimizationConfig::new(ori_llvm::aot::OptimizationLevel::O2);
-    if let Err(e) =
-        ori_llvm::aot::run_optimization_passes(&llvm_module, emitter.machine(), &opt_config)
-    {
-        eprintln!("error: optimization failed: {e}");
-        std::process::exit(1);
+        crate::problem::codegen::report_codegen_error(
+            crate::problem::codegen::CodegenProblem::ModuleConfigFailed {
+                message: e.to_string(),
+            },
+        );
     }
 
     // Ensure cache directory exists
@@ -223,12 +327,14 @@ pub fn run_file_compiled(path: &str) {
         eprintln!("warning: could not create cache directory: {e}");
     }
 
-    // Emit object file to temp location
+    // Verify → optimize → emit object file via unified pipeline (O2 for good performance)
+    let opt_config = ori_llvm::aot::OptimizationConfig::new(ori_llvm::aot::OptimizationLevel::O2);
     let obj_path = cache_dir.join(format!("{binary_name}.o"));
 
-    if let Err(e) = emitter.emit(&llvm_module, &obj_path, OutputFormat::Object) {
-        eprintln!("error: failed to emit object file: {e}");
-        std::process::exit(1);
+    if let Err(e) =
+        emitter.verify_optimize_emit(&llvm_module, &opt_config, &obj_path, OutputFormat::Object)
+    {
+        crate::problem::codegen::report_codegen_error(e);
     }
 
     // Link into executable
@@ -238,9 +344,7 @@ pub fn run_file_compiled(path: &str) {
     let runtime_config = match RuntimeConfig::detect() {
         Ok(config) => config,
         Err(e) => {
-            eprintln!("error: {e}");
-            eprintln!("hint: ensure libori_rt is built and available");
-            std::process::exit(1);
+            crate::problem::codegen::report_codegen_error(e);
         }
     };
 
@@ -255,10 +359,9 @@ pub fn run_file_compiled(path: &str) {
     runtime_config.configure_link(&mut link_input);
 
     if let Err(e) = driver.link(&link_input) {
-        eprintln!("error: linking failed: {e}");
         // Clean up partial artifacts
         let _ = std::fs::remove_file(&obj_path);
-        std::process::exit(1);
+        crate::problem::codegen::report_codegen_error(e);
     }
 
     // Clean up object file
@@ -305,16 +408,18 @@ fn get_cache_dir() -> PathBuf {
 /// Run with compile mode when LLVM feature is not enabled.
 #[cfg(not(feature = "llvm"))]
 pub fn run_file_compiled(_path: &str) {
-    eprintln!("error: the '--compile' flag requires the LLVM backend");
-    eprintln!();
-    eprintln!("The Ori compiler was built without LLVM support.");
-    eprintln!("To enable AOT compilation, rebuild with the 'llvm' feature:");
-    eprintln!();
-    eprintln!("  cargo build --features llvm");
-    eprintln!();
-    eprintln!("Or use the LLVM-enabled Docker container:");
-    eprintln!();
-    eprintln!("  ./docker/llvm/run.sh ori run --compile <file.ori>");
+    use ori_diagnostic::emitter::{ColorMode, DiagnosticEmitter, TerminalEmitter};
+    use ori_diagnostic::{Diagnostic, ErrorCode};
+
+    let diag = Diagnostic::error(ErrorCode::E5004)
+        .with_message("the '--compile' flag requires the LLVM backend")
+        .with_note("the Ori compiler was built without LLVM support")
+        .with_suggestion("rebuild with `cargo build --features llvm`");
+
+    let is_tty = std::io::IsTerminal::is_terminal(&std::io::stderr());
+    let mut emitter = TerminalEmitter::with_color_mode(std::io::stderr(), ColorMode::Auto, is_tty);
+    emitter.emit(&diag);
+    emitter.flush();
     std::process::exit(1);
 }
 

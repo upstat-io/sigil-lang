@@ -53,6 +53,7 @@ macro_rules! static_assert_size {
 
 pub mod commands;
 pub mod db;
+pub mod imports;
 pub mod input;
 pub mod ir;
 pub mod parser;
@@ -77,8 +78,8 @@ pub use context::{shared_context, CompilerContext, SharedContext};
 pub use db::{CompilerDb, Db};
 pub use diagnostic::{Diagnostic, ErrorCode, Label, Severity};
 pub use eval::{
-    Environment, EvalError, EvalOutput, EvalResult, Evaluator, FunctionValue, ModuleEvalResult,
-    RangeValue, Value,
+    Environment, EvalError, EvalErrorSnapshot, EvalOutput, EvalResult, Evaluator, FunctionValue,
+    ModuleEvalResult, RangeValue, Value,
 };
 pub use input::SourceFile;
 pub use ir::{
@@ -132,7 +133,6 @@ pub use ir::{
     Typed,
     UnaryOp,
 };
-pub use ori_patterns::{EvalContext, PatternDefinition, PatternRegistry};
 pub use query::evaluated;
 pub use test::{
     run_test_file, run_tests, TestOutcome, TestResult, TestRunner, TestRunnerConfig, TestSummary,

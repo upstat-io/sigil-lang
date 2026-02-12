@@ -1,3 +1,8 @@
+//! Error codes for all compiler diagnostics.
+//!
+//! Each error code is a unique identifier (e.g., `E1001`) with the first digit
+//! indicating the compiler phase. Used for `--explain` lookups and documentation.
+
 use std::fmt;
 
 /// Error codes for all compiler diagnostics.
@@ -7,6 +12,9 @@ use std::fmt;
 /// - E1xxx: Parser errors
 /// - E2xxx: Type errors
 /// - E3xxx: Pattern errors
+/// - E4xxx: ARC analysis errors
+/// - E5xxx: Codegen / LLVM errors
+/// - E6xxx: Runtime / eval errors
 /// - E9xxx: Internal compiler errors
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum ErrorCode {
@@ -122,6 +130,84 @@ pub enum ErrorCode {
     /// Pattern type error
     E3003,
 
+    // ARC Analysis Errors (E4xxx)
+    /// Unsupported expression in ARC IR lowering
+    E4001,
+    /// Unsupported pattern in ARC IR lowering
+    E4002,
+    /// ARC internal error (invariant violation)
+    E4003,
+
+    // Codegen / LLVM Errors (E5xxx)
+    /// LLVM module verification failed (ICE)
+    E5001,
+    /// Optimization pipeline failed
+    E5002,
+    /// Object/assembly/bitcode emission failed
+    E5003,
+    /// Target not supported / target configuration failed
+    E5004,
+    /// Runtime library (`libori_rt.a`) not found
+    E5005,
+    /// Linker failed
+    E5006,
+    /// Debug info creation failed
+    E5007,
+    /// WASM-specific error
+    E5008,
+    /// Module target configuration failed
+    E5009,
+
+    // Runtime / Eval Errors (E6xxx)
+    /// Division by zero
+    E6001,
+    /// Modulo by zero
+    E6002,
+    /// Integer overflow
+    E6003,
+    /// Type mismatch
+    E6010,
+    /// Invalid binary operator for type
+    E6011,
+    /// Binary type mismatch
+    E6012,
+    /// Undefined variable
+    E6020,
+    /// Undefined function
+    E6021,
+    /// Undefined constant
+    E6022,
+    /// Undefined field
+    E6023,
+    /// Undefined method
+    E6024,
+    /// Index out of bounds
+    E6025,
+    /// Key not found
+    E6026,
+    /// Immutable binding
+    E6027,
+    /// Arity mismatch
+    E6030,
+    /// Stack overflow (recursion limit)
+    E6031,
+    /// Not callable
+    E6032,
+    /// Non-exhaustive match
+    E6040,
+    /// Assertion failed
+    E6050,
+    /// Panic called
+    E6051,
+    /// Missing capability
+    E6060,
+    /// Const-eval budget exceeded
+    E6070,
+    /// Not implemented feature
+    E6080,
+    /// Custom runtime error
+    E6099,
+
     // Internal Errors (E9xxx)
     /// Internal compiler error
     E9001,
@@ -134,11 +220,6 @@ pub enum ErrorCode {
 }
 
 impl ErrorCode {
-    /// Check if this is a parser/syntax error (E1xxx range).
-    pub fn is_parser_error(&self) -> bool {
-        self.as_str().starts_with("E1")
-    }
-
     /// Get the numeric code as a string (e.g., "E1001").
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -198,12 +279,71 @@ impl ErrorCode {
             ErrorCode::E3001 => "E3001",
             ErrorCode::E3002 => "E3002",
             ErrorCode::E3003 => "E3003",
+            // ARC
+            ErrorCode::E4001 => "E4001",
+            ErrorCode::E4002 => "E4002",
+            ErrorCode::E4003 => "E4003",
+            // Codegen / LLVM
+            ErrorCode::E5001 => "E5001",
+            ErrorCode::E5002 => "E5002",
+            ErrorCode::E5003 => "E5003",
+            ErrorCode::E5004 => "E5004",
+            ErrorCode::E5005 => "E5005",
+            ErrorCode::E5006 => "E5006",
+            ErrorCode::E5007 => "E5007",
+            ErrorCode::E5008 => "E5008",
+            ErrorCode::E5009 => "E5009",
+            // Runtime / Eval
+            ErrorCode::E6001 => "E6001",
+            ErrorCode::E6002 => "E6002",
+            ErrorCode::E6003 => "E6003",
+            ErrorCode::E6010 => "E6010",
+            ErrorCode::E6011 => "E6011",
+            ErrorCode::E6012 => "E6012",
+            ErrorCode::E6020 => "E6020",
+            ErrorCode::E6021 => "E6021",
+            ErrorCode::E6022 => "E6022",
+            ErrorCode::E6023 => "E6023",
+            ErrorCode::E6024 => "E6024",
+            ErrorCode::E6025 => "E6025",
+            ErrorCode::E6026 => "E6026",
+            ErrorCode::E6027 => "E6027",
+            ErrorCode::E6030 => "E6030",
+            ErrorCode::E6031 => "E6031",
+            ErrorCode::E6032 => "E6032",
+            ErrorCode::E6040 => "E6040",
+            ErrorCode::E6050 => "E6050",
+            ErrorCode::E6051 => "E6051",
+            ErrorCode::E6060 => "E6060",
+            ErrorCode::E6070 => "E6070",
+            ErrorCode::E6080 => "E6080",
+            ErrorCode::E6099 => "E6099",
             // Internal
             ErrorCode::E9001 => "E9001",
             ErrorCode::E9002 => "E9002",
             // Warnings
             ErrorCode::W1001 => "W1001",
         }
+    }
+
+    /// Check if this is a parser/syntax error (E1xxx range).
+    pub fn is_parser_error(&self) -> bool {
+        self.as_str().starts_with("E1")
+    }
+
+    /// Check if this is an ARC analysis error (E4xxx range).
+    pub fn is_arc_error(&self) -> bool {
+        self.as_str().starts_with("E4")
+    }
+
+    /// Check if this is a codegen/LLVM error (E5xxx range).
+    pub fn is_codegen_error(&self) -> bool {
+        self.as_str().starts_with("E5")
+    }
+
+    /// Check if this is a runtime/eval error (E6xxx range).
+    pub fn is_eval_error(&self) -> bool {
+        self.as_str().starts_with("E6")
     }
 
     /// Check if this is a warning code (Wxxx range).
@@ -226,5 +366,82 @@ mod tests {
     fn test_error_code_display() {
         assert_eq!(ErrorCode::E1001.to_string(), "E1001");
         assert_eq!(ErrorCode::E2001.as_str(), "E2001");
+    }
+
+    #[test]
+    fn test_arc_error_codes() {
+        assert_eq!(ErrorCode::E4001.as_str(), "E4001");
+        assert_eq!(ErrorCode::E4002.as_str(), "E4002");
+        assert_eq!(ErrorCode::E4003.as_str(), "E4003");
+
+        assert!(ErrorCode::E4001.is_arc_error());
+        assert!(ErrorCode::E4002.is_arc_error());
+        assert!(ErrorCode::E4003.is_arc_error());
+
+        assert!(!ErrorCode::E4001.is_codegen_error());
+        assert!(!ErrorCode::E4001.is_parser_error());
+        assert!(!ErrorCode::E4001.is_warning());
+    }
+
+    #[test]
+    fn test_codegen_error_codes() {
+        assert_eq!(ErrorCode::E5001.as_str(), "E5001");
+        assert_eq!(ErrorCode::E5005.as_str(), "E5005");
+        assert_eq!(ErrorCode::E5009.as_str(), "E5009");
+
+        assert!(ErrorCode::E5001.is_codegen_error());
+        assert!(ErrorCode::E5006.is_codegen_error());
+        assert!(ErrorCode::E5009.is_codegen_error());
+
+        assert!(!ErrorCode::E5001.is_arc_error());
+        assert!(!ErrorCode::E5001.is_parser_error());
+        assert!(!ErrorCode::E5001.is_warning());
+    }
+
+    #[test]
+    fn test_eval_error_codes() {
+        assert_eq!(ErrorCode::E6001.as_str(), "E6001");
+        assert_eq!(ErrorCode::E6020.as_str(), "E6020");
+        assert_eq!(ErrorCode::E6099.as_str(), "E6099");
+
+        assert!(ErrorCode::E6001.is_eval_error());
+        assert!(ErrorCode::E6031.is_eval_error());
+        assert!(ErrorCode::E6099.is_eval_error());
+
+        assert!(!ErrorCode::E6001.is_arc_error());
+        assert!(!ErrorCode::E6001.is_codegen_error());
+        assert!(!ErrorCode::E6001.is_parser_error());
+        assert!(!ErrorCode::E6001.is_warning());
+    }
+
+    #[test]
+    fn test_predicate_exclusivity() {
+        // Ensure predicates don't overlap
+        let all_codes = [
+            ErrorCode::E0001,
+            ErrorCode::E1001,
+            ErrorCode::E2001,
+            ErrorCode::E3001,
+            ErrorCode::E4001,
+            ErrorCode::E5001,
+            ErrorCode::E6001,
+            ErrorCode::E9001,
+            ErrorCode::W1001,
+        ];
+
+        for code in &all_codes {
+            let flags = [
+                code.is_parser_error(),
+                code.is_arc_error(),
+                code.is_codegen_error(),
+                code.is_eval_error(),
+                code.is_warning(),
+            ];
+            // At most one predicate should be true for any code
+            assert!(
+                flags.iter().filter(|&&f| f).count() <= 1,
+                "overlapping predicates for {code}"
+            );
+        }
     }
 }

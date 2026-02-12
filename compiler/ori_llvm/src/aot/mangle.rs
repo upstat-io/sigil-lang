@@ -66,7 +66,10 @@ const EXT_MARKER: &str = "$$ext$";
 pub struct Mangler {
     /// Whether to use Windows-style decorated names (no leading underscore on some platforms).
     /// Reserved for future use when Windows-specific mangling is needed.
-    #[allow(dead_code)]
+    #[expect(
+        dead_code,
+        reason = "Reserved for future Windows-specific mangling; used in for_windows constructor"
+    )]
     windows_compat: bool,
 }
 
@@ -170,6 +173,34 @@ impl Mangler {
         }
 
         self.encode_identifier(&mut result, method_name);
+        result
+    }
+
+    /// Mangle an inherent method (method defined directly on a type, not via trait).
+    ///
+    /// # Arguments
+    ///
+    /// * `module_path` - The module path (empty for root module)
+    /// * `type_name` - The type name (e.g., "Point", "Line")
+    /// * `method_name` - The method name (e.g., "distance", "length")
+    ///
+    /// # Returns
+    ///
+    /// The mangled symbol name: `_ori_[<module>$]<type>$<method>`.
+    #[must_use]
+    pub fn mangle_method(&self, module_path: &str, type_name: &str, method_name: &str) -> String {
+        let mut result = String::with_capacity(64);
+        result.push_str(MANGLE_PREFIX);
+
+        if !module_path.is_empty() {
+            self.encode_module_path(&mut result, module_path);
+            result.push(MODULE_SEP);
+        }
+
+        self.encode_type_name(&mut result, type_name);
+        result.push(MODULE_SEP);
+        self.encode_identifier(&mut result, method_name);
+
         result
     }
 

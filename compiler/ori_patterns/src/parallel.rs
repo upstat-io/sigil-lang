@@ -68,7 +68,7 @@ impl PatternDefinition for ParallelPattern {
             tasks_prop.ok_or_else(|| EvalError::new("parallel requires .tasks property"))?;
         let tasks_value = exec.eval(tasks_prop.value)?;
         let Value::List(task_list) = tasks_value else {
-            return Err(EvalError::new("parallel .tasks must be a list"));
+            return Err(EvalError::new("parallel .tasks must be a list").into());
         };
 
         // Extract .timeout (optional) - convert nanoseconds to milliseconds
@@ -297,7 +297,7 @@ pub fn execute_task(task: Value) -> Value {
     match task {
         Value::FunctionVal(func, _) => match func(&[]) {
             Ok(v) => wrap_in_result(v),
-            Err(e) => Value::err(Value::string(e.clone())),
+            Err(e) => Value::err(Value::string(e.message.clone())),
         },
         // If task is already a Result, keep it
         Value::Ok(_) | Value::Err(_) => task,
@@ -334,7 +334,7 @@ mod tests {
 
         #[test]
         fn function_val_error_wraps_in_err() {
-            let task = Value::FunctionVal(|_| Err("test error".to_string()), "test_fn");
+            let task = Value::FunctionVal(|_| Err(EvalError::new("test error")), "test_fn");
             let result = execute_task(task);
             assert!(matches!(result, Value::Err(_)));
         }

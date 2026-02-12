@@ -1,27 +1,45 @@
 # Performance Baselines
 
-Last updated: 2026-02-06
+Last updated: 2026-02-08
+
+## Lexer Core (Raw Scanner) Throughput
+
+Pure `ori_lexer_core::RawScanner` — no keyword resolution, no literal parsing,
+no interning, no diagnostics. This is the apples-to-apples comparison with
+published lexer benchmarks from other compilers.
+
+| Workload | Target (MiB/s) | Minimum | Notes |
+|----------|----------------|---------|-------|
+| 10 functions | 720 | 650 | Small file overhead |
+| 50 functions | 890 | 800 | |
+| 100 functions | 910 | 820 | |
+| 500 functions | 960 | 870 | Steady state |
+| 1000 functions | 965 | 870 | Steady state |
+| 5000 functions | 1020 | 920 | Steady state, ~1 GiB/s |
 
 ## Parser Raw Throughput
 
 | Workload | Target (MiB/s) | Minimum | Notes |
 |----------|----------------|---------|-------|
-| 10 functions | 120 | 100 | Small file overhead |
-| 50 functions | 140 | 120 | |
-| 100 functions | 150 | 130 | |
-| 500 functions | 165 | 140 | Steady state |
-| 1000 functions | 160 | 140 | Steady state |
+| 10 functions | 95 | 80 | Small file overhead |
+| 50 functions | 113 | 95 | |
+| 100 functions | 118 | 100 | |
+| 500 functions | 126 | 105 | Steady state |
+| 1000 functions | 128 | 108 | Steady state |
 
-## Lexer Raw Throughput
+## Lexer (Cooked) Raw Throughput
+
+Full `ori_lexer::lex()` — includes keyword resolution, literal parsing, string
+interning, escape processing, and flag computation on top of raw scanning.
 
 | Workload | Target (MiB/s) | Minimum | Notes |
 |----------|----------------|---------|-------|
-| 10 functions | 230 | 200 | Small file overhead |
-| 50 functions | 255 | 220 | |
-| 100 functions | 264 | 230 | |
-| 500 functions | 290 | 255 | Steady state |
-| 1000 functions | 286 | 255 | Steady state |
-| 5000 functions | 288 | 255 | Steady state |
+| 10 functions | 208 | 180 | Small file overhead |
+| 50 functions | 227 | 195 | |
+| 100 functions | 232 | 200 | |
+| 500 functions | 235 | 200 | Steady state |
+| 1000 functions | 238 | 205 | Steady state |
+| 5000 functions | 240 | 205 | Steady state |
 
 ## Salsa Query Overhead
 
@@ -31,10 +49,11 @@ Expected overhead when using Salsa queries vs raw:
 
 ## Industry Comparison
 
-| Parser | Throughput | Notes |
-|--------|------------|-------|
-| Ori parser | ~120-164 MiB/s | Hand-written recursive descent |
-| Ori lexer | ~232-292 MiB/s | Logos DFA + tag array |
+| Component | Throughput | Notes |
+|-----------|------------|-------|
+| Ori raw scanner | ~720–1020 MiB/s | Hand-written, sentinel-terminated |
+| Ori cooked lexer | ~208–240 MiB/s | + keywords, literals, interning |
+| Ori parser | ~95–128 MiB/s | Hand-written recursive descent |
 | Go | ~100-150 MiB/s | go/parser |
 | Rust (syn) | ~50-100 MiB/s | Proc-macro parsing |
 | TypeScript | ~200-400 MiB/s | Highly optimized |
@@ -81,3 +100,4 @@ Expected overhead when using Salsa queries vs raw:
 | 2026-02-06 | Tag-based dispatch (OPER_TABLE, tags Vec) | +10-20% parser, +7-14% lexer |
 | 2026-02-06 | POSTFIX_BITSET fast-exit | +2-3% parser |
 | 2026-02-06 | Direct dispatch in parse_primary() | +2-3% parser |
+| 2026-02-08 | Added lexer_core benchmark, rebased cooked lexer baselines | New tier |

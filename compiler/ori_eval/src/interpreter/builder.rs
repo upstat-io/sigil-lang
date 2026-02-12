@@ -4,85 +4,66 @@ use super::resolvers::{
     BuiltinMethodResolver, CollectionMethodResolver, MethodDispatcher, MethodResolverKind,
     UserRegistryResolver,
 };
-#[cfg(target_arch = "wasm32")]
-use super::DEFAULT_MAX_CALL_DEPTH;
-use super::{Interpreter, TypeNames};
+use super::{Interpreter, OpNames, PrintNames, PropNames, ScopeOwnership, TypeNames};
+use crate::diagnostics::CallStack;
+use crate::eval_mode::{EvalMode, ModeState};
 use crate::{
-    stdout_handler, Environment, SharedMutableRegistry, SharedPrintHandler, SharedRegistry,
-    UserMethodRegistry,
+    stdout_handler, Environment, SharedMutableRegistry, SharedPrintHandler, UserMethodRegistry,
 };
+use ori_ir::canon::SharedCanonResult;
 use ori_ir::{ExprArena, SharedArena, StringInterner};
-use ori_patterns::PatternRegistry;
-use ori_types::{Idx, PatternKey, PatternResolution};
 
 /// Builder for creating Interpreter instances with various configurations.
+///
+/// Every interpreter requires an explicit `EvalMode`. The default is `Interpret`,
+/// but callers should specify the mode appropriate for their context:
+/// - `EvalMode::Interpret` for `ori run`
+/// - `EvalMode::TestRun { .. }` for `ori test`
+/// - `EvalMode::ConstEval { .. }` for compile-time evaluation
 pub struct InterpreterBuilder<'a> {
     interner: &'a StringInterner,
     arena: &'a ExprArena,
     env: Option<Environment>,
-    registry: Option<SharedRegistry<PatternRegistry>>,
+    mode: EvalMode,
     imported_arena: Option<SharedArena>,
     user_method_registry: Option<SharedMutableRegistry<UserMethodRegistry>>,
     print_handler: Option<SharedPrintHandler>,
-    owns_scoped_env: bool,
-    call_depth: usize,
-    #[cfg(target_arch = "wasm32")]
-    max_call_depth: usize,
-    /// Expression type table from type checking.
-    expr_types: Option<&'a [Idx]>,
-    /// Pattern resolutions from type checking.
-    pattern_resolutions: &'a [(PatternKey, PatternResolution)],
+    scope_ownership: ScopeOwnership,
+    call_stack: Option<CallStack>,
+    /// Canonical IR for canonical evaluation path.
+    canon: Option<SharedCanonResult>,
 }
 
 impl<'a> InterpreterBuilder<'a> {
-    /// Create a new builder.
-    #[cfg(target_arch = "wasm32")]
+    /// Create a new builder with default `Interpret` mode.
     pub fn new(interner: &'a StringInterner, arena: &'a ExprArena) -> Self {
         Self {
             interner,
             arena,
             env: None,
-            registry: None,
+            mode: EvalMode::default(),
             imported_arena: None,
             user_method_registry: None,
             print_handler: None,
-            owns_scoped_env: false,
-            call_depth: 0,
-            max_call_depth: DEFAULT_MAX_CALL_DEPTH,
-            expr_types: None,
-            pattern_resolutions: &[],
+            scope_ownership: ScopeOwnership::Borrowed,
+            call_stack: None,
+            canon: None,
         }
     }
 
-    /// Create a new builder.
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn new(interner: &'a StringInterner, arena: &'a ExprArena) -> Self {
-        Self {
-            interner,
-            arena,
-            env: None,
-            registry: None,
-            imported_arena: None,
-            user_method_registry: None,
-            print_handler: None,
-            owns_scoped_env: false,
-            call_depth: 0,
-            expr_types: None,
-            pattern_resolutions: &[],
-        }
+    /// Set the evaluation mode.
+    ///
+    /// Controls I/O access, recursion limits, test collection, and const-eval budget.
+    #[must_use]
+    pub fn mode(mut self, mode: EvalMode) -> Self {
+        self.mode = mode;
+        self
     }
 
     /// Set the initial environment.
     #[must_use]
     pub fn env(mut self, env: Environment) -> Self {
         self.env = Some(env);
-        self
-    }
-
-    /// Set the pattern registry.
-    #[must_use]
-    pub fn registry(mut self, r: PatternRegistry) -> Self {
-        self.registry = Some(SharedRegistry::new(r));
         self
     }
 
@@ -102,8 +83,7 @@ impl<'a> InterpreterBuilder<'a> {
 
     /// Set the print handler for the Print capability.
     ///
-    /// Default is stdout for native builds.
-    /// Use `buffer_handler()` for WASM or testing.
+    /// Default is stdout for `Interpret` mode. Overrides mode-based default.
     #[must_use]
     pub fn print_handler(mut self, handler: SharedPrintHandler) -> Self {
         self.print_handler = Some(handler);
@@ -116,63 +96,32 @@ impl<'a> InterpreterBuilder<'a> {
     /// This is used for function/method call interpreters to ensure RAII panic safety.
     #[must_use]
     pub fn with_scoped_env_ownership(mut self) -> Self {
-        self.owns_scoped_env = true;
+        self.scope_ownership = ScopeOwnership::Owned;
         self
     }
 
-    /// Set the initial call depth for recursion tracking.
+    /// Set the call stack for recursion tracking.
     ///
     /// Used when creating child interpreters for function calls to propagate
-    /// the current call depth.
+    /// the parent's call stack (clone-per-child model).
     #[must_use]
-    pub fn call_depth(mut self, depth: usize) -> Self {
-        self.call_depth = depth;
+    pub fn call_stack(mut self, stack: CallStack) -> Self {
+        self.call_stack = Some(stack);
         self
     }
 
-    /// Set the maximum call depth for recursion limiting (WASM only).
+    /// Set the canonical IR for canonical evaluation dispatch.
     ///
-    /// Default is 200, which is conservative for browser environments.
-    /// WASM runtimes outside browsers (Node.js, Wasmtime, etc.) may support
-    /// higher limits depending on their stack configuration.
-    #[cfg(target_arch = "wasm32")]
+    /// When set, function calls on `FunctionValue`s with canonical bodies
+    /// will dispatch via `eval_can()` instead of legacy `eval()`.
     #[must_use]
-    pub fn max_call_depth(mut self, limit: usize) -> Self {
-        self.max_call_depth = limit;
+    pub fn canon(mut self, canon: SharedCanonResult) -> Self {
+        self.canon = Some(canon);
         self
     }
 
-    /// Set the expression type table from type checking.
-    ///
-    /// Enables type-aware evaluation for operators like `??` that need
-    /// to distinguish between chaining (`Option<T> ?? Option<T>`) and
-    /// unwrapping (`Option<T> ?? T`).
-    #[must_use]
-    pub fn expr_types(mut self, types: &'a [Idx]) -> Self {
-        self.expr_types = Some(types);
-        self
-    }
-
-    /// Set the pattern resolutions from type checking.
-    ///
-    /// Enables correct disambiguation of `Binding("Pending")` (unit variant)
-    /// vs `Binding("x")` (variable) in match patterns.
-    #[must_use]
-    pub fn pattern_resolutions(
-        mut self,
-        resolutions: &'a [(PatternKey, PatternResolution)],
-    ) -> Self {
-        self.pattern_resolutions = resolutions;
-        self
-    }
-
-    /// Build the interpreter (WASM version with max_call_depth).
-    #[cfg(target_arch = "wasm32")]
+    /// Build the interpreter.
     pub fn build(self) -> Interpreter<'a> {
-        let pat_reg = self
-            .registry
-            .unwrap_or_else(|| SharedRegistry::new(PatternRegistry::new()));
-
         let user_meth_reg = self
             .user_method_registry
             .unwrap_or_else(|| SharedMutableRegistry::new(UserMethodRegistry::new()));
@@ -182,7 +131,7 @@ impl<'a> InterpreterBuilder<'a> {
         let method_dispatcher = MethodDispatcher::new(vec![
             MethodResolverKind::UserRegistry(UserRegistryResolver::new(user_meth_reg.clone())),
             MethodResolverKind::Collection(CollectionMethodResolver::new(self.interner)),
-            MethodResolverKind::Builtin(BuiltinMethodResolver::new()),
+            MethodResolverKind::Builtin(BuiltinMethodResolver::new(self.interner)),
         ]);
 
         // Pre-compute the Name for "self" to avoid repeated interning
@@ -191,50 +140,34 @@ impl<'a> InterpreterBuilder<'a> {
         // Pre-intern all primitive type names for hot-path method dispatch
         let type_names = TypeNames::new(self.interner);
 
-        Interpreter {
-            interner: self.interner,
-            arena: self.arena,
-            env: self.env.unwrap_or_default(),
-            self_name,
-            type_names,
-            call_depth: self.call_depth,
-            max_call_depth: self.max_call_depth,
-            registry: pat_reg,
-            user_method_registry: user_meth_reg,
-            method_dispatcher,
-            imported_arena: self.imported_arena,
-            prelude_loaded: false,
-            print_handler: self.print_handler.unwrap_or_else(stdout_handler),
-            owns_scoped_env: self.owns_scoped_env,
-            expr_types: self.expr_types,
-            pattern_resolutions: self.pattern_resolutions,
-        }
-    }
+        // Pre-intern print method names for PatternExecutor print dispatch
+        let print_names = PrintNames::new(self.interner);
 
-    /// Build the interpreter (native version without `max_call_depth`).
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn build(self) -> Interpreter<'a> {
-        let pat_reg = self
-            .registry
-            .unwrap_or_else(|| SharedRegistry::new(PatternRegistry::new()));
+        // Pre-intern FunctionExp property names for prop dispatch
+        let prop_names = PropNames::new(self.interner);
 
-        let user_meth_reg = self
-            .user_method_registry
-            .unwrap_or_else(|| SharedMutableRegistry::new(UserMethodRegistry::new()));
+        // Pre-intern operator trait method names for user-defined operator dispatch
+        let op_names = OpNames::new(self.interner);
 
-        // Build method dispatcher once. Because user_method_registry uses interior
-        // mutability (RwLock), the dispatcher will see methods registered later.
-        let method_dispatcher = MethodDispatcher::new(vec![
-            MethodResolverKind::UserRegistry(UserRegistryResolver::new(user_meth_reg.clone())),
-            MethodResolverKind::Collection(CollectionMethodResolver::new(self.interner)),
-            MethodResolverKind::Builtin(BuiltinMethodResolver::new()),
-        ]);
+        // Pre-intern builtin method names for hot-path dispatch (u32 == u32)
+        let builtin_method_names = crate::methods::BuiltinMethodNames::new(self.interner);
 
-        // Pre-compute the Name for "self" to avoid repeated interning
-        let self_name = self.interner.intern("self");
+        // Default print handler depends on mode if not explicitly set
+        let print_handler = self.print_handler.unwrap_or_else(stdout_handler);
 
-        // Pre-intern all primitive type names for hot-path method dispatch
-        let type_names = TypeNames::new(self.interner);
+        let mode_state = ModeState::new(&self.mode);
+
+        // Default call stack uses the mode's recursion limit
+        let call_stack = self
+            .call_stack
+            .unwrap_or_else(|| CallStack::new(self.mode.max_recursion_depth()));
+
+        // Ensure imported_arena is always set so lambda capture never
+        // needs to deep-clone the arena. If not explicitly provided,
+        // wrap the top-level arena reference in a SharedArena.
+        let imported_arena = self
+            .imported_arena
+            .unwrap_or_else(|| ori_ir::SharedArena::new(self.arena.clone()));
 
         Interpreter {
             interner: self.interner,
@@ -242,16 +175,19 @@ impl<'a> InterpreterBuilder<'a> {
             env: self.env.unwrap_or_default(),
             self_name,
             type_names,
-            call_depth: self.call_depth,
-            registry: pat_reg,
+            print_names,
+            prop_names,
+            op_names,
+            mode: self.mode,
+            mode_state,
+            call_stack,
             user_method_registry: user_meth_reg,
             method_dispatcher,
-            imported_arena: self.imported_arena,
-            prelude_loaded: false,
-            print_handler: self.print_handler.unwrap_or_else(stdout_handler),
-            owns_scoped_env: self.owns_scoped_env,
-            expr_types: self.expr_types,
-            pattern_resolutions: self.pattern_resolutions,
+            imported_arena,
+            print_handler,
+            scope_ownership: self.scope_ownership,
+            builtin_method_names,
+            canon: self.canon,
         }
     }
 }

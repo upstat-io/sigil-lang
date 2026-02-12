@@ -10,13 +10,13 @@ spec:
 sections:
   - id: "3.0"
     title: Core Library Traits
-    status: complete
+    status: in-progress
   - id: "3.1"
     title: Trait Declarations
-    status: complete
+    status: in-progress
   - id: "3.2"
     title: Trait Implementations
-    status: complete
+    status: in-progress
   - id: "3.3"
     title: Trait Bounds
     status: complete
@@ -25,10 +25,10 @@ sections:
     status: complete
   - id: "3.5"
     title: Derive Traits
-    status: complete
+    status: in-progress
   - id: "3.6"
     title: Section Completion Checklist
-    status: complete
+    status: in-progress
   - id: "3.7"
     title: Clone Trait Formal Definition
     status: not-started
@@ -55,7 +55,7 @@ sections:
     status: not-started
   - id: "3.14"
     title: Comparable and Hashable Traits
-    status: in-progress
+    status: not-started
   - id: "3.15"
     title: Derived Traits Formal Semantics
     status: not-started
@@ -85,7 +85,7 @@ sections:
 
 > **SPEC**: `spec/07-properties-of-types.md`, `spec/08-declarations.md`
 
-**Status**: Partial — Core complete (3.0-3.6, 3.19-3.21), approved proposals pending (3.7-3.18), operator LLVM pending
+**Status**: In-progress — Core evaluator complete (3.0-3.6, 3.18-3.21), LLVM partial (built-in methods ✅, user impl dispatch ✅, operator traits ❌), proposals pending (3.7-3.17). Verified 2026-02-10: ~239 Ori tests + 3,068 full suite pass. Key gap: primitive trait methods (.clone()/.hash()/.to_str() on int/str/etc.) not callable — only work on #[derive] types and Ordering.
 
 ---
 
@@ -147,47 +147,59 @@ This approach follows the "Lean Core, Rich Libraries" principle — the runtime 
 
 ### 3.0.1 Len Trait
 
-- [x] **Implemented**: Trait bound `Len` recognized for `[T]`, `str`, `{K: V}`, `Set<T>`, `Range<T>`
+- [x] **Implemented**: Trait bound `Len` recognized for `[T]`, `str`, `{K: V}`, `Set<T>`, `Range<T>` ✅ (2026-02-10)
   - [x] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — `test_len_bound_satisfied_by_*`
-  - [x] **Ori Tests**: `tests/spec/traits/core/len.ori`
-- [x] **Implemented**: `.len()` method works on all collection types
+  - [x] **Ori Tests**: `tests/spec/traits/core/len.ori` — 14 tests (all pass)
+- [x] **Implemented**: `.len()` method works on all collection types ✅ (2026-02-10)
   - [x] **Tests**: `ori_eval/src/methods.rs` — list/string/range method tests
+  - [x] **LLVM Support**: LLVM codegen for `.len()` — inline IR via field extraction in `lower_calls.rs`
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_method_tests.rs` — `.len()` codegen (test file doesn't exist)
 
 ### 3.0.2 IsEmpty Trait
 
-- [x] **Implemented**: Trait bound `IsEmpty` recognized for `[T]`, `str`, `{K: V}`, `Set<T>`
+- [x] **Implemented**: Trait bound `IsEmpty` recognized for `[T]`, `str`, `{K: V}`, `Set<T>` ✅ (2026-02-10)
   - [x] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — `test_is_empty_bound_satisfied_by_*`
-  - [x] **Ori Tests**: `tests/spec/traits/core/is_empty.ori`
-- [x] **Implemented**: `.is_empty()` method works on all collection types
+  - [x] **Ori Tests**: `tests/spec/traits/core/is_empty.ori` — 13 tests (all pass)
+- [x] **Implemented**: `.is_empty()` method works on all collection types ✅ (2026-02-10)
   - [x] **Tests**: `ori_eval/src/methods.rs` — list/string method tests
+  - [x] **LLVM Support**: LLVM codegen for `.is_empty()` — inline IR in `lower_calls.rs`
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_method_tests.rs` — `.is_empty()` codegen (test file doesn't exist)
 
 ### 3.0.3 Option Methods
 
-- [x] **Implemented**: `.is_some()`, `.is_none()`, `.unwrap()`, `.unwrap_or()` methods
+- [x] **Implemented**: `.is_some()`, `.is_none()`, `.unwrap()`, `.unwrap_or(default:)` methods ✅ (2026-02-10)
   - [x] **Rust Tests**: `ori_eval/src/methods.rs` — `option_methods` module
-  - [x] **Ori Tests**: `tests/spec/traits/core/option.ori`
-- [x] **Type checking**: `infer_builtin_method()` handles Option methods
+  - [x] **Ori Tests**: `tests/spec/traits/core/option.ori` — 16 tests (all pass)
+  - [x] **LLVM Support**: LLVM codegen for Option — tag-based dispatch in `lower_calls.rs`
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_method_tests.rs` — Option methods codegen (test file doesn't exist)
+- [x] **Type checking**: `infer_builtin_method()` handles Option methods ✅ (2026-02-10)
 
 ### 3.0.4 Result Methods
 
-- [x] **Implemented**: `.is_ok()`, `.is_err()`, `.unwrap()` methods
+- [x] **Implemented**: `.is_ok()`, `.is_err()`, `.unwrap()` methods ✅ (2026-02-10)
   - [x] **Rust Tests**: `ori_eval/src/methods.rs` — `result_methods` module
-  - [x] **Ori Tests**: `tests/spec/traits/core/result.ori`
-- [x] **Type checking**: `infer_builtin_method()` handles Result methods
+  - [x] **Ori Tests**: `tests/spec/traits/core/result.ori` — 14 tests (all pass)
+  - [x] **LLVM Support**: LLVM codegen for Result — tag-based dispatch in `lower_calls.rs`
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_method_tests.rs` — Result methods codegen (test file doesn't exist)
+- [x] **Type checking**: `infer_builtin_method()` handles Result methods ✅ (2026-02-10)
 
 ### 3.0.5 Comparable Trait
 
-- [x] **Implemented**: Trait bound `Comparable` recognized for `int`, `float`, `bool`, `str`, `char`, `byte`, `Duration`, `Size`, `[T]`, `Option<T>`, `Result<T, E>`, `Ordering`
+- [x] **Implemented**: Trait bound `Comparable` recognized for `int`, `float`, `bool`, `str`, `char`, `byte`, `Duration`, `Size`, `[T]`, `Option<T>`, `Result<T, E>`, `Ordering` ✅ (2026-02-10)
   - [x] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — `test_comparable_bound_satisfied_by_*`
-  - [x] **Ori Tests**: `tests/spec/traits/core/comparable.ori`
-- [x] **Type checking**: All comparable types have `.compare()` returning `Ordering`
+  - [x] **Ori Tests**: `tests/spec/traits/core/comparable.ori` — 58 tests (all pass)
+- [x] **Type checking**: All comparable types have `.compare(other:)` returning `Ordering` ✅ (2026-02-10)
   - [x] **Type Checking**: `ori_typeck/src/infer/builtin_methods/` — numeric.rs, string.rs, list.rs, option.rs, result.rs, units.rs, ordering.rs
+  - [x] **LLVM Support**: LLVM codegen for `.compare()` — inline arithmetic/comparison in `lower_calls.rs`
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_method_tests.rs` — `.compare()` codegen (test file doesn't exist)
 
 ### 3.0.6 Eq Trait
 
-- [x] **Implemented**: Trait bound `Eq` recognized for all primitive types
+- [x] **Implemented**: Trait bound `Eq` recognized for all primitive types ✅ (2026-02-10)
   - [x] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — `test_eq_bound_satisfied_by_*`
-  - [x] **Ori Tests**: `tests/spec/traits/core/eq.ori`
+  - [x] **Ori Tests**: `tests/spec/traits/core/eq.ori` — 23 tests (all pass)
+  - [x] **LLVM Support**: LLVM codegen for `==`/`!=` on all primitives ✅
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_method_tests.rs` — Eq codegen (test file doesn't exist)
 
 ### Additional Traits
 
@@ -201,96 +213,110 @@ The following traits are also recognized in trait bounds:
 
 ## 3.1 Trait Declarations
 
-- [x] **Implement**: Parse `trait Name { ... }` — spec/08-declarations.md § Trait Declarations
-  - [x] **Write test**: `tests/spec/traits/declaration.ori`
-  - [x] **Run test**: `ori test tests/spec/traits/declaration.ori` (4 tests pass)
-
-- [x] **Implement**: Required method signatures — spec/08-declarations.md § Trait Declarations
-  - [x] **Write test**: `tests/spec/traits/declaration.ori`
+- [x] **Implement**: Parse `trait Name { ... }` — spec/08-declarations.md § Trait Declarations ✅ (2026-02-10)
+  - [x] **Write test**: `tests/spec/traits/declaration.ori` — 16 tests (all pass)
   - [x] **Run test**: `ori test tests/spec/traits/declaration.ori`
 
-- [x] **Implement**: Default method implementations — spec/08-declarations.md § Trait Declarations
-  - [x] **Write test**: `tests/spec/traits/declaration.ori` (test_default_method)
-  - [x] **Run test**: `ori test tests/spec/traits/declaration.ori` (5 tests pass)
+- [x] **Implement**: Required method signatures — spec/08-declarations.md § Trait Declarations ✅ (2026-02-10)
+  - [x] **Write test**: `tests/spec/traits/declaration.ori` — Greeter, Counter, Calculator traits
+  - [x] **Run test**: All pass
+
+- [x] **Implement**: Default method implementations — spec/08-declarations.md § Trait Declarations ✅ (2026-02-10)
+  - [x] **Write test**: `tests/spec/traits/declaration.ori` (test_default_method: summarize(), is_large())
+  - [x] **Run test**: All pass
   - **Note**: Added default trait method dispatch in `module_loading.rs:collect_impl_methods()`
+  - [ ] **LLVM Support**: LLVM codegen for default trait method dispatch — user impl methods work, but no dedicated test
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_tests.rs` — default method codegen (test file doesn't exist)
 
-- [x] **Implement**: Associated types — spec/08-declarations.md § Associated Types
+- [x] **Implement**: Associated types — spec/08-declarations.md § Associated Types ✅ (2026-02-10)
   - [x] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — associated type parsing
-  - [x] **Ori Tests**: `tests/spec/traits/associated_types.ori`
+  - [x] **Ori Tests**: `tests/spec/traits/associated_types.ori` — 2 tests + 1 compile_fail (all pass)
 
-- [x] **Implement**: `self` parameter — spec/08-declarations.md § self Parameter
+- [x] **Implement**: `self` parameter — spec/08-declarations.md § self Parameter ✅ (2026-02-10)
   - [x] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — self parameter handling
-  - [x] **Ori Tests**: `tests/spec/traits/self_param.ori`
+  - [x] **Ori Tests**: `tests/spec/traits/self_param.ori` — 9 tests (all pass)
 
-- [x] **Implement**: `Self` type reference — spec/08-declarations.md § Self Type
+- [x] **Implement**: `Self` type reference — spec/08-declarations.md § Self Type ✅ (2026-02-10)
   - [x] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — Self type resolution
-  - [x] **Ori Tests**: `tests/spec/traits/self_type.ori`
+  - [x] **Ori Tests**: `tests/spec/traits/self_type.ori` — 7 tests (all pass)
 
-- [x] **Implement**: Trait inheritance `trait Child: Parent` — spec/08-declarations.md § Trait Inheritance
+- [x] **Implement**: Trait inheritance `trait Child: Parent` — spec/08-declarations.md § Trait Inheritance ✅ (2026-02-10)
   - [x] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — trait inheritance
-  - [x] **Ori Tests**: `tests/spec/traits/inheritance.ori`
+  - [x] **Ori Tests**: `tests/spec/traits/inheritance.ori` — 6 tests including 3-level deep inheritance (all pass)
+
+- [ ] **BUG**: Static methods `Type.method()` not supported — commented out in declaration.ori (Point.new(), Point.origin())
 
 ---
 
 ## 3.2 Trait Implementations
 
-- [x] **Implement**: Inherent impl `impl Type { ... }` — spec/08-declarations.md § Inherent Implementations (PARSING + TYPE CHECK)
-  - [x] **Write test**: `tests/spec/traits/declaration.ori` (tests `Widget.get_name()`, `Widget.get_value()`)
-  - [x] **Run test**: `ori test tests/spec/traits/declaration.ori`
+- [x] **Implement**: Inherent impl `impl Type { ... }` — spec/08-declarations.md § Inherent Implementations ✅ (2026-02-10)
+  - [x] **Write test**: `tests/spec/traits/declaration.ori` (Widget.get_name(), Widget.get_value(), Point.distance_from_origin())
+  - [x] **Run test**: All pass
+  - [x] **LLVM Support**: LLVM codegen — type-qualified method dispatch (`_ori_Type$method` mangling)
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_tests.rs` — inherent impl codegen (test file doesn't exist)
 
-- [x] **Implement**: Trait impl `impl Trait for Type { ... }` — spec/08-declarations.md § Trait Implementations (PARSING + TYPE CHECK)
-  - [x] **Write test**: `tests/spec/traits/declaration.ori` (tests `Widget.greet()`, `Widget.describe()`)
-  - [x] **Run test**: `ori test tests/spec/traits/declaration.ori`
+- [x] **Implement**: Trait impl `impl Trait for Type { ... }` — spec/08-declarations.md § Trait Implementations ✅ (2026-02-10)
+  - [x] **Write test**: `tests/spec/traits/declaration.ori` (Widget.greet(), Widget.describe(), Widget.summarize())
+  - [x] **Run test**: All pass
+  - [x] **LLVM Support**: LLVM codegen — trait method dispatch (`_ori_Type$$Trait$method` mangling)
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_tests.rs` — trait impl codegen (test file doesn't exist)
 
-- [x] **Implement**: Generic impl `impl<T: Bound> Trait for Container<T>` — spec/08-declarations.md § Generic Implementations (PARSING + TYPE CHECK)
+- [x] **Implement**: Generic impl `impl<T: Bound> Trait for Container<T>` — spec/08-declarations.md § Generic Implementations ✅ (2026-02-10)
   - [x] **Rust Tests**: Parser tests in `ori_parse/src/grammar/item.rs`
-  - [x] **Ori Tests**: `tests/spec/traits/generic_impl.ori` — 4 tests (inherent + trait impls on generic types)
+  - [x] **Ori Tests**: `tests/spec/traits/generic_impl.ori` — 4 tests (inherent + trait impls on generic types, all pass)
   - **Note**: Added `parse_impl_type()` to handle `Box<T>` syntax in impl blocks. Also added
     `Type::Applied` for tracking instantiated generic types with their type arguments.
+  - [ ] **LLVM Support**: LLVM codegen for generic impl method dispatch — not explicitly tested
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_tests.rs` — generic impl codegen (test file doesn't exist)
 
-- [x] **Implement**: Where clauses — spec/08-declarations.md § Where Clauses (PARSING + TYPE CHECK)
+- [x] **Implement**: Where clauses — spec/08-declarations.md § Where Clauses ✅ (2026-02-10)
   - [x] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — where clause parsing
-  - [x] **Ori Tests**: `tests/spec/traits/declaration.ori` — uses where clauses in trait methods
+  - [x] **Ori Tests**: `tests/spec/traits/associated_types.ori` — `where C.Item: Eq` verified
 
-- [x] **Implement**: Method resolution in type checker — spec/08-declarations.md § Method Resolution
+- [x] **Implement**: Method resolution in type checker — spec/08-declarations.md § Method Resolution ✅ (2026-02-10)
   - `TraitRegistry.lookup_method()` checks inherent impls, then trait impls, then default methods
   - `infer_method_call()` uses trait registry, falls back to built-in methods
   - [x] **Rust Tests**: Covered by existing tests in `typeck/infer/call.rs`
-  - [x] **Ori Tests**: `tests/spec/traits/declaration.ori`, `tests/spec/traits/generic_impl.ori`
+  - [x] **Ori Tests**: `tests/spec/traits/declaration.ori`, `tests/spec/traits/generic_impl.ori`, `tests/spec/traits/method_call_test.ori`
+  - [x] **LLVM Support**: 4-tier dispatch: built-in → type-qualified → bare-name → LLVM module lookup
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_tests.rs` — method resolution codegen (test file doesn't exist)
 
-- [x] **Implement**: User-defined impl method dispatch in evaluator
+- [x] **Implement**: User-defined impl method dispatch in evaluator ✅ (2026-02-10)
   - Created `UserMethodRegistry` to store impl method definitions
   - Methods registered via `load_module` -> `register_impl_methods`
   - `eval_method_call` checks user methods first, falls back to built-in
   - Added `self_path` to `ImplDef` AST for type name resolution
   - [x] **Write test**: Rust unit tests in `eval/evaluator.rs` (4 tests covering dispatch, self access, args, fallback)
-  - [x] **Run test**: `cargo test --lib eval::evaluator::tests` (all pass)
+  - [x] **Run test**: All pass
+  - [x] **LLVM Support**: LLVM codegen for user-defined impl method dispatch — `compile_impls()` in `function_compiler.rs`
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_tests.rs` — user method dispatch codegen (test file doesn't exist)
 
-- [x] **Implement**: Coherence checking — spec/08-declarations.md § Coherence
+- [x] **Implement**: Coherence checking — spec/08-declarations.md § Coherence ✅ (2026-02-10)
   - `register_impl` returns `Result<(), CoherenceError>` and checks for conflicts
   - Duplicate trait impls for same type rejected
   - Duplicate inherent methods on same type rejected
   - Multiple inherent impl blocks allowed if methods don't conflict (merged)
   - Added `E2010` error code for coherence violations
   - [x] **Write test**: Rust unit tests in `typeck/type_registry.rs` (3 tests)
-  - [x] **Run test**: `cargo test --lib typeck::type_registry::tests` (all pass)
+  - [x] **Run test**: All pass
 
 ---
 
 ## 3.3 Trait Bounds
 
 **Complete Implementation:**
-- [x] Parser supports generic parameters with bounds `<T: Trait>`, `<T: A + B>`
-- [x] Parser supports where clauses `where T: Clone, U: Default`
-- [x] `Function` AST node stores `generics: GenericParamRange` and `where_clauses: Vec<WhereClause>`
-- [x] `FunctionType` in type checker stores `generics: Vec<GenericBound>` with bounds and type vars
-- [x] `Param` AST node stores `type_name: Option<Name>` to preserve type annotation names
-- [x] `parse_type_with_name()` captures identifier names during parameter type parsing
-- [x] `infer_function_signature` creates fresh type vars for generics and maps params correctly
-- [x] `function_sigs: HashMap<Name, FunctionType>` stores signatures for call-time lookup
-- [x] `check_generic_bounds()` verifies resolved types satisfy trait bounds at call sites
-- [x] E2009 error code for missing trait bound violations
-- [x] Unit tests verify end-to-end (10 tests in `typeck::checker::tests`)
+- [ ] Parser supports generic parameters with bounds `<T: Trait>`, `<T: A + B>`
+- [ ] Parser supports where clauses `where T: Clone, U: Default`
+- [ ] `Function` AST node stores `generics: GenericParamRange` and `where_clauses: Vec<WhereClause>`
+- [ ] `FunctionType` in type checker stores `generics: Vec<GenericBound>` with bounds and type vars
+- [ ] `Param` AST node stores `type_name: Option<Name>` to preserve type annotation names
+- [ ] `parse_type_with_name()` captures identifier names during parameter type parsing
+- [ ] `infer_function_signature` creates fresh type vars for generics and maps params correctly
+- [ ] `function_sigs: HashMap<Name, FunctionType>` stores signatures for call-time lookup
+- [ ] `check_generic_bounds()` verifies resolved types satisfy trait bounds at call sites
+- [ ] E2009 error code for missing trait bound violations
+- [ ] Unit tests verify end-to-end (10 tests in `typeck::checker::tests`)
 
 **What Works Now:**
 - Parsing generic functions: `@compare<T: Comparable> (a: T, b: T) -> Ordering`
@@ -307,17 +333,17 @@ The following traits are also recognized in trait bounds:
 - `check_generic_bounds` in `call.rs` resolves type vars after unification and checks bounds
 - `type_satisfies_bound` uses `TraitRegistry` to verify trait implementations
 
-- [x] **Implement**: Single bound `<T: Trait>` — spec/08-declarations.md § Generic Declarations
-  - [x] **Write test**: Rust unit tests in `typeck/checker.rs::tests`
-  - [x] **Run test**: `cargo test --lib typeck::checker::tests` (10 tests pass)
+- [x] **Implement**: Single bound `<T: Trait>` — spec/08-declarations.md § Generic Declarations ✅ (2026-02-10)
+  - [x] **Write test**: Rust unit tests in `typeck/checker.rs::tests` (10 tests pass)
+  - [x] **Run test**: All pass
 
-- [x] **Implement**: Multiple bounds `<T: A + B>` — spec/08-declarations.md § Generic Declarations
+- [x] **Implement**: Multiple bounds `<T: A + B>` — spec/08-declarations.md § Generic Declarations ✅ (2026-02-10)
   - [x] **Write test**: `test_multiple_bounds_parsing` in Rust unit tests
-  - [x] **Run test**: `cargo test --lib typeck::checker::tests` (all pass)
+  - [x] **Run test**: All pass
 
-- [x] **Implement**: Constraint satisfaction checking — spec/07-properties-of-types.md § Trait Bounds
+- [x] **Implement**: Constraint satisfaction checking — spec/07-properties-of-types.md § Trait Bounds ✅ (2026-02-10)
   - [x] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — 10+ constraint satisfaction tests
-  - [ ] **Ori Tests**: `tests/spec/traits/bounds.ori`
+  - [x] **Ori Tests**: `tests/spec/traits/associated_types.ori` — `needs_eq_item` + `compile_fail` for violated bound
 
 ---
 
@@ -333,19 +359,20 @@ Infrastructure implemented:
 - `ImplEntry.assoc_types` stores associated type definitions
 - `TraitRegistry.lookup_assoc_type()` resolves associated types
 
-- [x] **Implement**: Associated type declarations — spec/08-declarations.md § Associated Types
+- [x] **Implement**: Associated type declarations — spec/08-declarations.md § Associated Types ✅ (2026-02-10)
   - [x] **Rust Tests**: `ori_parse/src/grammar/ty.rs` — associated type parsing tests
-  - [x] **Ori Tests**: `tests/spec/traits/associated_types.ori`
+  - [x] **Ori Tests**: `tests/spec/traits/associated_types.ori` — 2 tests (all pass)
+  - [x] **Ori Tests**: `tests/spec/traits/associated_types_verify.ori` — 2 tests (all pass)
 
-- [x] **Implement**: Constraints `where T.Item: Eq` — spec/08-declarations.md § Where Clauses
+- [x] **Implement**: Constraints `where T.Item: Eq` — spec/08-declarations.md § Where Clauses ✅ (2026-02-10)
   - [x] **Rust Tests**: Parser/type checker support in `bound_checking.rs`
-  - [x] **Ori Tests**: `tests/spec/traits/associated_types.ori` — `test_fnbox_fails_eq_constraint`
+  - [x] **Ori Tests**: `tests/spec/traits/associated_types.ori` — `test_fnbox_fails_eq_constraint` compile_fail passes
   - **Note**: Added `WhereConstraint` struct with projection support. Parser handles `where C.Item: Eq`.
     Bound checking resolves associated types via `lookup_assoc_type_by_name()`.
 
-- [x] **Implement**: Impl validation (require all associated types defined)
+- [x] **Implement**: Impl validation (require all associated types defined) ✅ (2026-02-10)
   - [x] **Rust Tests**: `oric/src/typeck/checker/trait_registration.rs` — `validate_associated_types`
-  - [x] **Ori Tests**: `tests/compile-fail/impl_missing_assoc_type.ori`
+  - [ ] **Ori Tests**: `tests/compile-fail/impl_missing_assoc_type.ori` — test file not yet created
   - **Note**: Added validation in `register_impls()` that checks all required associated types are defined.
 
 ---
@@ -357,42 +384,55 @@ Infrastructure implemented:
 All 5 derive traits implemented in `oric/src/typeck/derives/mod.rs`.
 Tests at `tests/spec/traits/derive/all_derives.ori` (7 tests pass).
 
-- [x] **Implement**: Auto-implement `Eq` — spec/08-declarations.md § Attributes
+- [x] **Implement**: Auto-implement `Eq` — spec/08-declarations.md § Attributes ✅ (2026-02-10)
   - [x] **Rust Tests**: `oric/src/typeck/derives/mod.rs` — `test_process_struct_derives`
-  - [x] **Ori Tests**: `tests/spec/traits/derive/all_derives.ori`
+  - [x] **Ori Tests**: `tests/spec/traits/derive/all_derives.ori` + `tests/spec/traits/derive/eq.ori` — 3+13 tests (all pass)
+  - [ ] **LLVM Support**: LLVM codegen for derived Eq methods — derives handled by type checker, no LLVM-specific test
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/derive_tests.rs` — Eq derive codegen (test file doesn't exist)
 
-- [x] **Implement**: Auto-implement `Clone` — spec/08-declarations.md § Attributes
+- [x] **Implement**: Auto-implement `Clone` — spec/08-declarations.md § Attributes ✅ (2026-02-10)
   - [x] **Rust Tests**: `oric/src/typeck/derives/mod.rs` — `test_process_multiple_derives`
-  - [x] **Ori Tests**: `tests/spec/traits/derive/all_derives.ori`
+  - [x] **Ori Tests**: `tests/spec/traits/derive/all_derives.ori` — `.clone()` on derived Point (passes)
+  - [ ] **LLVM Support**: LLVM codegen for derived Clone methods — no LLVM-specific test
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/derive_tests.rs` — Clone derive codegen (test file doesn't exist)
 
-- [x] **Implement**: Auto-implement `Hashable` — spec/08-declarations.md § Attributes
+- [x] **Implement**: Auto-implement `Hashable` — spec/08-declarations.md § Attributes ✅ (2026-02-10)
   - [x] **Rust Tests**: `oric/src/typeck/derives/mod.rs`
-  - [x] **Ori Tests**: `tests/spec/traits/derive/all_derives.ori`
+  - [x] **Ori Tests**: `tests/spec/traits/derive/all_derives.ori` — `.hash()` on derived Point (passes)
+  - [ ] **LLVM Support**: LLVM codegen for derived Hashable methods — no LLVM-specific test
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/derive_tests.rs` — Hashable derive codegen (test file doesn't exist)
 
-- [x] **Implement**: Auto-implement `Printable` — spec/08-declarations.md § Attributes
+- [x] **Implement**: Auto-implement `Printable` — spec/08-declarations.md § Attributes ✅ (2026-02-10)
   - [x] **Rust Tests**: `oric/src/typeck/derives/mod.rs`
-  - [x] **Ori Tests**: `tests/spec/traits/derive/all_derives.ori`
+  - [x] **Ori Tests**: `tests/spec/traits/derive/all_derives.ori` — `.to_string()` on derived Point (passes)
+  - [ ] **LLVM Support**: LLVM codegen for derived Printable methods — no LLVM-specific test
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/derive_tests.rs` — Printable derive codegen (test file doesn't exist)
 
-- [x] **Implement**: Auto-implement `Default` — spec/08-declarations.md § Attributes
+- [ ] **Implement**: Auto-implement `Default` — spec/08-declarations.md § Attributes
   - [x] **Rust Tests**: `oric/src/typeck/derives/mod.rs` — `create_derived_method_def` handles Default
   - [ ] **Ori Tests**: `tests/spec/traits/derive/default.ori` — test file not yet created
+  - [ ] **LLVM Support**: LLVM codegen for derived Default methods
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/derive_tests.rs` — Default derive codegen (test file doesn't exist)
 
 ---
 
 ## 3.6 Section Completion Checklist
 
-- [x] Core library traits (3.0): All complete
-- [x] Trait declarations (3.1): All complete
-- [x] Trait implementations (3.2): All complete
-- [x] Trait bounds (3.3): All complete
-- [x] Associated types (3.4): All complete
-- [x] Derive traits (3.5): All 5 derives implemented
-- [x] 148 trait tests pass
-- [x] Run full test suite: `./test-all.sh`
+- [x] Core library traits (3.0): Len, IsEmpty, Option, Result, Comparable, Eq — all complete ✅ (2026-02-10)
+  - [ ] **Gap**: Clone/Hashable/Default/Printable methods NOT callable on primitives (only as trait bounds and on #[derive] types)
+- [x] Trait declarations (3.1): Parse, required methods, default methods, self, Self, inheritance — all complete ✅ (2026-02-10)
+  - [ ] **Gap**: Static methods `Type.method()` not supported
+- [x] Trait implementations (3.2): Inherent, trait, generic impls, method resolution, coherence — all complete ✅ (2026-02-10)
+- [x] Trait bounds (3.3): Single, multiple, constraint satisfaction — all complete ✅ (2026-02-10)
+- [x] Associated types (3.4): Declaration, `Self.Item`, where constraints — all complete ✅ (2026-02-10)
+- [x] Derive traits (3.5): Eq, Clone, Hashable, Printable complete; Default NOT tested ✅ (2026-02-10)
+- [x] ~239 trait test annotations pass (len: 14, is_empty: 13, option: 16, result: 14, comparable: 58, eq: 23, declaration: 16, self_param: 9, self_type: 7, inheritance: 6, generic_impl: 4, associated_types: 4, default_type_params: 2, default_assoc_types: 4, derive: 16, ordering: 32, method_call: 1) ✅ (2026-02-10)
+- [x] Run full test suite: `./test-all.sh` — 3,068 passed, 0 failed ✅ (2026-02-10)
+- [ ] LLVM test files missing: `ori_llvm/tests/trait_method_tests.rs`, `ori_llvm/tests/trait_tests.rs`, `ori_llvm/tests/derive_tests.rs` don't exist
+- [ ] Operator traits (3.21): User-defined operator dispatch NOT working (entirely commented out)
+- [ ] Proposals (3.7-3.17): Iterator, Debug, Formattable, Into, etc. — all not started
 
-**Exit Criteria**: Trait-based code compiles and runs
-
-**Section 3 Complete**
+**Exit Criteria**: Core trait-based code compiles and runs in evaluator ✅. LLVM codegen for built-in and user methods works ✅. User-defined operators and formal trait proposals pending.
 
 ---
 
@@ -407,22 +447,32 @@ Formalizes the `Clone` trait that enables explicit value duplication. The trait 
 - [ ] **Implement**: Formal `Clone` trait definition in type system
   - [ ] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — clone trait parsing
   - [ ] **Ori Tests**: `tests/spec/traits/clone/definition.ori`
+  - [ ] **LLVM Support**: LLVM codegen for Clone trait definition
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/clone_tests.rs` — Clone definition codegen
 
 - [ ] **Implement**: Clone implementations for all primitives (int, float, bool, str, char, byte, Duration, Size)
   - [ ] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — primitive clone bounds
   - [ ] **Ori Tests**: `tests/spec/traits/clone/primitives.ori`
+  - [ ] **LLVM Support**: LLVM codegen for primitive clone methods
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/clone_tests.rs` — primitive clone codegen
 
 - [ ] **Implement**: Clone implementations for collections ([T], {K: V}, Set<T>) with element-wise cloning
   - [ ] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — collection clone bounds
   - [ ] **Ori Tests**: `tests/spec/traits/clone/collections.ori`
+  - [ ] **LLVM Support**: LLVM codegen for collection clone methods
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/clone_tests.rs` — collection clone codegen
 
 - [ ] **Implement**: Clone implementations for Option<T> and Result<T, E>
   - [ ] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — option/result clone
   - [ ] **Ori Tests**: `tests/spec/traits/clone/wrappers.ori`
+  - [ ] **LLVM Support**: LLVM codegen for Option/Result clone methods
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/clone_tests.rs` — Option/Result clone codegen
 
 - [ ] **Implement**: Clone implementations for tuples (all arities)
   - [ ] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — tuple clone bounds
   - [ ] **Ori Tests**: `tests/spec/traits/clone/tuples.ori`
+  - [ ] **LLVM Support**: LLVM codegen for tuple clone methods
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/clone_tests.rs` — tuple clone codegen
 
 - [ ] **Update Spec**: `06-types.md` — add Clone trait section
 - [ ] **Update Spec**: `12-modules.md` — update prelude traits description
@@ -681,6 +731,8 @@ Specifies rules for resolving trait implementation conflicts: diamond problem, c
 - [ ] **Implement**: Method resolution order — Inherent > Trait > Extension priority
   - [ ] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — resolution order tests
   - [ ] **Ori Tests**: `tests/spec/traits/resolution/method_priority.ori`
+  - [ ] **LLVM Support**: LLVM codegen for method resolution order dispatch
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_resolution_tests.rs` — method resolution codegen
 
 - [ ] **Implement**: Ambiguous method detection with fully-qualified syntax
   - [ ] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — ambiguous method tests
@@ -689,6 +741,8 @@ Specifies rules for resolving trait implementation conflicts: diamond problem, c
 - [ ] **Implement**: Super trait calls with `Trait.method(self)` syntax
   - [ ] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — super call tests
   - [ ] **Ori Tests**: `tests/spec/traits/resolution/super_calls.ori`
+  - [ ] **LLVM Support**: LLVM codegen for super trait call dispatch
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_resolution_tests.rs` — super trait call codegen
 
 - [ ] **Implement**: Extension method conflict detection (including re-exports)
   - [ ] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — extension conflict tests
@@ -826,31 +880,45 @@ Formalizes three core traits: `Printable`, `Default`, and `Traceable`. The `Iter
 - [ ] **Implement**: `Printable` trait formal definition in type system
   - [ ] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — printable trait parsing/bounds
   - [ ] **Ori Tests**: `tests/spec/traits/printable/definition.ori`
+  - [ ] **LLVM Support**: LLVM codegen for Printable trait methods
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_method_tests.rs` — Printable codegen
 
 - [ ] **Implement**: Printable derivation with `Point(1, 2)` format (type name + values)
   - [ ] **Rust Tests**: `oric/src/typeck/derives/mod.rs` — printable derive tests
   - [ ] **Ori Tests**: `tests/spec/traits/printable/derive.ori`
+  - [ ] **LLVM Support**: LLVM codegen for Printable derivation
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_method_tests.rs` — Printable derivation codegen
 
 - [ ] **Implement**: `Default` trait formal definition in type system
   - [ ] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — default trait parsing/bounds
   - [ ] **Ori Tests**: `tests/spec/traits/default/definition.ori`
+  - [ ] **LLVM Support**: LLVM codegen for Default trait methods
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_method_tests.rs` — Default codegen
 
 - [ ] **Implement**: Default derivation for structs only (error on sum types)
   - [ ] **Rust Tests**: `oric/src/typeck/derives/mod.rs` — default derive tests
   - [ ] **Ori Tests**: `tests/spec/traits/default/derive.ori`
   - [ ] **Ori Compile-Fail Tests**: `tests/compile-fail/default_sum_type.ori`
+  - [ ] **LLVM Support**: LLVM codegen for Default derivation
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_method_tests.rs` — Default derivation codegen
 
 - [ ] **Implement**: `Traceable` trait formal definition in type system
   - [ ] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — traceable trait parsing/bounds
   - [ ] **Ori Tests**: `tests/spec/traits/traceable/definition.ori`
+  - [ ] **LLVM Support**: LLVM codegen for Traceable trait methods
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_method_tests.rs` — Traceable codegen
 
 - [ ] **Implement**: Traceable for Error type with trace storage
   - [ ] **Rust Tests**: `oric/src/eval/tests/` — error trace evaluation
   - [ ] **Ori Tests**: `tests/spec/traits/traceable/error.ori`
+  - [ ] **LLVM Support**: LLVM codegen for Traceable Error type
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_method_tests.rs` — Traceable Error codegen
 
 - [ ] **Implement**: Traceable delegation for Result<T, E: Traceable>
   - [ ] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — result traceable bounds
   - [ ] **Ori Tests**: `tests/spec/traits/traceable/result.ori`
+  - [ ] **LLVM Support**: LLVM codegen for Traceable Result delegation
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/trait_method_tests.rs` — Traceable Result codegen
 
 - [ ] **Implement**: Error messages (E1040, E1042)
   - [ ] E1040: Missing Printable for string interpolation
@@ -873,18 +941,18 @@ Formalizes the `Comparable` and `Hashable` traits with complete definitions, mat
   - [ ] **Rust Tests**: `oric/src/typeck/checker/tests.rs` — comparable trait parsing/bounds
   - [ ] **Ori Tests**: `tests/spec/traits/comparable/definition.ori`
 
-- [x] **Implement**: Comparable implementations for all primitives (int, float, bool, str, char, byte, Duration, Size)
-  - [x] **Rust Implementation**: `ori_eval/src/methods.rs` — dispatch_*_method with compare()
-  - [x] **Type Checking**: `ori_typeck/src/infer/builtin_methods/` — compare() returns Ordering for all primitives
-  - [x] **Ori Tests**: `tests/spec/traits/core/comparable.ori` — all primitive compare() tests
-  - [x] **Ori Tests**: `tests/spec/types/duration_size_comparable.ori` — Duration/Size compare() tests
+- [ ] **Implement**: Comparable implementations for all primitives (int, float, bool, str, char, byte, Duration, Size)
+  - [ ] **Rust Implementation**: `ori_eval/src/methods.rs` — dispatch_*_method with compare()
+  - [ ] **Type Checking**: `ori_typeck/src/infer/builtin_methods/` — compare() returns Ordering for all primitives
+  - [ ] **Ori Tests**: `tests/spec/traits/core/comparable.ori` — all primitive compare() tests
+  - [ ] **Ori Tests**: `tests/spec/types/duration_size_comparable.ori` — Duration/Size compare() tests
   - [ ] **LLVM Support**: LLVM codegen for primitive compare methods
   - [ ] **LLVM Rust Tests**: `ori_llvm/tests/comparable_tests.rs`
 
-- [x] **Implement**: Comparable implementations for lists ([T])
-  - [x] **Rust Implementation**: `ori_eval/src/methods.rs` — dispatch_list_method with compare()
-  - [x] **Type Checking**: `ori_typeck/src/infer/builtin_methods/list.rs` — compare() returns Ordering
-  - [x] **Ori Tests**: `tests/spec/traits/core/comparable.ori` — list compare() tests
+- [ ] **Implement**: Comparable implementations for lists ([T])
+  - [ ] **Rust Implementation**: `ori_eval/src/methods.rs` — dispatch_list_method with compare()
+  - [ ] **Type Checking**: `ori_typeck/src/infer/builtin_methods/list.rs` — compare() returns Ordering
+  - [ ] **Ori Tests**: `tests/spec/traits/core/comparable.ori` — list compare() tests
   - [ ] **LLVM Support**: LLVM codegen for list compare
   - [ ] **LLVM Rust Tests**: `ori_llvm/tests/comparable_tests.rs`
 
@@ -894,32 +962,32 @@ Formalizes the `Comparable` and `Hashable` traits with complete definitions, mat
   - [ ] **LLVM Support**: LLVM codegen for tuple compare
   - [ ] **LLVM Rust Tests**: `ori_llvm/tests/comparable_tests.rs`
 
-- [x] **Implement**: Comparable implementation for Option<T>
-  - [x] **Rust Implementation**: `ori_eval/src/methods.rs` — dispatch_option_method with compare()
-  - [x] **Type Checking**: `ori_typeck/src/infer/builtin_methods/option.rs` — compare() returns Ordering
-  - [x] **Ori Tests**: `tests/spec/traits/core/comparable.ori` — Option compare() tests
+- [ ] **Implement**: Comparable implementation for Option<T>
+  - [ ] **Rust Implementation**: `ori_eval/src/methods.rs` — dispatch_option_method with compare()
+  - [ ] **Type Checking**: `ori_typeck/src/infer/builtin_methods/option.rs` — compare() returns Ordering
+  - [ ] **Ori Tests**: `tests/spec/traits/core/comparable.ori` — Option compare() tests
   - [ ] **LLVM Support**: LLVM codegen for option compare
   - [ ] **LLVM Rust Tests**: `ori_llvm/tests/comparable_tests.rs`
 
-- [x] **Implement**: Comparable implementation for Result<T, E>
-  - [x] **Rust Implementation**: `ori_eval/src/methods.rs` — dispatch_result_method with compare()
-  - [x] **Type Checking**: `ori_typeck/src/infer/builtin_methods/result.rs` — compare() returns Ordering
-  - [x] Result: `Ok(_) < Err(_)`, then compare inner values
-  - [x] **Ori Tests**: `tests/spec/traits/core/comparable.ori` — Result compare() tests
+- [ ] **Implement**: Comparable implementation for Result<T, E>
+  - [ ] **Rust Implementation**: `ori_eval/src/methods.rs` — dispatch_result_method with compare()
+  - [ ] **Type Checking**: `ori_typeck/src/infer/builtin_methods/result.rs` — compare() returns Ordering
+  - [ ] Result: `Ok(_) < Err(_)`, then compare inner values
+  - [ ] **Ori Tests**: `tests/spec/traits/core/comparable.ori` — Result compare() tests
   - [ ] **LLVM Support**: LLVM codegen for result compare
   - [ ] **LLVM Rust Tests**: `ori_llvm/tests/comparable_tests.rs`
 
-- [x] **Implement**: Float IEEE 754 total ordering (NaN handling)
-  - [x] **Rust Implementation**: `ori_eval/src/methods.rs` — uses `total_cmp()` for IEEE 754 ordering
+- [ ] **Implement**: Float IEEE 754 total ordering (NaN handling)
+  - [ ] **Rust Implementation**: `ori_eval/src/methods.rs` — uses `total_cmp()` for IEEE 754 ordering
   - [ ] **Ori Tests**: `tests/spec/traits/comparable/float_nan.ori`
   - [ ] **LLVM Support**: LLVM codegen for float total ordering
   - [ ] **LLVM Rust Tests**: `ori_llvm/tests/comparable_tests.rs`
 
-- [x] **Implement**: Comparable implementation for Ordering
-  - [x] **Rust Implementation**: `ori_eval/src/methods.rs` — dispatch_ordering_method with compare()
-  - [x] **Type Checking**: `ori_typeck/src/infer/builtin_methods/ordering.rs` — compare() returns Ordering
-  - [x] Ordering: `Less < Equal < Greater`
-  - [x] **Ori Tests**: `tests/spec/traits/core/comparable.ori` — Ordering compare() tests
+- [ ] **Implement**: Comparable implementation for Ordering
+  - [ ] **Rust Implementation**: `ori_eval/src/methods.rs` — dispatch_ordering_method with compare()
+  - [ ] **Type Checking**: `ori_typeck/src/infer/builtin_methods/ordering.rs` — compare() returns Ordering
+  - [ ] Ordering: `Less < Equal < Greater`
+  - [ ] **Ori Tests**: `tests/spec/traits/core/comparable.ori` — Ordering compare() tests
   - [ ] **LLVM Support**: LLVM codegen for ordering compare
   - [ ] **LLVM Rust Tests**: `ori_llvm/tests/comparable_tests.rs`
 
@@ -997,43 +1065,63 @@ Formalizes the `#derive` attribute semantics: derivable traits list, derivation 
 - [ ] **Implement**: Eq derivation for structs — field-wise equality
   - [ ] **Rust Tests**: `oric/src/typeck/derives/mod.rs` — eq derive tests
   - [ ] **Ori Tests**: `tests/spec/traits/derive/eq.ori`
+  - [ ] **LLVM Support**: LLVM codegen for Eq struct derivation
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/derive_tests.rs` — Eq struct derive codegen
 
 - [ ] **Implement**: Eq derivation for sum types — variant matching
   - [ ] **Rust Tests**: `oric/src/typeck/derives/mod.rs` — eq sum type tests
   - [ ] **Ori Tests**: `tests/spec/traits/derive/eq_sum.ori`
+  - [ ] **LLVM Support**: LLVM codegen for Eq sum type derivation
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/derive_tests.rs` — Eq sum type derive codegen
 
 - [ ] **Implement**: Hashable derivation — combined field hashes via `hash_combine`
   - [ ] **Rust Tests**: `oric/src/typeck/derives/mod.rs` — hashable derive tests
   - [ ] **Ori Tests**: `tests/spec/traits/derive/hashable.ori`
+  - [ ] **LLVM Support**: LLVM codegen for Hashable derivation
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/derive_tests.rs` — Hashable derive codegen
 
 - [ ] **Implement**: Comparable derivation — lexicographic field comparison
   - [ ] **Rust Tests**: `oric/src/typeck/derives/mod.rs` — comparable derive tests
   - [ ] **Ori Tests**: `tests/spec/traits/derive/comparable.ori`
+  - [ ] **LLVM Support**: LLVM codegen for Comparable derivation
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/derive_tests.rs` — Comparable derive codegen
 
 - [ ] **Implement**: Clone derivation — field-wise clone
   - [ ] **Rust Tests**: `oric/src/typeck/derives/mod.rs` — clone derive tests
   - [ ] **Ori Tests**: `tests/spec/traits/derive/clone.ori`
+  - [ ] **LLVM Support**: LLVM codegen for Clone derivation
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/derive_tests.rs` — Clone derive codegen
 
 - [ ] **Implement**: Default derivation for structs only
   - [ ] **Rust Tests**: `oric/src/typeck/derives/mod.rs` — default derive tests
   - [ ] **Ori Tests**: `tests/spec/traits/derive/default.ori`
   - [ ] **Ori Compile-Fail Tests**: `tests/compile-fail/derive_default_sum.ori`
+  - [ ] **LLVM Support**: LLVM codegen for Default derivation
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/derive_tests.rs` — Default derive codegen
 
 - [ ] **Implement**: Debug derivation — structural representation with type name
   - [ ] **Rust Tests**: `oric/src/typeck/derives/mod.rs` — debug derive tests
   - [ ] **Ori Tests**: `tests/spec/traits/derive/debug.ori`
+  - [ ] **LLVM Support**: LLVM codegen for Debug derivation
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/derive_tests.rs` — Debug derive codegen
 
 - [ ] **Implement**: Printable derivation — human-readable format `TypeName(field1, field2)`
   - [ ] **Rust Tests**: `oric/src/typeck/derives/mod.rs` — printable derive tests
   - [ ] **Ori Tests**: `tests/spec/traits/derive/printable.ori`
+  - [ ] **LLVM Support**: LLVM codegen for Printable derivation
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/derive_tests.rs` — Printable derive codegen
 
 - [ ] **Implement**: Generic type conditional derivation — bounded impls
   - [ ] **Rust Tests**: `oric/src/typeck/derives/mod.rs` — generic derive tests
   - [ ] **Ori Tests**: `tests/spec/traits/derive/generic.ori`
+  - [ ] **LLVM Support**: LLVM codegen for generic conditional derivation
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/derive_tests.rs` — generic derive codegen
 
 - [ ] **Implement**: Recursive type derivation
   - [ ] **Rust Tests**: `oric/src/typeck/derives/mod.rs` — recursive derive tests
   - [ ] **Ori Tests**: `tests/spec/traits/derive/recursive.ori`
+  - [ ] **LLVM Support**: LLVM codegen for recursive type derivation
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/derive_tests.rs` — recursive derive codegen
 
 - [ ] **Implement**: Error messages (E0880-E0882)
   - [ ] E0880: Cannot derive trait for type (field missing trait)
@@ -1179,42 +1267,42 @@ Formalizes the `Ordering` type that represents comparison results. Defines the t
 
 ### Implementation
 
-- [x] **Implement**: `Ordering` type definition (already in spec as `type Ordering = Less | Equal | Greater`)
+- [x] **Implement**: `Ordering` type definition (already in spec as `type Ordering = Less | Equal | Greater`) ✅ (2026-02-10)
   - Type checking via `Type::Named("Ordering")`
   - Runtime values via `Value::Variant { type_name: "Ordering", ... }`
   - [x] **Variants available as bare names**: `Less`, `Equal`, `Greater` are registered as built-in enum variants
     - Type registry: `register_builtin_types()` in `ori_typeck/src/registry/mod.rs`
     - Evaluator: `register_prelude()` in `ori_eval/src/interpreter/mod.rs`
-  - [x] **Ori Tests**: `tests/spec/types/ordering/methods.ori` — 30+ tests for predicate methods
+  - [x] **Ori Tests**: `tests/spec/types/ordering/methods.ori` — 32 tests (all pass)
 
-- [x] **Implement**: Ordering predicate methods (`is_less`, `is_equal`, `is_greater`, `is_less_or_equal`, `is_greater_or_equal`)
+- [x] **Implement**: Ordering predicate methods (`is_less`, `is_equal`, `is_greater`, `is_less_or_equal`, `is_greater_or_equal`) ✅ (2026-02-10)
   - [x] **Type checker**: `ori_typeck/src/infer/builtin_methods/ordering.rs`
   - [x] **Evaluator**: `ori_eval/src/methods.rs` — `dispatch_ordering_method`
-  - [x] **Ori Tests**: `tests/spec/types/duration_size_comparable.ori` (16 tests)
-  - [x] **LLVM Support**: Via LLVM Variant method dispatch (inherits from interpreter)
+  - [x] **Ori Tests**: `tests/spec/types/ordering/methods.ori` — 15 predicate tests (all pass)
+  - [x] **LLVM Support**: i8 comparison/arithmetic in `lower_calls.rs`
 
-- [x] **Implement**: `reverse` method for Ordering
+- [x] **Implement**: `reverse` method for Ordering ✅ (2026-02-10)
   - [x] **Type checker**: Returns `Type::Named("Ordering")`
   - [x] **Evaluator**: Swaps Less↔Greater, preserves Equal
-  - [x] **Ori Tests**: `tests/spec/types/duration_size_comparable.ori`
+  - [x] **Ori Tests**: `tests/spec/types/ordering/methods.ori` — 4 reverse tests including involution
 
 - [ ] **Implement**: `then` method for lexicographic comparison chaining
-  - **BLOCKED**: `then` is a keyword in Ori grammar (if...then...else)
+  - **BLOCKED**: `then` is a keyword in Ori grammar (if...then...else) — commented out in tests
   - [ ] **Ori Tests**: `tests/spec/types/ordering/then.ori`
 
 - [ ] **Implement**: `then_with` method for lazy lexicographic chaining
   - [ ] **Ori Tests**: `tests/spec/types/ordering/then_with.ori`
 
-- [x] **Implement**: Trait methods for Ordering (Clone, Debug, Printable, Hashable)
-  - [x] `clone()` → returns self
-  - [x] `to_str()` → "Less"/"Equal"/"Greater"
-  - [x] `debug()` → "Less"/"Equal"/"Greater"
-  - [x] `hash()` → -1/0/1
+- [x] **Implement**: Trait methods for Ordering (Clone, Printable, Hashable) ✅ (2026-02-10)
+  - [x] `clone()` → returns self — verified in ordering/methods.ori
+  - [x] `to_str()` → "Less"/"Equal"/"Greater" — verified in ordering/methods.ori
+  - [ ] `debug()` → "Less"/"Equal"/"Greater" — NOT implemented (Debug trait doesn't exist yet)
+  - [x] `hash()` → distinct values for each variant — verified in ordering/methods.ori
 
-- [ ] **Implement**: Default value is `Equal` (via associated function `Ordering.default()`)
+- [ ] **Implement**: Default value is `Equal` (via associated function `Ordering.default()`) — NOT testable (static methods not supported)
 
 - [ ] **Update Spec**: `06-types.md` — expand Ordering section with methods and trait implementations
-- [x] **Update**: `CLAUDE.md` — Ordering methods already documented in quick reference
+- [ ] **Update**: `CLAUDE.md` — Ordering methods already documented in quick reference
 
 ---
 
@@ -1228,32 +1316,33 @@ Allow type parameters on traits to have default values, enabling `trait Add<Rhs 
 
 ### Implementation
 
-- [x] **Implement**: Parse default type in `type_param` grammar rule (`identifier [ ":" bounds ] [ "=" type ]`)
+- [x] **Implement**: Parse default type in `type_param` grammar rule (`identifier [ ":" bounds ] [ "=" type ]`) ✅ (2026-02-10)
   - [x] **Rust Tests**: `ori_parse/src/grammar/item/generics.rs` — `parse_generics()` handles `= Type` after bounds
-  - [x] **Ori Tests**: `tests/spec/traits/default_type_params.ori`
+  - [x] **Ori Tests**: `tests/spec/traits/default_type_params.ori` — 2 tests (all pass)
 
-- [x] **Implement**: Store default types in trait definition AST
+- [x] **Implement**: Store default types in trait definition AST ✅ (2026-02-10)
   - [x] **Rust Tests**: `GenericParam` in `ori_ir/src/ast/items/traits.rs` has `default_type: Option<ParsedType>`
   - [x] **Rust Tests**: `TraitEntry` in `ori_typeck/src/registry/trait_types.rs` has `default_types: Vec<Option<ParsedType>>`
 
-- [x] **Implement**: Fill missing type arguments with defaults in impl checking
+- [x] **Implement**: Fill missing type arguments with defaults in impl checking ✅ (2026-02-10)
   - [x] **Rust Tests**: `resolve_trait_type_args()` in `trait_registration.rs`
-  - [x] **Ori Tests**: `tests/spec/traits/default_type_params.ori`
+  - [x] **Ori Tests**: `tests/spec/traits/default_type_params.ori` — `impl Addable for Point` omits Rhs, uses Self default
 
-- [x] **Implement**: Substitute `Self` with implementing type in defaults
+- [x] **Implement**: Substitute `Self` with implementing type in defaults ✅ (2026-02-10)
   - [x] **Rust Tests**: `resolve_parsed_type_with_self_substitution()` in `trait_registration.rs`
   - [x] **Ori Tests**: `tests/spec/traits/default_type_params.ori` — `test_add` uses Self default
 
-- [x] **Implement**: Ordering constraint enforcement (defaults must follow non-defaults)
+- [x] **Implement**: Ordering constraint enforcement (defaults must follow non-defaults) ✅ (2026-02-10)
   - [x] **Rust Tests**: `validate_default_type_param_ordering()` in `trait_registration.rs`
   - [x] **Error Code**: E2015 (type parameter ordering violation)
 
-- [x] **Implement**: Later parameters can reference earlier ones in defaults
+- [x] **Implement**: Later parameters can reference earlier ones in defaults ✅ (2026-02-10)
   - [x] **Design**: Stored as `ParsedType`, resolved at impl time with substitution
+  - [x] **Verified**: `trait Transform<Input = Self, Output = Input>` in default_type_params.ori
 
-- [x] **Update Spec**: `grammar.ebnf` § Generics — `type_param = identifier [ ":" bounds ] [ "=" type ] .`
-- [x] **Update Spec**: `08-declarations.md` — Default Type Parameters section under Traits
-- [x] **Update**: `CLAUDE.md` — `trait N<T = Self>` syntax documented
+- [ ] **Update Spec**: `grammar.ebnf` § Generics — `type_param = identifier [ ":" bounds ] [ "=" type ] .`
+- [ ] **Update Spec**: `08-declarations.md` — Default Type Parameters section under Traits
+- [ ] **Update**: `CLAUDE.md` — `trait N<T = Self>` syntax documented
 
 ---
 
@@ -1267,30 +1356,30 @@ Allow associated types in traits to have default values, enabling `type Output =
 
 ### Implementation
 
-- [x] **Implement**: Parse default type in `assoc_type` grammar rule (`"type" identifier [ ":" bounds ] [ "=" type ]`)
+- [x] **Implement**: Parse default type in `assoc_type` grammar rule (`"type" identifier [ ":" bounds ] [ "=" type ]`) ✅ (2026-02-10)
   - [x] **Rust Tests**: `ori_parse/src/grammar/item/trait_def.rs` — default assoc type parsing
-  - [x] **Ori Tests**: `tests/spec/traits/default_assoc_types.ori`
+  - [x] **Ori Tests**: `tests/spec/traits/default_assoc_types.ori` — 4 tests (all pass)
 
-- [x] **Implement**: Store default types in trait definition AST for associated types
+- [x] **Implement**: Store default types in trait definition AST for associated types ✅ (2026-02-10)
   - [x] **Rust Tests**: `ori_ir/src/ast/items/traits.rs` — `TraitAssocType.default_type: Option<ParsedType>`
 
-- [x] **Implement**: Fill missing associated types with defaults in impl checking
+- [x] **Implement**: Fill missing associated types with defaults in impl checking ✅ (2026-02-10)
   - [x] **Rust Tests**: `ori_typeck/src/checker/trait_registration.rs` — `validate_associated_types()` uses defaults
-  - [x] **Ori Tests**: `tests/spec/traits/default_assoc_types.ori`
+  - [x] **Ori Tests**: `tests/spec/traits/default_assoc_types.ori` — Point impl omits Output, uses Self default
 
-- [x] **Implement**: Substitute `Self` with implementing type in defaults
+- [x] **Implement**: Substitute `Self` with implementing type in defaults ✅ (2026-02-10)
   - [x] **Rust Tests**: `ori_typeck/src/registry/trait_registry.rs` — `resolve_parsed_type_with_self_substitution()`
-  - [x] **Ori Tests**: `tests/spec/traits/default_assoc_types.ori`
+  - [x] **Ori Tests**: `tests/spec/traits/default_assoc_types.ori` — verified with Point (default Output=Self) and Number (overridden Output=int)
 
-- [ ] **Implement**: Defaults can reference type parameters and other associated types
+- [x] **Implement**: Defaults can reference type parameters and other associated types ✅ (2026-02-10)
   - Note: Basic support implemented; complex cascading defaults deferred
 
 - [ ] **Implement**: Bounds checking — verify default satisfies any bounds after substitution
   - Note: Deferred to future enhancement; bounds on associated types not yet fully implemented
 
-- [x] **Update Spec**: `grammar.ebnf` — update assoc_type production
-- [x] **Update Spec**: `08-declarations.md` — add Default Associated Types section
-- [x] **Update**: `CLAUDE.md` — add default associated type syntax to Traits section
+- [ ] **Update Spec**: `grammar.ebnf` — update assoc_type production
+- [ ] **Update Spec**: `08-declarations.md` — add Default Associated Types section
+- [ ] **Update**: `CLAUDE.md` — add default associated type syntax to Traits section
 
 ---
 
@@ -1304,29 +1393,30 @@ Defines traits for arithmetic, bitwise, and unary operators that user-defined ty
 
 ### Dependencies
 
-- [x] Default Type Parameters on Traits (3.19) — for `trait Add<Rhs = Self>`
-- [x] Default Associated Types (3.20) — for `type Output = Self`
+- [x] Default Type Parameters on Traits (3.19) — for `trait Add<Rhs = Self>` ✅ (2026-02-10)
+- [x] Default Associated Types (3.20) — for `type Output = Self` ✅ (2026-02-10)
 
 ### Implementation
 
-- [x] **Implement**: Define operator traits in prelude (via trait registry lookup)
-  - [x] `Add<Rhs = Self>`, `Sub<Rhs = Self>`, `Mul<Rhs = Self>`, `Div<Rhs = Self>`, `FloorDiv<Rhs = Self>`, `Rem<Rhs = Self>`
-  - [x] `Neg`, `Not`, `BitNot`
-  - [x] `BitAnd<Rhs = Self>`, `BitOr<Rhs = Self>`, `BitXor<Rhs = Self>`, `Shl<Rhs = int>`, `Shr<Rhs = int>`
-  - [x] **Ori Tests**: `tests/spec/traits/operators/user_defined.ori`
+- [ ] **Implement**: Define operator traits in prelude (via trait registry lookup)
+  - [ ] `Add<Rhs = Self>`, `Sub<Rhs = Self>`, `Mul<Rhs = Self>`, `Div<Rhs = Self>`, `FloorDiv<Rhs = Self>`, `Rem<Rhs = Self>`
+  - [ ] `Neg`, `Not`, `BitNot`
+  - [ ] `BitAnd<Rhs = Self>`, `BitOr<Rhs = Self>`, `BitXor<Rhs = Self>`, `Shl<Rhs = int>`, `Shr<Rhs = int>`
+  - [ ] **Ori Tests**: `tests/spec/traits/operators/user_defined.ori` — **ENTIRELY COMMENTED OUT** (type checker doesn't support operator trait dispatch yet)
 
-- [x] **Implement**: Operator desugaring in type checker
-  - [x] `a + b` → `a.add(rhs: b)` (etc. for all operators)
-  - [x] **Files**: `ori_typeck/src/infer/expressions/operators.rs` — `check_operator_trait()`
+- [ ] **Implement**: Operator desugaring in type checker
+  - [ ] `a + b` → `a.add(rhs: b)` (etc. for all operators)
+  - [ ] **Files**: `ori_typeck/src/infer/expressions/operators.rs` — `check_operator_trait()`
+  - **NOTE**: Not yet implemented. User-defined operators are NOT desugared to trait calls.
 
-- [x] **Implement**: Operator dispatch in evaluator via trait impls
+- [x] **Implement**: Operator dispatch in evaluator via trait impls — PARTIAL (built-in primitives only) ✅ (2026-02-10)
   - [x] **Files**: `ori_eval/src/interpreter/mod.rs` — `eval_binary()`, `binary_op_to_method()`
   - [x] **Files**: `ori_eval/src/methods.rs` — operator methods for primitives
-  - [x] **Ori Tests**: `tests/spec/traits/operators/user_defined.ori`
-  - [ ] **LLVM Support**: LLVM codegen for operator trait dispatch (see Section 21A § 21.2)
-  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/operator_trait_tests.rs`
+  - [ ] **Ori Tests**: `tests/spec/traits/operators/user_defined.ori` — entirely commented out, no working tests
+  - [ ] **LLVM Support**: LLVM codegen for operator trait dispatch — NOT implemented for user types
+  - [ ] **LLVM Rust Tests**: `ori_llvm/tests/operator_trait_tests.rs` — test file doesn't exist
 
-- [x] **Implement**: Built-in operator trait implementations for primitives
+- [x] **Implement**: Built-in operator implementations for primitives (NOT trait-based, direct evaluator dispatch) ✅ (2026-02-10)
   - [x] `int`: Add, Sub, Mul, Div, FloorDiv, Rem, Neg, BitAnd, BitOr, BitXor, Shl, Shr, BitNot
   - [x] `float`: Add, Sub, Mul, Div, Neg
   - [x] `bool`: Not
@@ -1336,10 +1426,11 @@ Defines traits for arithmetic, bitwise, and unary operators that user-defined ty
   - [x] `Size`: Add, Sub, Mul (with int), Div (with int), Rem
   - [x] **Files**: `ori_eval/src/methods.rs` — `dispatch_int_method()`, `dispatch_float_method()`, etc.
 
-- [x] **Implement**: User-defined operator implementations
-  - [x] **Ori Tests**: `tests/spec/traits/operators/user_defined.ori` (skipped in LLVM)
+- [ ] **Implement**: User-defined operator implementations — NOT WORKING
+  - [ ] **Ori Tests**: `tests/spec/traits/operators/user_defined.ori` — entirely commented out with TODO
+  - **NOTE**: `impl Add for Point { ... }` + `a + b` does NOT desugar to trait call
 
-- [x] **Implement**: Mixed-type operations with explicit both-direction impls
+- [x] **Implement**: Mixed-type operations with explicit both-direction impls ✅ (2026-02-10)
   - [x] Example: `Duration * int` and `int * Duration`
   - [x] **Files**: `ori_eval/src/interpreter/mod.rs` — `is_mixed_primitive_op()`
 
@@ -1354,5 +1445,5 @@ Defines traits for arithmetic, bitwise, and unary operators that user-defined ty
   - [ ] **Rust Tests**: `oric/src/typeck/derives/mod.rs` — operator derive tests
   - [ ] **Ori Tests**: `tests/spec/traits/operators/derive.ori`
 
-- [x] **Update Spec**: `09-expressions.md` — replace "No Operator Overloading" with Operator Traits section
-- [x] **Update**: `CLAUDE.md` — add operator traits to prelude and operators section
+- [ ] **Update Spec**: `09-expressions.md` — replace "No Operator Overloading" with Operator Traits section
+- [ ] **Update**: `CLAUDE.md` — add operator traits to prelude and operators section

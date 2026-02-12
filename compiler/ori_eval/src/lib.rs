@@ -1,6 +1,3 @@
-#![deny(clippy::arithmetic_side_effects)]
-// EvalError is a fundamental error type - boxing would add complexity across the crate
-#![allow(clippy::result_large_err)]
 //! Ori Eval - Interpreter/evaluator for the Ori compiler.
 //!
 //! This crate provides the tree-walking interpreter for Ori programs.
@@ -21,9 +18,17 @@
 //! - `Value`, `FunctionValue`, `RangeValue`, `StructValue`, `StructLayout`, `Heap`
 //! - `EvalError`, `EvalResult`
 
+#![deny(clippy::arithmetic_side_effects)]
+#![expect(
+    clippy::result_large_err,
+    reason = "EvalError is a fundamental type — boxing would add complexity across the crate"
+)]
+
 mod derives;
+pub mod diagnostics;
 mod environment;
 pub mod errors;
+mod eval_mode;
 pub mod exec;
 mod function_val;
 pub mod interpreter;
@@ -40,113 +45,37 @@ mod user_methods;
 #[expect(clippy::unwrap_used, reason = "Tests use unwrap for brevity")]
 mod tests;
 
-// Re-export value types from ori_patterns
+// Value types from ori_patterns — the natural API surface for consumers
 pub use ori_patterns::{
-    EvalContext, EvalError, EvalResult, FunctionValFn, FunctionValue, Heap, MemoizedFunctionValue,
-    PatternDefinition, PatternExecutor, PatternRegistry, RangeValue, ScalarInt, StructLayout,
-    StructValue, Value,
+    ControlAction, EvalError, EvalResult, FunctionValFn, FunctionValue, Heap,
+    MemoizedFunctionValue, RangeValue, ScalarInt, StructLayout, StructValue, Value,
 };
 
-// Re-export error constructors for convenience (canonical path is ori_eval::errors::*)
-pub use errors::{
-    // Collection method errors
-    all_requires_list,
-    any_requires_list,
-    // Miscellaneous errors
-    await_not_supported,
-    // Binary operation errors
-    binary_type_mismatch,
-    // Index and field access errors
-    cannot_access_field,
-    // Control flow errors
-    cannot_assign_immutable,
-    cannot_get_length,
-    cannot_index,
-    collect_requires_range,
-    // Index context errors
-    collection_too_large,
-    // Not implemented errors
-    default_requires_type_context,
-    division_by_zero,
-    // Pattern binding errors
-    expected_list,
-    expected_struct,
-    expected_tuple,
-    field_assignment_not_implemented,
-    filter_entries_not_implemented,
-    filter_entries_requires_map,
-    filter_requires_collection,
-    find_requires_list,
-    fold_requires_collection,
-    // Pattern errors
-    for_pattern_requires_list,
-    for_requires_iterable,
-    hash_outside_index,
-    index_assignment_not_implemented,
-    index_out_of_bounds,
-    invalid_assignment_target,
-    invalid_literal_pattern,
-    invalid_tuple_field,
-    key_not_found,
-    list_pattern_too_long,
-    map_entries_not_implemented,
-    map_entries_requires_map,
-    // Type conversion errors
-    map_key_not_hashable,
-    map_requires_collection,
-    missing_struct_field,
-    modulo_by_zero,
-    no_field_on_struct,
-    no_member_in_module,
-    // Method call errors
-    no_such_method,
-    non_exhaustive_match,
-    non_integer_in_index,
-    // Variable and function errors
-    not_callable,
-    operator_not_supported_in_index,
-    parse_error,
-    range_bound_not_int,
-    self_outside_method,
-    spread_requires_map,
-    tuple_index_out_of_bounds,
-    tuple_pattern_mismatch,
-    unbounded_range_end,
-    undefined_const,
-    undefined_function,
-    undefined_variable,
-    unknown_pattern,
-    wrong_arg_count,
-    wrong_arg_type,
-    wrong_function_args,
-};
-
-pub use environment::{Environment, LocalScope, Mutability, Scope};
+pub use diagnostics::{CallFrame, CallStack, EvalCounters};
+pub use environment::{AssignError, Environment, LocalScope, Mutability, Scope};
+pub use eval_mode::{BudgetExceeded, EvalMode, ModeState};
 pub use method_key::MethodKey;
-pub use methods::{dispatch_builtin_method, EVAL_BUILTIN_METHODS};
+pub use methods::{dispatch_builtin_method_str, EVAL_BUILTIN_METHODS};
 pub use operators::evaluate_binary;
 pub use unary_operators::evaluate_unary;
 pub use user_methods::{MethodEntry, UserMethod, UserMethodRegistry};
-// Re-export from ori_ir for backward compatibility
-pub use ori_ir::{DerivedMethodInfo, DerivedTrait};
 
 pub use derives::process_derives;
 pub use function_val::{
     function_val_byte, function_val_float, function_val_int, function_val_str,
     function_val_thread_id,
 };
-#[cfg(target_arch = "wasm32")]
-pub use interpreter::DEFAULT_MAX_CALL_DEPTH;
 pub use interpreter::{Interpreter, InterpreterBuilder, ScopedInterpreter};
 pub use ori_stack::ensure_sufficient_stack;
 pub use print_handler::{
-    buffer_handler, stdout_handler, BufferPrintHandler, PrintHandlerImpl, SharedPrintHandler,
-    StdoutPrintHandler,
+    buffer_handler, silent_handler, stdout_handler, BufferPrintHandler, PrintHandlerImpl,
+    SharedPrintHandler, StdoutPrintHandler,
 };
 pub use shared::{SharedMutableRegistry, SharedRegistry};
 
 // Re-export module registration functions for CLI and Playground
 pub use module_registration::{
-    collect_def_impl_methods, collect_extend_methods, collect_impl_methods,
-    register_module_functions, register_newtype_constructors, register_variant_constructors,
+    collect_def_impl_methods_with_config, collect_extend_methods_with_config,
+    collect_impl_methods_with_config, register_module_functions, register_newtype_constructors,
+    register_variant_constructors, MethodCollectionConfig,
 };

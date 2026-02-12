@@ -39,6 +39,7 @@ pub mod ast;
 pub mod builtin_constants;
 pub mod builtin_methods;
 mod builtin_type;
+pub mod canon;
 mod comment;
 mod derives;
 mod expr_id;
@@ -47,6 +48,7 @@ mod interner;
 mod metadata;
 mod name;
 mod parsed_type;
+mod pattern_resolution;
 mod span;
 mod token;
 mod traits;
@@ -144,6 +146,7 @@ pub use interner::{InternError, SharedInterner, StringInterner, StringLookup};
 pub use metadata::ModuleExtra;
 pub use name::Name;
 pub use parsed_type::ParsedType;
+pub use pattern_resolution::{PatternKey, PatternResolution};
 pub use span::{Span, SpanError};
 pub use token::{
     DurationUnit, SizeUnit, Token, TokenCapture, TokenFlags, TokenIdx, TokenKind, TokenList,

@@ -16,7 +16,8 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, RwLock};
 
-use ori_ir::{ExprArena, ExprId, MatchPattern, Name, SharedArena};
+use ori_ir::canon::{CanId, SharedCanonResult};
+use ori_ir::{ExprArena, Name, SharedArena};
 
 use super::Value;
 
@@ -115,39 +116,33 @@ impl StructValue {
 /// This eliminates potential race conditions and simplifies reasoning about
 /// closure behavior.
 ///
-/// # Arena Requirement (Thread Safety)
-/// Every function carries its own arena reference. This is required for thread
-/// safety in parallel execution - when functions are called from different
-/// contexts (e.g., parallel test runner), they must use their own arena to
-/// resolve `ExprId` values correctly.
+/// # Canonical Evaluation
+///
+/// All evaluation goes through `eval_can(CanId)` using `can_body`/`canon`.
+/// The `arena` field is retained for `create_function_interpreter` which
+/// needs it for arena threading during function calls.
 #[derive(Clone)]
 pub struct FunctionValue {
     /// Parameter names.
     pub params: Vec<Name>,
-    /// Parameter patterns for clause-based matching.
-    /// `patterns[i]` is `Some(pattern)` if parameter `i` has a pattern (e.g., literal `0`).
-    /// If `None`, the parameter is a simple name binding.
-    /// Length matches `params.len()`.
-    pub patterns: Vec<Option<MatchPattern>>,
-    /// Guard clause expression (evaluated after patterns match).
-    /// If present, clause only matches if guard evaluates to true.
-    pub guard: Option<ExprId>,
-    /// Default value expressions for each parameter.
-    /// `defaults[i]` is `Some(expr_id)` if parameter `i` has a default value.
-    /// The length matches `params.len()`.
-    pub defaults: Vec<Option<ExprId>>,
-    /// Body expression.
-    pub body: ExprId,
+    /// Canonical body expression. The evaluator dispatches on `CanExpr`
+    /// from the canonical arena instead of `ExprKind` from `ExprArena`.
+    pub can_body: CanId,
     /// Captured environment (frozen at creation).
     ///
     /// No `RwLock` needed since captures are immutable after creation.
     captures: Arc<FxHashMap<Name, Value>>,
-    /// Arena for expression resolution.
-    ///
-    /// Required for thread safety - the body `ExprId` must be resolved
-    /// against this arena, not whatever arena happens to be in scope
-    /// at call time.
+    /// Arena for expression resolution (needed for `create_function_interpreter`).
     arena: SharedArena,
+    /// Canonical IR for this function's body.
+    ///
+    /// When set, `can_body` indexes into this result's `CanArena`.
+    /// Functions created from canonicalized modules have this; lambdas
+    /// inherit it from their enclosing function.
+    canon: Option<SharedCanonResult>,
+    /// Default expressions for each parameter.
+    /// `can_defaults[i]` is `Some(can_id)` if parameter `i` has a default value.
+    can_defaults: Vec<Option<CanId>>,
     /// Required capabilities (from `uses` clause).
     ///
     /// When calling this function, capabilities with these names must be
@@ -160,24 +155,16 @@ impl FunctionValue {
     ///
     /// # Arguments
     /// * `params` - Parameter names
-    /// * `body` - Body expression ID
     /// * `captures` - Captured environment (frozen at creation)
     /// * `arena` - Arena for expression resolution (required for thread safety)
-    pub fn new(
-        params: Vec<Name>,
-        body: ExprId,
-        captures: FxHashMap<Name, Value>,
-        arena: SharedArena,
-    ) -> Self {
-        let len = params.len();
+    pub fn new(params: Vec<Name>, captures: FxHashMap<Name, Value>, arena: SharedArena) -> Self {
         FunctionValue {
             params,
-            patterns: vec![None; len],
-            guard: None,
-            defaults: vec![None; len],
-            body,
+            can_body: CanId::INVALID,
             captures: Arc::new(captures),
             arena,
+            canon: None,
+            can_defaults: Vec::new(),
             capabilities: Vec::new(),
         }
     }
@@ -186,108 +173,34 @@ impl FunctionValue {
     ///
     /// # Arguments
     /// * `params` - Parameter names
-    /// * `body` - Body expression ID
     /// * `captures` - Captured environment (frozen at creation)
     /// * `arena` - Arena for expression resolution (required for thread safety)
     /// * `capabilities` - Required capabilities from `uses` clause
     pub fn with_capabilities(
         params: Vec<Name>,
-        body: ExprId,
         captures: FxHashMap<Name, Value>,
         arena: SharedArena,
         capabilities: Vec<Name>,
     ) -> Self {
-        let len = params.len();
         FunctionValue {
             params,
-            patterns: vec![None; len],
-            guard: None,
-            defaults: vec![None; len],
-            body,
+            can_body: CanId::INVALID,
             captures: Arc::new(captures),
             arena,
-            capabilities,
-        }
-    }
-
-    /// Create a function value with capabilities and default parameter values.
-    ///
-    /// # Arguments
-    /// * `params` - Parameter names
-    /// * `defaults` - Default value expressions for each parameter (same length as params)
-    /// * `body` - Body expression ID
-    /// * `captures` - Captured environment (frozen at creation)
-    /// * `arena` - Arena for expression resolution (required for thread safety)
-    /// * `capabilities` - Required capabilities from `uses` clause
-    pub fn with_defaults(
-        params: Vec<Name>,
-        defaults: Vec<Option<ExprId>>,
-        body: ExprId,
-        captures: FxHashMap<Name, Value>,
-        arena: SharedArena,
-        capabilities: Vec<Name>,
-    ) -> Self {
-        debug_assert_eq!(params.len(), defaults.len());
-        let len = params.len();
-        FunctionValue {
-            params,
-            patterns: vec![None; len],
-            guard: None,
-            defaults,
-            body,
-            captures: Arc::new(captures),
-            arena,
-            capabilities,
-        }
-    }
-
-    /// Create a function value with patterns for clause-based matching.
-    ///
-    /// # Arguments
-    /// * `params` - Parameter names
-    /// * `patterns` - Pattern for each parameter (None for simple binding)
-    /// * `guard` - Optional guard clause expression
-    /// * `defaults` - Default value expressions for each parameter
-    /// * `body` - Body expression ID
-    /// * `captures` - Captured environment (frozen at creation)
-    /// * `arena` - Arena for expression resolution (required for thread safety)
-    /// * `capabilities` - Required capabilities from `uses` clause
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "Builder pattern alternative would be more complex"
-    )]
-    pub fn with_patterns(
-        params: Vec<Name>,
-        patterns: Vec<Option<MatchPattern>>,
-        guard: Option<ExprId>,
-        defaults: Vec<Option<ExprId>>,
-        body: ExprId,
-        captures: FxHashMap<Name, Value>,
-        arena: SharedArena,
-        capabilities: Vec<Name>,
-    ) -> Self {
-        debug_assert_eq!(params.len(), patterns.len());
-        debug_assert_eq!(params.len(), defaults.len());
-        FunctionValue {
-            params,
-            patterns,
-            guard,
-            defaults,
-            body,
-            captures: Arc::new(captures),
-            arena,
+            canon: None,
+            can_defaults: Vec::new(),
             capabilities,
         }
     }
 
     /// Count the number of required parameters (those without defaults).
     pub fn required_param_count(&self) -> usize {
-        self.defaults.iter().filter(|d| d.is_none()).count()
-    }
-
-    /// Check if this function has any patterns (is a clause function).
-    pub fn has_patterns(&self) -> bool {
-        self.patterns.iter().any(Option::is_some)
+        if self.can_defaults.is_empty() {
+            // No defaults set — all parameters are required
+            self.params.len()
+        } else {
+            self.can_defaults.iter().filter(|d| d.is_none()).count()
+        }
     }
 
     /// Create a function value with shared captures.
@@ -298,91 +211,22 @@ impl FunctionValue {
     ///
     /// # Arguments
     /// * `params` - Parameter names
-    /// * `body` - Body expression ID
     /// * `captures` - Shared captured environment
     /// * `arena` - Arena for expression resolution (required for thread safety)
     /// * `capabilities` - Required capabilities from `uses` clause
     pub fn with_shared_captures(
         params: Vec<Name>,
-        body: ExprId,
         captures: Arc<FxHashMap<Name, Value>>,
         arena: SharedArena,
         capabilities: Vec<Name>,
     ) -> Self {
-        let len = params.len();
         FunctionValue {
             params,
-            patterns: vec![None; len],
-            guard: None,
-            defaults: vec![None; len],
-            body,
+            can_body: CanId::INVALID,
             captures,
             arena,
-            capabilities,
-        }
-    }
-
-    /// Create a function value with shared captures and defaults.
-    ///
-    /// Use this when multiple functions should share the same captures
-    /// (e.g., module functions for mutual recursion) and have default parameters.
-    ///
-    /// # Arguments
-    /// * `params` - Parameter names
-    /// * `defaults` - Default value expressions for each parameter
-    /// * `body` - Body expression ID
-    /// * `captures` - Shared captured environment
-    /// * `arena` - Arena for expression resolution (required for thread safety)
-    /// * `capabilities` - Required capabilities from `uses` clause
-    pub fn with_shared_captures_and_defaults(
-        params: Vec<Name>,
-        defaults: Vec<Option<ExprId>>,
-        body: ExprId,
-        captures: Arc<FxHashMap<Name, Value>>,
-        arena: SharedArena,
-        capabilities: Vec<Name>,
-    ) -> Self {
-        debug_assert_eq!(params.len(), defaults.len());
-        let len = params.len();
-        FunctionValue {
-            params,
-            patterns: vec![None; len],
-            guard: None,
-            defaults,
-            body,
-            captures,
-            arena,
-            capabilities,
-        }
-    }
-
-    /// Create a function value with shared captures, patterns, and defaults.
-    ///
-    /// Full constructor for clause-based functions with pattern matching.
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "Full constructor for clause functions"
-    )]
-    pub fn with_shared_captures_and_patterns(
-        params: Vec<Name>,
-        patterns: Vec<Option<MatchPattern>>,
-        guard: Option<ExprId>,
-        defaults: Vec<Option<ExprId>>,
-        body: ExprId,
-        captures: Arc<FxHashMap<Name, Value>>,
-        arena: SharedArena,
-        capabilities: Vec<Name>,
-    ) -> Self {
-        debug_assert_eq!(params.len(), patterns.len());
-        debug_assert_eq!(params.len(), defaults.len());
-        FunctionValue {
-            params,
-            patterns,
-            guard,
-            defaults,
-            body,
-            captures,
-            arena,
+            canon: None,
+            can_defaults: Vec::new(),
             capabilities,
         }
     }
@@ -402,9 +246,49 @@ impl FunctionValue {
         !self.captures.is_empty()
     }
 
-    /// Get the arena for this function.
+    /// Get the legacy arena for this function (for multi-clause pattern matching).
     pub fn arena(&self) -> &ExprArena {
         &self.arena
+    }
+
+    /// Get the shared arena reference for O(1) Arc cloning.
+    ///
+    /// Use this instead of `arena().clone()` to avoid deep-cloning the `ExprArena`.
+    /// `SharedArena` is `Arc<ExprArena>`, so `.clone()` is an atomic increment.
+    pub fn shared_arena(&self) -> &SharedArena {
+        &self.arena
+    }
+
+    /// Get the canonical IR for this function, if available.
+    pub fn canon(&self) -> Option<&SharedCanonResult> {
+        self.canon.as_ref()
+    }
+
+    /// Set canonical IR for this function.
+    ///
+    /// Called after construction to attach canonical data without modifying
+    /// every constructor's signature. The `can_body` must index into the
+    /// `canon` result's `CanArena`.
+    pub fn set_canon(&mut self, can_body: CanId, canon: SharedCanonResult) {
+        self.can_body = can_body;
+        self.canon = Some(canon);
+    }
+
+    /// Set canonical default expressions for this function's parameters.
+    ///
+    /// Called after construction to attach canonicalized defaults without modifying
+    /// every constructor. The `CanId` values index into the function's `canon` arena.
+    pub fn set_can_defaults(&mut self, can_defaults: Vec<Option<CanId>>) {
+        debug_assert!(
+            can_defaults.is_empty() || can_defaults.len() == self.params.len(),
+            "can_defaults length must match params length"
+        );
+        self.can_defaults = can_defaults;
+    }
+
+    /// Get the canonical default expressions for this function's parameters.
+    pub fn can_defaults(&self) -> &[Option<CanId>] {
+        &self.can_defaults
     }
 
     /// Get the required capabilities for this function.
@@ -422,7 +306,7 @@ impl fmt::Debug for FunctionValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FunctionValue")
             .field("params", &self.params)
-            .field("body", &self.body)
+            .field("can_body", &self.can_body)
             .field("captures", &format!("{} bindings", self.captures.len()))
             .finish_non_exhaustive()
     }
@@ -814,7 +698,7 @@ mod tests {
 
     #[test]
     fn test_function_value_new() {
-        let func = FunctionValue::new(vec![], ExprId::new(0), FxHashMap::default(), dummy_arena());
+        let func = FunctionValue::new(vec![], FxHashMap::default(), dummy_arena());
         assert!(func.params.is_empty());
         assert!(!func.has_captures());
     }
@@ -823,7 +707,7 @@ mod tests {
     fn test_function_value_with_captures() {
         let mut captures = FxHashMap::default();
         captures.insert(Name::new(0, 1), Value::int(42));
-        let func = FunctionValue::new(vec![], ExprId::new(0), captures, dummy_arena());
+        let func = FunctionValue::new(vec![], captures, dummy_arena());
         assert!(func.has_captures());
         assert_eq!(func.get_capture(Name::new(0, 1)), Some(&Value::int(42)));
     }
@@ -876,7 +760,7 @@ mod tests {
     fn test_function_value_get_capture_missing() {
         let mut captures = FxHashMap::default();
         captures.insert(Name::new(0, 1), Value::int(42));
-        let func = FunctionValue::new(vec![], ExprId::new(0), captures, dummy_arena());
+        let func = FunctionValue::new(vec![], captures, dummy_arena());
 
         // Query a capture that doesn't exist
         let missing_name = Name::new(0, 999);
@@ -885,7 +769,7 @@ mod tests {
 
     #[test]
     fn test_memoized_function_get_cached_uncached() {
-        let func = FunctionValue::new(vec![], ExprId::new(0), FxHashMap::default(), dummy_arena());
+        let func = FunctionValue::new(vec![], FxHashMap::default(), dummy_arena());
         let memoized = MemoizedFunctionValue::new(func);
 
         // Query with args that haven't been cached
@@ -895,7 +779,7 @@ mod tests {
 
     #[test]
     fn test_memoized_function_cache_and_retrieve() {
-        let func = FunctionValue::new(vec![], ExprId::new(0), FxHashMap::default(), dummy_arena());
+        let func = FunctionValue::new(vec![], FxHashMap::default(), dummy_arena());
         let memoized = MemoizedFunctionValue::new(func);
 
         // Cache a result
@@ -910,7 +794,7 @@ mod tests {
 
     #[test]
     fn test_memoized_function_different_args_not_cached() {
-        let func = FunctionValue::new(vec![], ExprId::new(0), FxHashMap::default(), dummy_arena());
+        let func = FunctionValue::new(vec![], FxHashMap::default(), dummy_arena());
         let memoized = MemoizedFunctionValue::new(func);
 
         // Cache with one set of args
@@ -926,7 +810,7 @@ mod tests {
     fn test_memoized_function_cache_eviction() {
         use super::MAX_MEMO_CACHE_SIZE;
 
-        let func = FunctionValue::new(vec![], ExprId::new(0), FxHashMap::default(), dummy_arena());
+        let func = FunctionValue::new(vec![], FxHashMap::default(), dummy_arena());
         let memoized = MemoizedFunctionValue::new(func);
 
         // Fill the cache to capacity
@@ -961,7 +845,7 @@ mod tests {
 
     #[test]
     fn test_memoized_function_cache_update_no_eviction() {
-        let func = FunctionValue::new(vec![], ExprId::new(0), FxHashMap::default(), dummy_arena());
+        let func = FunctionValue::new(vec![], FxHashMap::default(), dummy_arena());
         let memoized = MemoizedFunctionValue::new(func);
 
         // Cache initial value

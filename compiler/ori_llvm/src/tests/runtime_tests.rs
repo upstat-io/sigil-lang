@@ -238,54 +238,140 @@ fn test_ori_str_concat_empty() {
 
 #[test]
 #[allow(unsafe_code)]
-fn test_ori_closure_box_allocates_memory() {
-    // Test allocation of various sizes
-    let ptr1 = runtime::ori_closure_box(24); // closure with 1 capture: 1 + 8 + 8 + 8 (aligned)
-    let ptr2 = runtime::ori_closure_box(40); // closure with 3 captures
+fn test_rc_alloc_and_data_pointer() {
+    // V2: ori_rc_alloc returns data pointer directly (no separate ori_rc_data)
+    let data = runtime::ori_rc_alloc(24, 8); // env with 3 × i64 captures
+    assert!(!data.is_null());
 
-    assert!(!ptr1.is_null());
-    assert!(!ptr2.is_null());
+    // Refcount at data_ptr - 8 should be 1
+    assert_eq!(runtime::ori_rc_count(data), 1);
 
-    // Verify pointers are aligned to 8 bytes
-    assert_eq!(ptr1 as usize % 8, 0);
-    assert_eq!(ptr2 as usize % 8, 0);
-
-    // Write and read back to verify memory is usable
-    // We're guaranteed 8-byte alignment from ori_closure_box.
+    // Write captures and read back
     unsafe {
-        // Write a pattern to the memory
-        *ptr1 = 42;
-
-        // For the i64 write at offset 8, we need to ensure alignment.
-        // Since ptr1 is 8-byte aligned and we add 8 bytes, the result is 8-byte aligned.
-        // Use write_unaligned to satisfy clippy, even though we know it's aligned.
-        let i64_ptr = ptr1.add(8);
-        std::ptr::write_unaligned(i64_ptr.cast::<i64>(), 12345);
-
-        // Read back
-        assert_eq!(*ptr1, 42);
-        assert_eq!(std::ptr::read_unaligned(i64_ptr.cast::<i64>()), 12345);
+        std::ptr::write_unaligned(data.cast::<i64>(), 111);
+        std::ptr::write_unaligned(data.add(8).cast::<i64>(), 222);
+        std::ptr::write_unaligned(data.add(16).cast::<i64>(), 333);
+        assert_eq!(std::ptr::read_unaligned(data.cast::<i64>()), 111);
+        assert_eq!(std::ptr::read_unaligned(data.add(8).cast::<i64>()), 222);
+        assert_eq!(std::ptr::read_unaligned(data.add(16).cast::<i64>()), 333);
     }
 
-    // Clean up (normally closures would be freed by GC or explicit dealloc)
-    unsafe {
-        let layout1 = std::alloc::Layout::from_size_align(24, 8).unwrap();
-        let layout2 = std::alloc::Layout::from_size_align(40, 8).unwrap();
-        std::alloc::dealloc(ptr1, layout1);
-        std::alloc::dealloc(ptr2, layout2);
+    // Decrement → refcount reaches 0 → calls drop_fn
+    // Use a trivial drop function that calls ori_rc_free
+    extern "C" fn drop_env_24(data_ptr: *mut u8) {
+        runtime::ori_rc_free(data_ptr, 24, 8);
     }
+    runtime::ori_rc_dec(data, Some(drop_env_24));
 }
 
 #[test]
 #[allow(unsafe_code)]
-fn test_ori_closure_box_minimum_size() {
-    // Even if size is very small, should allocate at least 8 bytes
-    let ptr = runtime::ori_closure_box(1);
-    assert!(!ptr.is_null());
+fn test_rc_inc_dec_lifecycle() {
+    let data = runtime::ori_rc_alloc(8, 8);
+    assert!(!data.is_null());
+    assert_eq!(runtime::ori_rc_count(data), 1);
 
-    // Clean up
-    unsafe {
-        let layout = std::alloc::Layout::from_size_align(8, 8).unwrap();
-        std::alloc::dealloc(ptr, layout);
+    // Increment twice
+    runtime::ori_rc_inc(data);
+    assert_eq!(runtime::ori_rc_count(data), 2);
+    runtime::ori_rc_inc(data);
+    assert_eq!(runtime::ori_rc_count(data), 3);
+
+    // Decrement — not freed yet (refcount > 0)
+    extern "C" fn drop_8(data_ptr: *mut u8) {
+        runtime::ori_rc_free(data_ptr, 8, 8);
     }
+    runtime::ori_rc_dec(data, Some(drop_8));
+    assert_eq!(runtime::ori_rc_count(data), 2);
+    runtime::ori_rc_dec(data, Some(drop_8));
+    assert_eq!(runtime::ori_rc_count(data), 1);
+
+    // Final dec → refcount 0 → freed via drop_fn
+    runtime::ori_rc_dec(data, Some(drop_8));
+    // data is now freed — do not access
+}
+
+#[test]
+fn test_rc_header_is_8_bytes() {
+    // V2: strong_count is a single i64 (8 bytes), not 16-byte RcHeader
+    let data = runtime::ori_rc_alloc(16, 8);
+    assert!(!data.is_null());
+
+    // The strong_count is at data - 8. Verify the offset:
+    // base = data - 8, data = base + 8
+    let base = unsafe { data.sub(8) };
+    let rc_from_base = unsafe { *(base.cast::<i64>()) };
+    assert_eq!(rc_from_base, 1, "strong_count at data_ptr - 8 should be 1");
+
+    extern "C" fn drop_16(data_ptr: *mut u8) {
+        runtime::ori_rc_free(data_ptr, 16, 8);
+    }
+    runtime::ori_rc_dec(data, Some(drop_16));
+}
+
+#[test]
+fn test_ori_args_from_argv_null() {
+    // Null argv → empty list
+    let list = runtime::ori_args_from_argv(0, std::ptr::null());
+    assert_eq!(list.len, 0);
+    assert_eq!(list.cap, 0);
+    assert!(list.data.is_null());
+}
+
+#[test]
+fn test_ori_args_from_argv_no_user_args() {
+    // argc=1 means only program name → empty list (spec: args excludes program name)
+    let prog = b"./my_prog\0";
+    let argv = [prog.as_ptr().cast::<i8>()];
+    let list = runtime::ori_args_from_argv(1, argv.as_ptr());
+    assert_eq!(list.len, 0);
+    assert_eq!(list.cap, 0);
+    assert!(list.data.is_null());
+}
+
+#[test]
+#[allow(unsafe_code)]
+fn test_ori_args_from_argv_with_args() {
+    let prog = b"./my_prog\0";
+    let arg1 = b"hello\0";
+    let arg2 = b"world\0";
+    let argv = [
+        prog.as_ptr().cast::<i8>(),
+        arg1.as_ptr().cast::<i8>(),
+        arg2.as_ptr().cast::<i8>(),
+    ];
+    let list = runtime::ori_args_from_argv(3, argv.as_ptr());
+    assert_eq!(list.len, 2);
+    assert_eq!(list.cap, 2);
+    assert!(!list.data.is_null());
+
+    // Read back the OriStr elements
+    let elements = list.data.cast::<runtime::OriStr>();
+    unsafe {
+        let s0 = &*elements;
+        let s1 = &*elements.add(1);
+        assert_eq!(s0.as_str(), "hello");
+        assert_eq!(s1.as_str(), "world");
+    }
+
+    // Clean up (in production, the runtime or RC handles this)
+    unsafe {
+        // Free each string's data
+        for i in 0..2 {
+            let s = &*elements.add(i);
+            if !s.data.is_null() && s.len > 0 {
+                let layout = std::alloc::Layout::array::<u8>(s.len as usize).unwrap();
+                std::alloc::dealloc(s.data as *mut u8, layout);
+            }
+        }
+        // Free the array
+        let layout = std::alloc::Layout::array::<runtime::OriStr>(2).unwrap();
+        std::alloc::dealloc(list.data, layout);
+    }
+}
+
+#[test]
+fn test_ori_register_panic_handler_null() {
+    // Registering null should be a no-op (no crash)
+    runtime::ori_register_panic_handler(std::ptr::null());
 }

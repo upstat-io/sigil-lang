@@ -1,6 +1,6 @@
 //! Diagnostic system for rich error reporting.
 //!
-//! Per design spec 02-design-principlesmd:
+//! Per design spec 02-design-principles.md:
 //! - Error codes for searchability
 //! - Clear messages (what went wrong)
 //! - Primary span (where it went wrong)
@@ -32,7 +32,7 @@ pub mod span_utils;
 
 pub use errors::ErrorDocs;
 
-// Re-export all public types at crate root for backwards compatibility
+// Re-export all public types at crate root
 pub use diagnostic::{
     expected_expression, missing_pattern_arg, type_mismatch, unclosed_delimiter, unexpected_token,
     unknown_identifier, unknown_pattern_arg, Applicability, Diagnostic, Label, Severity,

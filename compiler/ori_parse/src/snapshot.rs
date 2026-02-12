@@ -31,11 +31,11 @@
 //! ```ignore
 //! // Good: Complex multi-token lookahead
 //! let is_with_capability = self.look_ahead(|p| {
-//!     p.check(&TokenKind::With)
-//!         && p.advance()
-//!         && p.check_ident()
-//!         && p.advance()
-//!         && p.check(&TokenKind::Eq)
+//!     p.cursor.check(&TokenKind::With)
+//!         && p.cursor.advance()
+//!         && p.cursor.check_ident()
+//!         && p.cursor.advance()
+//!         && p.cursor.check(&TokenKind::Eq)
 //! });
 //! ```
 //!
@@ -131,18 +131,6 @@ impl ParserSnapshot {
             context,
         }
     }
-
-    /// Get the cursor position from this snapshot.
-    #[inline]
-    pub fn cursor_pos(&self) -> usize {
-        self.cursor_pos
-    }
-
-    /// Get the context from this snapshot.
-    #[inline]
-    pub fn context(&self) -> ParseContext {
-        self.context
-    }
 }
 
 #[cfg(test)]
@@ -162,15 +150,15 @@ mod tests {
     #[test]
     fn test_snapshot_creation() {
         let snapshot = ParserSnapshot::new(42, ParseContext::IN_LOOP);
-        assert_eq!(snapshot.cursor_pos(), 42);
-        assert!(snapshot.context().in_loop());
+        assert_eq!(snapshot.cursor_pos, 42);
+        assert!(snapshot.context.in_loop());
     }
 
     #[test]
     fn test_snapshot_copy() {
         let snapshot1 = ParserSnapshot::new(10, ParseContext::IN_TYPE);
         let snapshot2 = snapshot1; // Copy
-        assert_eq!(snapshot1.cursor_pos(), snapshot2.cursor_pos());
-        assert_eq!(snapshot1.context(), snapshot2.context());
+        assert_eq!(snapshot1.cursor_pos, snapshot2.cursor_pos);
+        assert_eq!(snapshot1.context, snapshot2.context);
     }
 }

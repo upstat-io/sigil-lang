@@ -98,7 +98,10 @@ impl OrderingValue {
 ///
 /// `function_val`: type conversion functions like int(x), str(x), float(x)
 /// that allow positional arguments per the spec.
-pub type FunctionValFn = fn(&[Value]) -> Result<Value, String>;
+///
+/// Uses `EvalError` instead of `String` so that conversion errors preserve
+/// structured error information (kind, span, notes) across the boundary.
+pub type FunctionValFn = fn(&[Value]) -> Result<Value, crate::EvalError>;
 
 /// Runtime value in the Ori interpreter.
 #[derive(Clone)]
@@ -189,16 +192,6 @@ pub enum Value {
     /// Used by the `recurse` pattern with `memo: true` to cache results
     /// of recursive calls, enabling efficient algorithms like memoized Fibonacci.
     MemoizedFunction(MemoizedFunctionValue),
-    /// Multi-clause function with pattern matching.
-    ///
-    /// Clauses are tried in order; first clause whose patterns match is executed.
-    /// Used for functions defined with multiple clauses like:
-    /// ```ori
-    /// @fib (0: int) -> int = 0
-    /// @fib (1: int) -> int = 1
-    /// @fib (n: int) -> int = fib(n: n - 1) + fib(n: n - 2)
-    /// ```
-    MultiClauseFunction(Heap<Vec<FunctionValue>>),
     /// Type conversion function (`function_val`).
     /// Examples: int(x), str(x), float(x), byte(x)
     FunctionVal(FunctionValFn, &'static str),
@@ -457,26 +450,6 @@ impl Value {
     pub fn module_namespace(members: BTreeMap<Name, Value>) -> Self {
         Value::ModuleNamespace(Heap::new(members))
     }
-
-    /// Create a multi-clause function from a list of clause function values.
-    ///
-    /// Multi-clause functions are functions with the same name but different
-    /// patterns. When called, the first clause whose patterns match the
-    /// arguments is executed.
-    ///
-    /// # Example
-    ///
-    /// ```text
-    /// // Fibonacci with pattern-based clauses:
-    /// // @fib (0: int) -> int = 0
-    /// // @fib (1: int) -> int = 1
-    /// // @fib (n: int) -> int = fib(n: n - 1) + fib(n: n - 2)
-    /// let fib = Value::multi_clause_function(clauses);
-    /// ```
-    #[inline]
-    pub fn multi_clause_function(clauses: Vec<FunctionValue>) -> Self {
-        Value::MultiClauseFunction(Heap::new(clauses))
-    }
 }
 
 // Value Methods
@@ -564,9 +537,7 @@ impl Value {
             Value::Newtype { .. } => "newtype",
             Value::NewtypeConstructor { .. } => "newtype_constructor",
             Value::Struct(_) => "struct",
-            Value::Function(_) | Value::MemoizedFunction(_) | Value::MultiClauseFunction(_) => {
-                "function"
-            }
+            Value::Function(_) | Value::MemoizedFunction(_) => "function",
             Value::FunctionVal(_, _) => "function_val",
             Value::Duration(_) => "Duration",
             Value::Size(_) => "Size",
@@ -640,9 +611,7 @@ impl Value {
             Value::Newtype { inner, .. } => inner.display_value(),
             Value::NewtypeConstructor { .. } => "<newtype_constructor>".to_string(),
             Value::Struct(s) => format!("{s:?}"),
-            Value::Function(_) | Value::MemoizedFunction(_) | Value::MultiClauseFunction(_) => {
-                "<function>".to_string()
-            }
+            Value::Function(_) | Value::MemoizedFunction(_) => "<function>".to_string(),
             Value::FunctionVal(_, name) => format!("<function_val {name}>"),
             Value::Duration(ns) => format_duration(*ns),
             Value::Size(bytes) => format!("{bytes}b"),
@@ -701,7 +670,6 @@ impl Value {
             | Value::Struct(_)
             | Value::Function(_)
             | Value::MemoizedFunction(_)
-            | Value::MultiClauseFunction(_)
             | Value::FunctionVal(_, _)
             | Value::Range(_)
             | Value::ModuleNamespace(_)
@@ -810,9 +778,6 @@ impl fmt::Debug for Value {
             Value::Struct(s) => write!(f, "Struct({s:?})"),
             Value::Function(func) => write!(f, "Function({func:?})"),
             Value::MemoizedFunction(mf) => write!(f, "MemoizedFunction({mf:?})"),
-            Value::MultiClauseFunction(clauses) => {
-                write!(f, "MultiClauseFunction({} clauses)", clauses.len())
-            }
             Value::FunctionVal(_, name) => write!(f, "FunctionVal({name})"),
             Value::Duration(ms) => write!(f, "Duration({ms}ms)"),
             Value::Size(bytes) => write!(f, "Size({bytes}b)"),
@@ -901,9 +866,7 @@ impl fmt::Display for Value {
                 write!(f, "<newtype_constructor {type_name:?}>")
             }
             Value::Struct(s) => write!(f, "<struct {:?}>", s.type_name),
-            Value::Function(_) | Value::MemoizedFunction(_) | Value::MultiClauseFunction(_) => {
-                write!(f, "<function>")
-            }
+            Value::Function(_) | Value::MemoizedFunction(_) => write!(f, "<function>"),
             Value::FunctionVal(_, name) => write!(f, "<function_val {name}>"),
             Value::Duration(ns) => write!(f, "{}", format_duration(*ns)),
             Value::Size(bytes) => {
@@ -948,9 +911,11 @@ impl PartialEq for Value {
             (Value::Size(a), Value::Size(b)) => a == b,
             (Value::Ordering(a), Value::Ordering(b)) => a == b,
             (Value::FunctionVal(_, name_a), Value::FunctionVal(_, name_b)) => name_a == name_b,
-            // Functions are equal by body identity
-            (Value::Function(a), Value::Function(b)) => a.body == b.body,
-            (Value::MemoizedFunction(a), Value::MemoizedFunction(b)) => a.func.body == b.func.body,
+            // Functions are equal by canonical body identity
+            (Value::Function(a), Value::Function(b)) => a.can_body == b.can_body,
+            (Value::MemoizedFunction(a), Value::MemoizedFunction(b)) => {
+                a.func.can_body == b.func.can_body
+            }
             (Value::Struct(a), Value::Struct(b)) => {
                 a.type_name == b.type_name
                     && a.fields
@@ -1071,18 +1036,12 @@ impl std::hash::Hash for Value {
                 type_name.hash(state);
             }
             Value::Function(f) => {
-                // Hash by function identity (body expression ID)
-                f.body.hash(state);
+                // Hash by function identity (canonical body ID)
+                f.can_body.hash(state);
             }
             Value::MemoizedFunction(mf) => {
                 // Hash by underlying function identity
-                mf.func.body.hash(state);
-            }
-            Value::MultiClauseFunction(clauses) => {
-                // Hash by the body of the first clause
-                if let Some(first) = clauses.first() {
-                    first.body.hash(state);
-                }
+                mf.func.can_body.hash(state);
             }
             Value::FunctionVal(_, name) => name.hash(state),
             Value::Range(r) => {
@@ -1216,10 +1175,10 @@ mod tests {
 
     #[test]
     fn test_function_value() {
-        use ori_ir::{ExprArena, ExprId, SharedArena};
+        use ori_ir::{ExprArena, SharedArena};
         use rustc_hash::FxHashMap;
         let arena = SharedArena::new(ExprArena::new());
-        let func = FunctionValue::new(vec![], ExprId::new(0), FxHashMap::default(), arena);
+        let func = FunctionValue::new(vec![], FxHashMap::default(), arena);
         assert!(func.params.is_empty());
         assert!(!func.has_captures());
     }

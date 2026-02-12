@@ -1,84 +1,25 @@
 //! Module loading methods for the Evaluator.
 //!
 //! Provides Salsa-integrated module loading with proper dependency tracking.
-//! All file access goes through `db.load_file()`.
+//! Import resolution is handled by `imports::resolve_imports()` (unified pipeline);
+//! this module consumes the resolved data to build interpreter-specific
+//! `FunctionValue` objects and register them in the environment.
 
 use super::super::module::import;
 use super::Evaluator;
+use crate::imports;
 use crate::ir::SharedArena;
 use crate::parser::ParseOutput;
-use crate::query::parsed;
 use ori_eval::{
-    collect_def_impl_methods, collect_extend_methods, collect_impl_methods, process_derives,
-    register_module_functions, register_newtype_constructors, register_variant_constructors,
+    collect_def_impl_methods_with_config, collect_extend_methods_with_config,
+    collect_impl_methods_with_config, process_derives, register_module_functions,
+    register_newtype_constructors, register_variant_constructors, MethodCollectionConfig,
     UserMethodRegistry,
 };
-use std::path::{Path, PathBuf};
+use ori_ir::canon::SharedCanonResult;
+use std::path::Path;
 
 impl Evaluator<'_> {
-    /// Generate candidate paths for the prelude.
-    fn prelude_candidates(current_file: &Path) -> Vec<PathBuf> {
-        let mut candidates = Vec::new();
-        let mut dir = current_file.parent();
-        while let Some(d) = dir {
-            candidates.push(d.join("library").join("std").join("prelude.ori"));
-            dir = d.parent();
-        }
-        candidates
-    }
-
-    /// Check if a file is the prelude itself.
-    pub(super) fn is_prelude_file(file_path: &Path) -> bool {
-        file_path.ends_with("library/std/prelude.ori")
-            || file_path.file_name().is_some_and(|n| n == "prelude.ori")
-                && file_path.parent().is_some_and(|p| p.ends_with("std"))
-    }
-
-    /// Auto-load the prelude (library/std/prelude.ori).
-    ///
-    /// This is called automatically by `load_module` to make prelude functions
-    /// available without explicit import. All file access goes through
-    /// `db.load_file()` for proper Salsa tracking.
-    #[expect(
-        clippy::unnecessary_wraps,
-        reason = "Result return type maintained for API consistency with load_module"
-    )]
-    pub(super) fn load_prelude(&mut self, current_file: &Path) -> Result<(), String> {
-        // Don't load prelude if we're already loading it (avoid infinite recursion)
-        if Self::is_prelude_file(current_file) {
-            self.prelude_loaded = true;
-            return Ok(());
-        }
-
-        // Mark as loaded before actually loading to prevent recursion
-        self.prelude_loaded = true;
-
-        // Find and load prelude via Salsa-tracked file loading
-        let prelude_file = Self::prelude_candidates(current_file)
-            .iter()
-            .find_map(|candidate| self.db.load_file(candidate));
-
-        let Some(prelude_file) = prelude_file else {
-            // Prelude not found - this is okay (e.g., tests outside project)
-            return Ok(());
-        };
-
-        let prelude_result = parsed(self.db, prelude_file);
-        let prelude_arena = SharedArena::new(prelude_result.arena.clone());
-        let module_functions = import::build_module_functions(&prelude_result, &prelude_arena);
-
-        // Register all public functions from the prelude into the global environment
-        for func in &prelude_result.module.functions {
-            if func.visibility.is_public() {
-                if let Some(value) = module_functions.get(&func.name) {
-                    self.env_mut().define_global(func.name, value.clone());
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     /// Load a module: resolve imports and register all functions.
     ///
     /// This is the core module loading logic used by both the query system
@@ -88,42 +29,87 @@ impl Evaluator<'_> {
     /// 3. Registering all local functions
     /// 4. Registering all impl block methods
     ///
-    /// All file access goes through `db.load_file()` for proper Salsa tracking.
+    /// Import resolution uses the unified `imports::resolve_imports()` pipeline,
+    /// which handles prelude discovery and `use` statement resolution via Salsa.
+    /// The interpreter consumes the resolved data to build `FunctionValue` objects
+    /// with captures and register them in the environment.
     ///
-    /// After calling this, all functions from the module (and its imports)
-    /// are available in the environment for evaluation.
-    ///
-    /// Note: Type checking should be done by the caller before calling this method.
-    /// The type checker doesn't resolve imports, so it must be called on the resolved
-    /// module context, not on individual files in isolation.
+    /// When canonical IR is available (via `canon`), imported modules are also
+    /// type-checked and canonicalized so that imported functions have canonical
+    /// bodies. This ensures the evaluator uses `eval_can(CanId)` for all function
+    /// calls, including cross-module ones.
     pub fn load_module(
         &mut self,
         parse_result: &ParseOutput,
         file_path: &Path,
+        canon: Option<&SharedCanonResult>,
     ) -> Result<(), String> {
-        // Auto-load prelude if not already loaded and this isn't the prelude itself
+        // Resolve all imports via the unified pipeline (prelude + explicit use statements).
+        let resolved = imports::resolve_imports(self.db, parse_result, file_path);
+        let interner = self.db.interner();
+
+        // Register prelude functions (if not already loaded)
         if !self.prelude_loaded {
-            self.load_prelude(file_path)?;
+            self.prelude_loaded = true;
+            if let Some(ref prelude) = resolved.prelude {
+                let prelude_arena = SharedArena::new(prelude.parse_output.arena.clone());
+
+                // Type-check and canonicalize prelude for canonical function dispatch.
+                let prelude_canon =
+                    Self::canonicalize_module(self.db, &prelude.parse_output, &prelude.module_path);
+
+                let module_functions = import::build_module_functions(
+                    &prelude.parse_output,
+                    &prelude_arena,
+                    prelude_canon.as_ref(),
+                );
+
+                for func in &prelude.parse_output.module.functions {
+                    if func.visibility.is_public() {
+                        if let Some(value) = module_functions.get(&func.name) {
+                            self.env_mut().define_global(func.name, value.clone());
+                        }
+                    }
+                }
+            }
         }
 
-        // Resolve and load imports via Salsa-tracked resolution
-        for imp in &parse_result.module.imports {
-            let resolved =
-                import::resolve_import(self.db, &imp.path, file_path).map_err(|e| e.message)?;
-            let imported_result = parsed(self.db, resolved.file);
+        // Report all import resolution errors (accumulate, don't bail on the first)
+        if !resolved.errors.is_empty() {
+            let messages: Vec<&str> = resolved.errors.iter().map(|e| e.message.as_str()).collect();
+            return Err(messages.join("\n"));
+        }
 
-            let imported_arena = SharedArena::new(imported_result.arena.clone());
-            let imported_module = import::ImportedModule::new(&imported_result, &imported_arena);
+        // Register explicitly imported functions.
+        // Each resolved module carries its import_index so we can find
+        // the corresponding UseDef for visibility/alias handling.
+        for imp_module in &resolved.modules {
+            let imp = &parse_result.module.imports[imp_module.import_index];
 
-            // Access interner directly from interpreter to avoid borrow conflict
-            let interner = self.interpreter.interner;
+            let imported_arena = SharedArena::new(imp_module.parse_output.arena.clone());
+
+            // Type-check and canonicalize the imported module for canonical dispatch.
+            let imp_canon = Self::canonicalize_module(
+                self.db,
+                &imp_module.parse_output,
+                &imp_module.module_path,
+            );
+
+            let imported_module = import::ImportedModule::new(
+                &imp_module.parse_output,
+                &imported_arena,
+                imp_canon.as_ref(),
+            );
+
+            let import_path = std::path::Path::new(&imp_module.module_path);
             import::register_imports(
                 imp,
                 &imported_module,
-                &mut self.interpreter.env,
+                self.env_mut(),
                 interner,
-                &resolved.path,
+                import_path,
                 file_path,
+                imp_canon.as_ref(),
             )
             .map_err(|e| e.message)?;
         }
@@ -133,8 +119,8 @@ impl Evaluator<'_> {
         // when called from different contexts (e.g., from within a prelude function)
         let shared_arena = SharedArena::new(parse_result.arena.clone());
 
-        // Then register all local functions
-        register_module_functions(&parse_result.module, &shared_arena, self.env_mut());
+        // Then register all local functions (with canonical IR when available)
+        register_module_functions(&parse_result.module, &shared_arena, self.env_mut(), canon);
 
         // Register variant constructors from type declarations
         register_variant_constructors(&parse_result.module, self.env_mut());
@@ -143,27 +129,16 @@ impl Evaluator<'_> {
         register_newtype_constructors(&parse_result.module, self.env_mut());
 
         // Build up user method registry from impl and extend blocks
-        // Wrap captures in Arc once for efficient sharing across all collect_* calls
         let mut user_methods = UserMethodRegistry::new();
-        let captures = std::sync::Arc::new(self.env().capture());
-        collect_impl_methods(
-            &parse_result.module,
-            &shared_arena,
-            &captures,
-            &mut user_methods,
-        );
-        collect_extend_methods(
-            &parse_result.module,
-            &shared_arena,
-            &captures,
-            &mut user_methods,
-        );
-        collect_def_impl_methods(
-            &parse_result.module,
-            &shared_arena,
-            &captures,
-            &mut user_methods,
-        );
+        let config = MethodCollectionConfig {
+            module: &parse_result.module,
+            arena: &shared_arena,
+            captures: std::sync::Arc::new(self.env().capture()),
+            canon,
+        };
+        collect_impl_methods_with_config(&config, &mut user_methods);
+        collect_extend_methods_with_config(&config, &mut user_methods);
+        collect_def_impl_methods_with_config(&config, &mut user_methods);
 
         // Process derived traits (Eq, Clone, Hashable, Printable, Default)
         process_derives(&parse_result.module, &mut user_methods, self.interner());
@@ -174,5 +149,40 @@ impl Evaluator<'_> {
         self.user_method_registry().write().merge(user_methods);
 
         Ok(())
+    }
+
+    /// Type-check and canonicalize a module, returning its `SharedCanonResult`.
+    ///
+    /// This enables imported functions to carry canonical IR for `eval_can()`
+    /// dispatch. Uses Salsa caching so repeated calls for the same module are free.
+    fn canonicalize_module(
+        db: &dyn crate::db::Db,
+        parse_output: &ParseOutput,
+        module_path: &str,
+    ) -> Option<SharedCanonResult> {
+        let path = std::path::Path::new(module_path);
+        let (type_result, pool) =
+            crate::typeck::type_check_with_imports_and_pool(db, parse_output, path);
+
+        // Only canonicalize if there are no type errors — otherwise the
+        // canonical IR may be incomplete or inconsistent.
+        if type_result.has_errors() {
+            tracing::debug!(
+                module = module_path,
+                errors = type_result.errors().len(),
+                "skipping canonicalization due to type errors"
+            );
+            return None;
+        }
+
+        let interner = db.interner();
+        let canon = ori_canon::lower_module(
+            &parse_output.module,
+            &parse_output.arena,
+            &type_result,
+            &pool,
+            interner,
+        );
+        Some(SharedCanonResult::new(canon))
     }
 }

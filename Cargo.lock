@@ -81,6 +81,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
+name = "bincode"
+version = "1.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -100,6 +109,15 @@ name = "bitflags"
 version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "812e12b5285cc515a9c72a5c1d3b6d46a19dac5acfef5265968c166106e31dd3"
+
+[[package]]
+name = "bitmaps"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "031043d04099746d8db04daf1fa424b2bc8bd69d92b25962dcde24da39ab64a2"
+dependencies = [
+ "typenum",
+]
 
 [[package]]
 name = "boxcar"
@@ -383,6 +401,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
+name = "im"
+version = "15.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0acd33ff0285af998aaf9b57342af478078f53492322fafc47450e09397e0e9"
+dependencies = [
+ "bitmaps",
+ "rand_core 0.6.4",
+ "rand_xoshiro",
+ "sized-chunks",
+ "typenum",
+ "version_check",
+]
+
+[[package]]
 name = "indexmap"
 version = "2.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -543,6 +575,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
 
 [[package]]
+name = "ori_arc"
+version = "0.1.0-alpha.8"
+dependencies = [
+ "bincode",
+ "ori_ir",
+ "ori_types",
+ "pretty_assertions",
+ "rustc-hash",
+ "serde",
+ "smallvec",
+ "tracing",
+]
+
+[[package]]
+name = "ori_canon"
+version = "0.1.0-alpha.8"
+dependencies = [
+ "ori_arc",
+ "ori_ir",
+ "ori_types",
+ "pretty_assertions",
+ "rustc-hash",
+ "tracing",
+]
+
+[[package]]
 name = "ori_diagnostic"
 version = "0.1.0-alpha.8"
 dependencies = [
@@ -559,10 +617,10 @@ dependencies = [
  "ori_parse",
  "ori_patterns",
  "ori_stack",
- "ori_types",
  "parking_lot",
  "pretty_assertions",
  "rustc-hash",
+ "smallvec",
  "tracing",
 ]
 
@@ -585,6 +643,7 @@ dependencies = [
  "parking_lot",
  "pretty_assertions",
  "rustc-hash",
+ "serde",
 ]
 
 [[package]]
@@ -609,12 +668,16 @@ dependencies = [
 name = "ori_llvm"
 version = "0.1.0-alpha.8"
 dependencies = [
+ "bincode",
+ "im",
  "inkwell",
  "llvm-sys",
+ "ori_arc",
  "ori_ir",
  "ori_rt",
  "ori_types",
  "rustc-hash",
+ "serde",
  "tracing",
  "tracing-subscriber",
 ]
@@ -675,6 +738,7 @@ dependencies = [
  "parking_lot",
  "pretty_assertions",
  "rustc-hash",
+ "serde",
  "tracing",
 ]
 
@@ -683,11 +747,14 @@ name = "oric"
 version = "0.1.0-alpha.8"
 dependencies = [
  "criterion",
+ "ori_arc",
+ "ori_canon",
  "ori_diagnostic",
  "ori_eval",
  "ori_fmt",
  "ori_ir",
  "ori_lexer",
+ "ori_lexer_core",
  "ori_llvm",
  "ori_parse",
  "ori_patterns",
@@ -856,7 +923,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6db2770f06117d490610c7488547d543617b21bfa07796d7a12f6f1bd53850d1"
 dependencies = [
  "rand_chacha",
- "rand_core",
+ "rand_core 0.9.5",
 ]
 
 [[package]]
@@ -866,8 +933,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3022b5f1df60f26e1ffddd6c66e8aa15de382ae63b3a0c1bfc0e4d3e3f325cb"
 dependencies = [
  "ppv-lite86",
- "rand_core",
+ "rand_core 0.9.5",
 ]
+
+[[package]]
+name = "rand_core"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 
 [[package]]
 name = "rand_core"
@@ -884,7 +957,16 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "513962919efc330f829edb2535844d1b912b0fbe2ca165d613e4e8788bb05a5a"
 dependencies = [
- "rand_core",
+ "rand_core 0.9.5",
+]
+
+[[package]]
+name = "rand_xoshiro"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f97cdb2a36ed4183de61b2f824cc45c9f1037f28afe0a322e9fff4c108b5aaa"
+dependencies = [
+ "rand_core 0.6.4",
 ]
 
 [[package]]
@@ -1116,6 +1198,16 @@ name = "shlex"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
+
+[[package]]
+name = "sized-chunks"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16d69225bde7a69b235da73377861095455d298f2b970996eec25ddbb42b3d1e"
+dependencies = [
+ "bitmaps",
+ "typenum",
+]
 
 [[package]]
 name = "smallvec"
@@ -1351,6 +1443,12 @@ dependencies = [
  "termcolor",
  "toml",
 ]
+
+[[package]]
+name = "typenum"
+version = "1.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "562d481066bde0658276a35467c4af00bdc6ee726305698a55b86e61d7ad82bb"
 
 [[package]]
 name = "unarray"

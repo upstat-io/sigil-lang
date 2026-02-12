@@ -46,9 +46,11 @@ mod parallel_tests;
 #[cfg(test)]
 mod test_helpers;
 
-use ori_ir::{ExprArena, ExprId, NamedExpr, StringInterner};
+use ori_ir::{ExprArena, ExprId, Name, NamedExpr, StringInterner};
 
-pub use errors::{ControlFlow, EvalError, EvalResult};
+pub use errors::{
+    BacktraceFrame, ControlAction, EvalBacktrace, EvalError, EvalErrorKind, EvalNote, EvalResult,
+};
 pub use fusion::{ChainLink, FusedPattern, FusionHints, PatternChain};
 pub use method_key::{MethodKey, MethodKeyDisplay};
 pub use registry::{Pattern, PatternRegistry};
@@ -124,7 +126,9 @@ pub use errors::{
     range_bound_not_int,
     recursion_limit_exceeded,
     self_outside_method,
+    spread_requires_list,
     spread_requires_map,
+    spread_requires_struct,
     tuple_index_out_of_bounds,
     tuple_pattern_mismatch,
     unbounded_range_end,
@@ -219,13 +223,8 @@ impl<'a> EvalContext<'a> {
     pub fn eval_prop_spanned(&self, name: &str, exec: &mut dyn PatternExecutor) -> EvalResult {
         let expr_id = self.get_prop(name)?;
         let span = self.arena.get_expr(expr_id).span;
-        exec.eval(expr_id).map_err(|e| {
-            if e.span.is_none() {
-                e.with_span(span)
-            } else {
-                e
-            }
-        })
+        exec.eval(expr_id)
+            .map_err(|action| action.with_span_if_error(span))
     }
 
     /// Get an optional property and evaluate it if present.
@@ -236,7 +235,7 @@ impl<'a> EvalContext<'a> {
         &self,
         name: &str,
         exec: &mut dyn PatternExecutor,
-    ) -> Result<Option<Value>, EvalError> {
+    ) -> Result<Option<Value>, ControlAction> {
         match self.get_prop_opt(name) {
             Some(expr_id) => Ok(Some(exec.eval(expr_id)?)),
             None => Ok(None),
@@ -250,17 +249,13 @@ impl<'a> EvalContext<'a> {
         &self,
         name: &str,
         exec: &mut dyn PatternExecutor,
-    ) -> Result<Option<Value>, EvalError> {
+    ) -> Result<Option<Value>, ControlAction> {
         match self.get_prop_opt(name) {
             Some(expr_id) => {
                 let span = self.arena.get_expr(expr_id).span;
-                let value = exec.eval(expr_id).map_err(|e| {
-                    if e.span.is_none() {
-                        e.with_span(span)
-                    } else {
-                        e
-                    }
-                })?;
+                let value = exec
+                    .eval(expr_id)
+                    .map_err(|action| action.with_span_if_error(span))?;
                 Ok(Some(value))
             }
             None => Ok(None),
@@ -409,7 +404,7 @@ impl Iterable {
         &self,
         func: &Value,
         exec: &mut dyn PatternExecutor,
-    ) -> Result<Option<Value>, EvalError> {
+    ) -> Result<Option<Value>, ControlAction> {
         for item in self.iter_values() {
             let matches = exec.call(func, vec![item.clone()])?;
             if matches.is_truthy() {
@@ -443,22 +438,22 @@ pub trait PatternExecutor {
     /// Look up a capability from the environment.
     ///
     /// Used by patterns that need to access capabilities like Print.
-    fn lookup_capability(&self, name: &str) -> Option<Value>;
+    fn lookup_capability(&self, name: Name) -> Option<Value>;
 
     /// Call a method on a value.
     ///
     /// Used by patterns to invoke capability methods.
-    fn call_method(&mut self, receiver: Value, method: &str, args: Vec<Value>) -> EvalResult;
+    fn call_method(&mut self, receiver: Value, method: Name, args: Vec<Value>) -> EvalResult;
 
     /// Look up a variable in the current scope.
     ///
     /// Returns `None` if the variable is not defined.
-    fn lookup_var(&self, name: &str) -> Option<Value>;
+    fn lookup_var(&self, name: Name) -> Option<Value>;
 
     /// Bind a variable in the current scope.
     ///
     /// Used by patterns to introduce scoped bindings during evaluation.
-    fn bind_var(&mut self, name: &str, value: Value);
+    fn bind_var(&mut self, name: Name, value: Value);
 }
 
 // Focused Pattern Traits (ISP Compliance)

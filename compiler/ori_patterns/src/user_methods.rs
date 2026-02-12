@@ -11,7 +11,8 @@
 #![allow(clippy::disallowed_types)]
 
 use crate::Value;
-use ori_ir::{DerivedMethodInfo, ExprId, Name, SharedArena};
+use ori_ir::canon::{CanId, SharedCanonResult};
+use ori_ir::{DerivedMethodInfo, Name, SharedArena};
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
@@ -19,11 +20,13 @@ use crate::method_key::MethodKey;
 
 /// A user-defined method from an impl block.
 ///
+/// Dispatches via canonical IR (`CanId`). Each method carries its own arena
+/// and canonical result for thread-safe evaluation.
+///
 /// # Arena Requirement (Thread Safety)
 /// Every method carries its own arena reference. This is required for thread
-/// safety in parallel execution - when methods are called from different
-/// contexts (e.g., parallel test runner), they must use their own arena to
-/// resolve `ExprId` values correctly.
+/// safety in parallel execution — when methods are called from different
+/// contexts (e.g., parallel test runner), they need independent arena access.
 ///
 /// # Captures
 /// Uses `Arc<HashMap>` for captures to enable cheap cloning when registering
@@ -33,10 +36,12 @@ use crate::method_key::MethodKey;
 pub struct UserMethod {
     /// Parameter names (first is always `self`).
     pub params: Vec<Name>,
-    /// Method body expression.
-    pub body: ExprId,
+    /// Canonical method body.
+    pub can_body: CanId,
     /// Arena for evaluating the body (required for thread safety).
     pub arena: SharedArena,
+    /// Canonical IR for canonical dispatch.
+    pub canon: Option<SharedCanonResult>,
     /// Captured variables from the defining scope (Arc for cheap cloning).
     pub captures: Arc<FxHashMap<Name, Value>>,
 }
@@ -46,19 +51,18 @@ impl UserMethod {
     ///
     /// # Arguments
     /// * `params` - Parameter names (first is always `self`)
-    /// * `body` - Method body expression ID
     /// * `captures` - Captured variables from the defining scope (wrapped in Arc)
     /// * `arena` - Arena for expression resolution (required for thread safety)
     pub fn new(
         params: Vec<Name>,
-        body: ExprId,
         captures: Arc<FxHashMap<Name, Value>>,
         arena: SharedArena,
     ) -> Self {
         UserMethod {
             params,
-            body,
+            can_body: CanId::INVALID,
             arena,
+            canon: None,
             captures,
         }
     }
@@ -68,11 +72,16 @@ impl UserMethod {
     /// Convenience method that wraps the captures in Arc.
     pub fn with_captures(
         params: Vec<Name>,
-        body: ExprId,
         captures: FxHashMap<Name, Value>,
         arena: SharedArena,
     ) -> Self {
-        Self::new(params, body, Arc::new(captures), arena)
+        Self::new(params, Arc::new(captures), arena)
+    }
+
+    /// Attach canonical IR to this method for canonical dispatch.
+    pub fn set_canon(&mut self, can_body: CanId, canon: SharedCanonResult) {
+        self.can_body = can_body;
+        self.canon = Some(canon);
     }
 }
 
@@ -210,11 +219,7 @@ impl UserMethodRegistry {
 #[expect(clippy::unwrap_used, reason = "Tests use unwrap for brevity")]
 mod tests {
     use super::*;
-    use ori_ir::{DerivedMethodInfo, DerivedTrait, ExprArena, ExprId, SharedInterner};
-
-    fn dummy_expr_id() -> ExprId {
-        ExprId::new(0)
-    }
+    use ori_ir::{DerivedMethodInfo, DerivedTrait, ExprArena, SharedInterner};
 
     fn dummy_name() -> Name {
         let interner = SharedInterner::default();
@@ -233,12 +238,7 @@ mod tests {
     fn test_register_and_lookup() {
         let interner = SharedInterner::default();
         let mut registry = UserMethodRegistry::new();
-        let method = UserMethod::new(
-            vec![dummy_name()],
-            dummy_expr_id(),
-            dummy_captures(),
-            dummy_arena(),
-        );
+        let method = UserMethod::new(vec![dummy_name()], dummy_captures(), dummy_arena());
 
         let point = interner.intern("Point");
         let distance = interner.intern("distance");
@@ -327,12 +327,7 @@ mod tests {
         let nonexistent = interner.intern("nonexistent");
 
         // Register a user method
-        let method = UserMethod::new(
-            vec![dummy_name()],
-            dummy_expr_id(),
-            dummy_captures(),
-            dummy_arena(),
-        );
+        let method = UserMethod::new(vec![dummy_name()], dummy_captures(), dummy_arena());
         registry.register(point, distance, method);
 
         // Register a derived method
@@ -369,12 +364,7 @@ mod tests {
         let clone_name = interner.intern("clone");
 
         // Register in first registry
-        let method = UserMethod::new(
-            vec![dummy_name()],
-            dummy_expr_id(),
-            dummy_captures(),
-            dummy_arena(),
-        );
+        let method = UserMethod::new(vec![dummy_name()], dummy_captures(), dummy_arena());
         registry1.register(point, distance, method);
 
         // Register derived in second registry

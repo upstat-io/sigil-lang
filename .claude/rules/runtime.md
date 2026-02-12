@@ -28,8 +28,10 @@ Both built with `cargo build -p ori_rt`.
 - `Option<T>` → `{ tag: i8, value: T }`
 
 ## Functions
-- Memory: `ori_alloc`, `ori_free`
-- RefCount: `ori_rc_new`, `ori_rc_inc`, `ori_rc_dec`
+- Memory: `ori_alloc`, `ori_free`, `ori_realloc`
+- RefCount (V2): `ori_rc_alloc(size, align)`, `ori_rc_inc(data_ptr)`, `ori_rc_dec(data_ptr, drop_fn)`, `ori_rc_free(data_ptr, size, align)`
+  - 8-byte header: `strong_count` at `data_ptr - 8`, data pointer returned directly
+  - `drop_fn`: type-specialized, handles child Dec + calls `ori_rc_free`
 - Strings: `ori_str_concat`, `ori_str_eq`
 - I/O: `ori_print`, `ori_print_int`
 - Panic: `ori_panic`, `ori_assert`

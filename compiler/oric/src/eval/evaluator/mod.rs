@@ -43,7 +43,7 @@ use ori_eval::{
 /// {
 ///     let mut scoped = evaluator.scoped();
 ///     scoped.env_mut().define(name, value, Mutability::Immutable);
-///     scoped.eval(body)?;
+///     scoped.eval_can(can_id)?;
 /// } // Scope automatically popped when `scoped` goes out of scope
 /// ```
 pub struct ScopedEvaluator<'guard, 'eval> {
@@ -52,7 +52,7 @@ pub struct ScopedEvaluator<'guard, 'eval> {
 
 impl Drop for ScopedEvaluator<'_, '_> {
     fn drop(&mut self) {
-        self.evaluator.interpreter.env.pop_scope();
+        self.evaluator.interpreter.env_mut().pop_scope();
     }
 }
 
@@ -100,9 +100,12 @@ impl<'a> Evaluator<'a> {
         EvaluatorBuilder::new(interner, arena, db)
     }
 
-    /// Evaluate an expression.
-    pub fn eval(&mut self, expr_id: crate::ir::ExprId) -> EvalResult {
-        self.interpreter.eval(expr_id)
+    /// Evaluate a canonical expression.
+    ///
+    /// Dispatches via the canonical IR path (`eval_can`). Requires that
+    /// the interpreter was built with a `SharedCanonResult`.
+    pub fn eval_can(&mut self, can_id: ori_ir::canon::CanId) -> EvalResult {
+        self.interpreter.eval_can(can_id)
     }
 
     /// Get a reference to the environment.
@@ -120,14 +123,22 @@ impl<'a> Evaluator<'a> {
         self.db
     }
 
+    /// Look up a canonical root by name.
+    ///
+    /// Returns the `CanId` for a named root (function or test body) if canonical
+    /// IR is available and the name exists in the roots list.
+    pub fn canon_root_for(&self, name: ori_ir::Name) -> Option<ori_ir::canon::CanId> {
+        self.interpreter.canon_root_for(name)
+    }
+
     /// Get the string interner.
     pub fn interner(&self) -> &StringInterner {
-        self.interpreter.interner
+        self.interpreter.interner()
     }
 
     /// Get the expression arena.
     pub fn arena(&self) -> &ExprArena {
-        self.interpreter.arena
+        self.interpreter.arena()
     }
 
     /// Register the prelude functions.
@@ -152,7 +163,20 @@ impl<'a> Evaluator<'a> {
 
     /// Get the user method registry for registering impl block methods.
     pub fn user_method_registry(&self) -> &SharedMutableRegistry<UserMethodRegistry> {
-        &self.interpreter.user_method_registry
+        self.interpreter.user_method_registry()
+    }
+
+    /// Enable performance counters for `--profile` mode.
+    ///
+    /// Must be called before evaluation begins. When enabled, expression,
+    /// function call, method call, and pattern match counts are tracked.
+    pub fn enable_counters(&mut self) {
+        self.interpreter.enable_counters();
+    }
+
+    /// Get the counter report string, if counters are enabled.
+    pub fn counters_report(&self) -> Option<String> {
+        self.interpreter.counters_report()
     }
 
     /// Create a scoped evaluator that automatically pops the environment scope on drop.
@@ -171,11 +195,11 @@ impl<'a> Evaluator<'a> {
     /// {
     ///     let mut scoped = evaluator.scoped();
     ///     scoped.env_mut().define(name, value, Mutability::Immutable);
-    ///     scoped.eval(body)?;
+    ///     scoped.eval_can(can_id)?;
     /// } // Scope popped here, even on panic
     /// ```
     pub fn scoped(&mut self) -> ScopedEvaluator<'_, 'a> {
-        self.interpreter.env.push_scope();
+        self.interpreter.env_mut().push_scope();
         ScopedEvaluator { evaluator: self }
     }
 
@@ -189,7 +213,7 @@ impl<'a> Evaluator<'a> {
     /// ```text
     /// evaluator.with_env_scope(|scoped| {
     ///     scoped.env_mut().define(name, value, Mutability::Immutable);
-    ///     scoped.eval(body)
+    ///     scoped.eval_can(can_id)
     /// })
     /// ```
     pub fn with_env_scope<T, F>(&mut self, f: F) -> T

@@ -11,7 +11,7 @@ use ori_ir::TokenKind;
 /// that isn't relevant for spacing decisions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum TokenCategory {
-    // === Literals (ignore values) ===
+    // Literals (ignore values)
     /// Integer literal: `42`, `1_000`
     Int,
     /// Float literal: 3.14, 2.5e-8
@@ -25,11 +25,11 @@ pub enum TokenCategory {
     /// Size literal: 4kb, 10mb
     Size,
 
-    // === Identifiers ===
+    // Identifiers
     /// Identifier: foo, bar
     Ident,
 
-    // === Keywords ===
+    // Keywords
     /// break
     Break,
     /// continue
@@ -91,7 +91,7 @@ pub enum TokenCategory {
     /// extension
     Extension,
 
-    // === Type keywords ===
+    // Type keywords
     /// int type
     IntType,
     /// float type
@@ -107,7 +107,7 @@ pub enum TokenCategory {
     /// Never type
     NeverType,
 
-    // === Wrappers ===
+    // Wrappers
     /// Ok
     Ok,
     /// Err
@@ -117,7 +117,7 @@ pub enum TokenCategory {
     /// None
     None,
 
-    // === Compiler constructs ===
+    // Compiler constructs
     /// cache
     Cache,
     /// catch
@@ -145,7 +145,7 @@ pub enum TokenCategory {
     /// unreachable
     Unreachable,
 
-    // === Delimiters ===
+    // Delimiters
     /// (
     LParen,
     /// )
@@ -159,7 +159,7 @@ pub enum TokenCategory {
     /// ]
     RBracket,
 
-    // === Punctuation ===
+    // Punctuation
     /// @
     At,
     /// $
@@ -168,6 +168,8 @@ pub enum TokenCategory {
     Hash,
     /// #[
     HashBracket,
+    /// #!
+    HashBang,
     /// :
     Colon,
     /// ::
@@ -197,7 +199,7 @@ pub enum TokenCategory {
     /// ;
     Semicolon,
 
-    // === Operators ===
+    // Operators
     /// =
     Eq,
     /// ==
@@ -241,7 +243,7 @@ pub enum TokenCategory {
     /// div
     Div,
 
-    // === Special ===
+    // Special
     /// Newline
     Newline,
     /// End of file
@@ -437,6 +439,7 @@ impl From<&TokenKind> for TokenCategory {
             TokenKind::Todo => TokenCategory::Todo,
             TokenKind::Unreachable => TokenCategory::Unreachable,
             TokenKind::HashBracket => TokenCategory::HashBracket,
+            TokenKind::HashBang => TokenCategory::HashBang,
             TokenKind::At => TokenCategory::At,
             TokenKind::Dollar => TokenCategory::Dollar,
             TokenKind::Hash => TokenCategory::Hash,
