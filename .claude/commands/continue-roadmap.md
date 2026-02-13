@@ -152,6 +152,20 @@ Based on user choice:
 
 ## Implementation Guidelines
 
+### Scope Rule: ALL Checkboxes in the Section Are In Scope
+
+**Every `- [ ]` checkbox within the current section is part of that section's work — no exceptions.** This includes:
+
+- **LLVM Support** checkboxes (codegen verification)
+- **LLVM Rust Tests** checkboxes (AOT end-to-end tests)
+- **Ori Tests** checkboxes
+- **Rust Tests** checkboxes
+- Any other sub-item checkboxes nested under a parent item
+
+**Do NOT defer items to other sections.** If subsection 1.1A has `[ ] LLVM Rust Tests: No AOT tests for Duration`, that checkbox is part of 1.1A — not Section 21A. Section 21A tracks LLVM *infrastructure* (codegen architecture, optimization passes). Individual feature sections track their own LLVM *coverage* (does this feature work in AOT?).
+
+**A subsection is only complete when ALL its checkboxes are checked**, including LLVM items. Do not mark a subsection as complete or move to the next subsection while LLVM checkboxes remain unchecked.
+
 ### Before Writing Code
 
 1. **Read the spec** — Understand exactly what behavior is required
