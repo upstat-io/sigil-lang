@@ -1,4 +1,10 @@
-# Continue Roadmap Command
+---
+name: continue-roadmap
+description: Resume work on the Ori compiler roadmap, picking up where we left off
+argument-hint: "[section]"
+---
+
+# Continue Roadmap
 
 Resume work on the Ori compiler roadmap, picking up where we left off.
 
@@ -8,106 +14,51 @@ Resume work on the Ori compiler roadmap, picking up where we left off.
 /continue-roadmap [section]
 ```
 
-- No args: Auto-detect first incomplete item by scanning all sections in tier order
+- No args: Auto-detect first incomplete item sequentially (00 → 01 → ...)
 - `section-4`, `4`, or `modules`: Continue Section 4 (Modules)
-- `section-8`, `8`, or `patterns`: Continue Section 8 (Patterns)
-- `section-9`, `9`, or `match`: Continue Section 9 (Match)
-- `section-7`, `7`, or `stdlib`: Continue Section 7 (Stdlib)
-- `section-15`, `15`, or `syntax`: Continue Section 15 (Syntax Proposals)
-- `section-21A`, `21A`, or `llvm`: Continue Section 21A (LLVM Backend)
-- `section-21B`, `21B`, or `aot`: Continue Section 21B (AOT Compilation)
+- Any section number or keyword: Use `plans/roadmap/index.md` to find sections by keyword
 
 ## Finding Sections by Topic
 
-Use `plans/roadmap/index.md` to find sections by keyword. The index contains searchable keyword clusters for each section, making it easy to locate where specific features are tracked.
-
-**Example workflow:**
-1. Search index.md for "iterator" → finds Section 07C (Collections & Iteration)
-2. Run `/continue-roadmap 07C` or `/continue-roadmap collections`
+Use `plans/roadmap/index.md` to find sections by keyword. The index contains searchable keyword clusters for each section.
 
 ---
 
 ## Workflow
 
-### Step 1: Determine Focus Section
+### Step 1: Run the Scanner
 
-**If argument provided**, use that section and skip to Step 3.
+Run the roadmap scanner script to get current status:
 
-**If no argument provided**, scan section files in tier order to find the first incomplete item:
-
-#### Section Scanning Order (by tier)
-
-Scan sections in this order (matching `plans/roadmap/00-overview.md` tier structure):
-
-```
-Tier 1 (Foundation):
-  section-01-type-system.md
-  section-02-type-inference.md
-  section-03-traits.md
-  section-04-modules.md
-  section-05-type-declarations.md
-
-Tier 2 (Capabilities & Stdlib):
-  section-06-capabilities.md
-  section-07A-core-builtins.md
-  section-07B-option-result.md
-  section-07C-collections.md
-  section-07D-stdlib-modules.md
-
-Tier 3 (Core Patterns):
-  section-08-patterns.md
-  section-09-match.md
-  section-10-control-flow.md
-
-Tier 4 (FFI & Interop):
-  section-11-ffi.md
-  section-12-variadic-functions.md
-
-Tier 5 (Language Completion):
-  section-13-conditional-compilation.md
-  section-14-testing.md
-  section-15A-attributes-comments.md
-  section-15B-function-syntax.md
-  section-15C-literals-operators.md
-  section-15D-bindings-types.md
-
-Tier 6 (Async & Concurrency):
-  section-16-async.md
-  section-17-concurrency.md
-
-Tier 7 (Advanced Type System):
-  section-18-const-generics.md
-  section-19-existential-types.md
-
-Tier 8 (Ecosystem):
-  section-20-reflection.md
-  section-21A-llvm.md
-  section-21B-aot.md
-  section-22-tooling.md
+```bash
+.claude/skills/continue-roadmap/roadmap-scan.sh plans/roadmap
 ```
 
-### Step 2: Scan for First Incomplete Item
+This outputs:
+- One line per section: `[done]` or `[open]` with progress stats
+- Detail block for the **first incomplete section**: subsection statuses, first 5 unchecked items with line numbers
 
-For each section file in order:
+### Step 2: Determine Focus Section
 
-1. Read the section file's YAML frontmatter
-2. Check the section `status` field:
-   - If `status: complete`, skip to next section
-   - If `status: in-progress` or `status: not-started`, this section has work — use it
-3. For the selected section, find the first `- [ ]` checkbox in the body
+**If argument provided**, find the matching section file and skip to Step 3.
 
-**Stop at the first section with incomplete work.** This is the focus section.
+**If no argument provided**, use the scanner's `=== FOCUS ===` section — the first section with `[ ]` items, scanning sequentially from Section 00.
 
-If ALL sections have `status: complete`, report "Roadmap complete!"
+#### Dependency Skip Rule
 
-> **CRITICAL:** The YAML frontmatter `status` field must ALWAYS match the checkbox state in the body. If they're out of sync, trust the checkboxes and **immediately fix the frontmatter**. Never proceed with stale frontmatter — the website and progress tracking depend on accurate status values. See "Verification/Audit Workflow" below for the full sync process.
+Only skip a section if **all** of these are true:
+1. The section has explicit dependencies listed in `plans/roadmap/00-overview.md` § Dependency Graph
+2. One or more of those dependencies has `status: not-started` or `status: in-progress` (prerequisite isn't complete)
+3. The incomplete work in the current section actually **requires** the blocker (not all items may be blocked)
+
+If a section has some blocked items and some unblocked items, **work the unblocked items** rather than skipping.
 
 ### Step 3: Load Section Details
 
-Read the focus section file (`plans/roadmap/section-XX-*.md`) and extract:
+Read the focus section file at the line numbers reported by the scanner. Extract:
 
 1. **Section title** from the `# Section N:` header
-2. **Completion stats**: Count `[x]` vs `[ ]` checkboxes
+2. **Completion stats**: from scanner output
 3. **First incomplete item**: The first `- [ ]` line and its context (subsection header, description)
 4. **Recently completed items**: Last few `- [x]` items for context
 
@@ -165,6 +116,16 @@ Based on user choice:
 **Do NOT defer items to other sections.** If subsection 1.1A has `[ ] LLVM Rust Tests: No AOT tests for Duration`, that checkbox is part of 1.1A — not Section 21A. Section 21A tracks LLVM *infrastructure* (codegen architecture, optimization passes). Individual feature sections track their own LLVM *coverage* (does this feature work in AOT?).
 
 **A subsection is only complete when ALL its checkboxes are checked**, including LLVM items. Do not mark a subsection as complete or move to the next subsection while LLVM checkboxes remain unchecked.
+
+### Verification Rule: Empty Checkboxes Must Be Verified
+
+**Never check off a `[ ]` item without verifying it.** Before marking any item `[x]`:
+
+1. **Read the relevant code** — confirm the feature/test actually exists
+2. **Run the test** — if it's a test item, run it and confirm it passes
+3. **Check the spec** — if it's an implementation item, verify behavior matches the spec
+
+Checking off items without verification defeats the purpose of the roadmap.
 
 ### Before Writing Code
 
@@ -235,32 +196,6 @@ sections:
    - Any subsection in-progress → `status: in-progress`
    - All subsections not-started → `status: not-started`
 
-### Example Update
-
-If you complete the last checkbox in subsection 1.1B:
-
-```yaml
-# Before
-  - id: "1.1B"
-    title: Never Type Semantics
-    status: in-progress
-
-# After
-  - id: "1.1B"
-    title: Never Type Semantics
-    status: complete
-```
-
-Then check if ALL subsections are now complete. If so, update the section status:
-
-```yaml
-# Before
-status: in-progress
-
-# After (only if ALL subsections are complete)
-status: complete
-```
-
 ### Why This Matters
 
 The website dynamically loads roadmap data from these YAML frontmatter blocks. Incorrect status values cause the roadmap page to show wrong progress information.
@@ -293,7 +228,7 @@ Fix checkboxes to match verified reality:
 
 - Feature works → `[x]`
 - Feature broken/missing → `[ ]`
-- Add date stamps for verification: `✅ (2026-02-04)`
+- Add date stamps for verification: `(2026-02-04)`
 
 ### Step 4: Update Frontmatter Immediately
 
@@ -303,70 +238,6 @@ Fix checkboxes to match verified reality:
 2. Update subsection `status` values in frontmatter
 3. Recalculate section status from subsection statuses
 4. Update section `status` value in frontmatter
-
-### Step 5: Update Status Summary
-
-Update any status messages in the body (e.g., "~45 failures remain" → "Only 2 bugs remain").
-
-### Audit Checklist
-
-When verifying a section:
-
-- [ ] Frontmatter subsection statuses match body checkboxes
-- [ ] Tested sample of `[x]` items — they actually work
-- [ ] Tested sample of `[ ]` items — they actually fail
-- [ ] Updated checkboxes to match reality
-- [ ] **Updated frontmatter to match checkboxes**
-- [ ] Updated status summary text in body
-- [ ] Added verification date to completion summary
-
-### Common Audit Triggers
-
-Run an audit when:
-- Starting work on a section after a long gap
-- User reports "this feature works but roadmap says broken"
-- Major refactoring that might have fixed/broken multiple items
-- Before presenting roadmap status to stakeholders
-
----
-
-## Section-Specific Notes
-
-### Tier 1: Foundation
-
-**Section 1: Type System** — Primitive types, Duration/Size, Never semantics
-**Section 2: Type Inference** — HM inference, unification, generics
-**Section 3: Traits** — Trait definitions, implementations, bounds
-**Section 4: Modules** — Imports, exports, namespaces, extensions
-**Section 5: Type Declarations** — Structs, enums, newtypes, associated functions
-
-Key files: `compiler/ori_types/`, `compiler/ori_ir/src/types.rs`
-
-### Tier 2: Capabilities & Stdlib
-
-**Section 6: Capabilities** — Effect system, capability bounds
-**Section 7A-D: Stdlib** — Built-ins, Option/Result, collections, modules
-
-Key files: `library/std/`, `compiler/ori_eval/src/`
-
-### Tier 3: Core Patterns
-
-**Section 8: Patterns** — `run`, `try`, `cache`, `parallel`, etc.
-**Section 9: Match** — Pattern matching, guards, exhaustiveness
-**Section 10: Control Flow** — Loops, iterators, break/continue
-
-Key files: `compiler/ori_patterns/`, `compiler/oric/src/patterns/`
-
-### Tier 8: Ecosystem
-
-**Section 21A: LLVM Backend** — JIT compilation, LLVM codegen for all language constructs
-**Section 21B: AOT Compilation** — Native executables, WebAssembly, linking, debug info
-
-Key files: `compiler/ori_llvm/`, `docker/llvm/`
-
-### Other Tiers
-
-Refer to individual section files for details.
 
 ---
 
