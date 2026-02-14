@@ -36,7 +36,7 @@ Run the roadmap scanner script to get current status:
 
 This outputs:
 - One line per section: `[done]` or `[open]` with progress stats
-- Detail block for the **first incomplete section**: subsection statuses, first 5 unchecked items with line numbers
+- Detail block for the **first incomplete section**: subsection statuses (with blocked counts), first 5 **unblocked** items, blocker summary, and blocker chain
 
 ### Step 2: Determine Focus Section
 
@@ -52,6 +52,58 @@ Only skip a section if **all** of these are true:
 3. The incomplete work in the current section actually **requires** the blocker (not all items may be blocked)
 
 If a section has some blocked items and some unblocked items, **work the unblocked items** rather than skipping.
+
+#### Blocker References (2-Way)
+
+When you discover a blocker, you **must** add a 2-way reference so both sides are linked:
+
+1. **On the blocked item** — Add `<!-- blocked-by:X -->` where X is the blocker section number
+2. **On the blocker item** — Add `<!-- unblocks:X.Y -->` where X.Y is the blocked subsection ID
+
+**Tag format**: Machine-readable, no free text. Human-readable names come from frontmatter lookup.
+- `<!-- blocked-by:18 -->` — blocked by Section 18
+- `<!-- blocked-by:18 --><!-- blocked-by:3 -->` — blocked by multiple sections
+- `<!-- unblocks:0.3.2 -->` — unblocks subsection 0.3.2
+
+**Both references must be added at the same time.** A one-way reference is incomplete.
+
+Example:
+```markdown
+## 5.3 Pattern Matching Exhaustiveness
+- [ ] Implement exhaustiveness checker  <!-- blocked-by:1 -->
+
+## In Section 1, subsection 1.2:
+- [ ] ADT type representation  <!-- unblocks:5.3 -->
+```
+
+**Parent inheritance**: Nested `- [ ]` items (indented) inherit their parent's blocker. Only tag the top-level item.
+
+This ensures:
+- The scanner correctly counts blocked vs unblocked items
+- When completing a blocker, you can `grep 'unblocks:'` to find what it unblocks
+- When reviewing a blocked item, `grep 'blocked-by:'` shows what prerequisite is missing
+
+### Step 2.5: Blocker Chain Resolution
+
+When the scanner shows blocked items, analyze the blocker chain:
+
+1. Read the **Blocker summary** and **Blocker chain** from scanner output
+2. Classify each blocker:
+   - **READY**: All its dependencies are `[complete]` — can start implementing now
+   - **IN PROGRESS**: Section already being worked on — progress will eventually unblock
+   - **WAITING**: Has incomplete dependencies — blocked itself, can't start yet
+3. Build and present a blocker tree in the summary:
+   ```
+   Blocker Tree:
+   ├─ Section 18: Const Generics [not-started] — READY (deps satisfied: 2 [complete])
+   │  └─ blocks 17 items here
+   ├─ Section 19: Existential Types [not-started] — WAITING on Section 3
+   │  └─ blocks 6 items here
+   ├─ Section 3: Traits [in-progress, 24%] — IN PROGRESS
+   │  └─ blocks 2 items here, also blocks Section 19
+   └─ Section 14: Testing [in-progress, 8%] — WAITING (deep chain: 13←12←11←10←9)
+      └─ blocks 2 items here
+   ```
 
 ### Step 3: Load Section Details
 
@@ -70,33 +122,47 @@ Present to the user:
 ## Section N: [Name]
 
 **Progress:** X/Y items complete (Z%)
+**Actionable:** A unblocked, B blocked (by N sections)
 
 ### Recently Completed
 - [last 2-3 completed items]
 
-### Next Up
+### Next Up (Unblocked)
 **Subsection X.Y: [Subsection Name]**
-- [ ] [First incomplete item description]
+- [ ] [First unblocked incomplete item]
   - [sub-items if any]
 
+### Blockers
+[Blocker tree from Step 2.5 — READY/IN PROGRESS/WAITING classification]
+
 ### Remaining in This Section
-- [count of remaining incomplete items]
+- [count of remaining unblocked items]
+- [count of blocked items, with "blocked by N sections" note]
 ```
 
 ### Step 5: Ask What to Do
 
-Use AskUserQuestion with options:
-1. **Start next task (Recommended)** — Begin implementing the first incomplete item
+Use AskUserQuestion with options. The options depend on the blocker state:
+
+**When there are unblocked items:**
+1. **Start next task (Recommended)** — Begin implementing the first unblocked item
 2. **Show task details** — See more context about the task (read spec, find related code)
-3. **Pick different task** — Choose a specific incomplete task from this section
-4. **Switch sections** — Work on a different section
+3. **Pick different task** — Choose a specific unblocked task from this section
+4. **Tackle a blocker** — Work on a READY blocker to unblock items (ranked by impact: most items unblocked first)
+5. **Switch sections** — Work on a different section
+
+**When ALL remaining items are blocked:**
+1. **Tackle deepest ready blocker (Recommended)** — Work on the READY blocker that unblocks the most items
+2. **Show blocker details** — See what the blocker requires and its dependency chain
+3. **Switch sections** — Work on a different section
 
 ### Step 6: Execute Work
 
 Based on user choice:
-- **Start next task**: Begin implementing, following the Implementation Guidelines below
+- **Start next task**: Begin implementing the first unblocked item, following the Implementation Guidelines below
 - **Show task details**: Read relevant spec sections, explore codebase for implementation location
-- **Pick different task**: List all incomplete items in the section, let user choose
+- **Pick different task**: List all unblocked incomplete items in the section, let user choose
+- **Tackle a blocker**: Switch to the blocker section and begin implementing its first unchecked item. When the blocker is complete, return to update the blocked items.
 - **Switch sections**: Ask which section to switch to
 
 ---
