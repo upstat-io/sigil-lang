@@ -109,7 +109,7 @@ Bottom type (uninhabited); coerces to any `T`
 ## Patterns (compiler constructs)
 
 **function_seq**: `run(let x = a, result)` | `run(pre_check:, body, post_check:)` | `try(let x = f()?, Ok(x))` | `match(v, P -> e, _ -> d)`
-**function_exp**: `recurse(condition:, base:, step:, memo:, parallel:)` | `parallel(tasks:, max_concurrent:, timeout:)` → `[Result]` | `spawn(tasks:, max_concurrent:)` → `void` | `timeout(op:, after:)` | `cache(key:, op:, ttl:)` | `with(acquire:, use:, release:)` | `for(over:, match:, default:)` | `catch(expr:)` → `Result<T, str>` | `nursery(body:, on_error:, timeout:)`
+**function_exp**: `recurse(condition:, base:, step:, memo:, parallel:)` | `parallel(tasks:, max_concurrent:, timeout:)` → `[Result]` | `spawn(tasks:, max_concurrent:)` → `void` | `timeout(op:, after:)` | `cache(key:, op:, ttl:)` | `with(acquire:, action:, release:)` | `for(over:, match:, default:)` | `catch(expr:)` → `Result<T, str>` | `nursery(body:, on_error:, timeout:)`
 **Channels**: `channel<T>(buffer:)` → `(Producer, Consumer)` | `channel_in` | `channel_out` | `channel_all`
 **Conversions**: `42 as float` infallible | `"42" as? int` fallible → `Option`
 **Match patterns**: literal | `x` | `_` | `Some(x)` | `{ x, y }` | `[a, ..rest]` | `1..10` | `A | B` | `x @ pat` | `x.match(guard)`
