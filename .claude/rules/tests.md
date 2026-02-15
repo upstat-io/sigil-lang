@@ -39,15 +39,21 @@ paths:
 - Edge cases: empty, boundary, error
 - No flaky: no timing, shared state, order deps
 - `#[ignore]` needs tracking issue
-- Tests live in sibling `tests.rs` files: `#[cfg(test)] mod tests;` in source, body in `tests.rs`
+- Rust tests live in sibling `tests.rs` files: `#[cfg(test)] mod tests;` in source, body in `tests.rs`
+  - `foo.rs` → `foo/tests.rs`
+  - `mod.rs` in `bar/` → `bar/tests.rs`
+  - `lib.rs` / `main.rs` → `tests.rs` in same directory
+- Ori tests live in `_test/` subdirectories: `foo.ori` → `_test/foo.test.ori`
 - Clear naming: `test_parses_nested_generics`
 - AAA structure
 
 ## Directories
-- `tests/spec/`: Conformance
-- `tests/compile-fail/`: Expected failures
-- `tests/run-pass/`: Expected success
+- `tests/spec/`: Conformance (`.ori` files with inline `@test` attributes)
+- `tests/compile-fail/`: Expected failures (`#compile_fail`/`#fail` attributes)
+- `tests/run-pass/`: Expected success (source + `_test/*.test.ori`)
 - `tests/fmt/`: Formatting
+- `compiler/oric/tests/phases/`: Phase integration tests
+- `compiler/ori_llvm/tests/aot/`: AOT integration tests
 
 ## Running
 ```bash

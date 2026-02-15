@@ -116,7 +116,7 @@ For Ori syntax, types, patterns, and prelude:
 
 ## Files & Tests
 
-`.ori` source, `.test.ori` in `_test/` | Attached: `@test tests @target () -> void` (runs on target/caller changes) | Floating: `tests _` (runs via `ori test`) | Private: `::` prefix | Every function (except `@main`) requires tests
+`.ori` source | Tests in `_test/` subdirectory: `foo.ori` → `_test/foo.test.ori` | Attached: `@test tests @target () -> void` (runs on target/caller changes) | Floating: `tests _` (runs via `ori test`) | Private: `::` prefix | Every function (except `@main`) requires tests
 
 ## Entry Points
 
