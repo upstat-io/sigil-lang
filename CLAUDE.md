@@ -65,7 +65,7 @@ For Ori syntax, types, patterns, and prelude:
 
 **Diagnostics**: All errors have spans; imperative suggestions ("try using X"); verb phrase fixes ("Replace X with Y"); no `panic!` on user errors; accumulate
 
-**Testing**: Verify behavior not implementation; tests based on spec, not current code; multiple test angles per feature (happy path, edge cases, error cases); inline < 200 lines; TDD is mandatory for bugs (see above)
+**Testing**: Verify behavior not implementation; tests based on spec, not current code; multiple test angles per feature (happy path, edge cases, error cases); TDD is mandatory for bugs (see above). **Test file locations**: tests live in sibling `tests.rs` files, not inline. Source files use `#[cfg(test)] mod tests;` (declaration only). Resolution: `foo.rs` → `foo/tests.rs`; `mod.rs` in `bar/` → `bar/tests.rs`; `lib.rs`/`main.rs` → `tests.rs` in same dir
 
 **Performance**: O(n²) → O(n) or O(n log n); hash lookups not linear scans; no allocation in hot loops; iterators over indexing
 
