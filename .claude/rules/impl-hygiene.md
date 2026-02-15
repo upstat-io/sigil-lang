@@ -48,6 +48,13 @@ paths:
 - **Boundary validation**: Assert invariants before crossing to next phase (e.g., all tokens consumed, all types resolved).
 - **`#[cold]` on error paths**: Error handling code doesn't pollute hot-path instruction cache.
 
+## Registration Sync Points
+
+- **Single source of truth**: When the same logical fact (enum variant, error code, operator mapping, trait name) must appear in multiple locations, one location is the source and others are derived or validated against it.
+- **No manual mirroring**: If two match arms, arrays, or maps must list the same set of variants, centralize via a shared method (`from_str()`, `all()`, iterator) rather than maintaining parallel lists. Failing: `ErrorCode` enum + `parse_error_code()` + `DOCS` array all listing codes independently.
+- **Compile-time or test-time enforcement**: When centralization isn't possible (e.g., docs files that may not exist yet), add a test that iterates the source-of-truth list and checks each derived location for completeness.
+- **Flag drift as a finding**: When a new variant, mapping, or registration is added in one location but missing from a parallel location, that's a **DRIFT** finding — the plumbing equivalent of a phase leak, but for registration data instead of control flow.
+
 ## Phase-Specific Purity
 
 **Lexer**: Stateless scanning. Produces structural facts (`tag`, `len`). Does NOT judge keywords, resolve names, or track nesting context beyond what's needed for tokenization.
