@@ -39,7 +39,7 @@ paths:
 - Edge cases: empty, boundary, error
 - No flaky: no timing, shared state, order deps
 - `#[ignore]` needs tracking issue
-- Inline < 200 lines
+- Tests live in sibling `tests.rs` files: `#[cfg(test)] mod tests;` in source, body in `tests.rs`
 - Clear naming: `test_parses_nested_generics`
 - AAA structure
 
