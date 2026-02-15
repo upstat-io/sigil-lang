@@ -116,6 +116,9 @@ For each file, check and fix:
 - Any dead pub items? (pub but unused outside crate)
 - Any dead code? (unused functions, imports, variants)
 
+**File Size:**
+- Source file (excluding `tests.rs`) over 500 lines? Flag it — should be split into submodules
+
 **Style:**
 - All `#[allow(clippy)]` have `reason`?
 - Functions under 50 lines? (note: dispatch tables exempt)

@@ -71,6 +71,8 @@ For Ori syntax, types, patterns, and prelude:
 
 **Style**: No `#[allow(clippy)]` without justification; functions < 50 lines (target < 30); no dead/commented code or banners; `//!`/`///` docs
 
+**File Size — 500 line recommended limit**: Source files (excluding tests) should stay under 500 lines. When writing code that would push a file past this limit, **stop and split first** — do not add the code and plan to split later. Extract logical groups (e.g., a set of related methods, a submodule's types, a match arm group) into a new sibling file/submodule. When touching a file already over 500 lines, take the opportunity to split it. Use `scripts/extract_tests.py` for test extraction; for production code, create submodules with `mod foo;` and move the extracted code there.
+
 **Tracing — ALWAYS USE FOR DEBUGGING**: `ORI_LOG` is your **first** debugging tool. Before `println!`, before reading code line-by-line, turn on tracing. Use `tracing` macros, not `println!`/`eprintln!`. Levels: `error` (never happen), `warn` (recoverable), `debug` (phases/queries), `trace` (per-expression). Targets by crate: `ori_types` (type checker), `ori_eval` (evaluator), `ori_llvm` (codegen), `oric` (Salsa queries). Use `#[tracing::instrument]` on public API functions. Salsa queries use manual `tracing::debug!()`. Setup: `compiler/oric/src/tracing_setup.rs`.
 
 **Match Extraction**: No 20+ arm match in single file; group related arms; 3+ similar → extract helper
