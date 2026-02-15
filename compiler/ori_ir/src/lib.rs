@@ -65,6 +65,11 @@ pub use ast::{
     CallArgRange,
     // Capability types
     CapabilityRef,
+    // Conditional compilation attribute types
+    CfgAttr,
+    // Check types
+    CheckExpr,
+    CheckRange,
     // Constant definition
     ConstDef,
     // Default implementation types
@@ -74,8 +79,17 @@ pub use ast::{
     ExprKind,
     // Extension types
     ExtendDef,
+    ExtensionImport,
+    ExtensionImportItem,
+    // Extern (FFI) types
+    ExternBlock,
+    ExternItem,
+    ExternParam,
+    FieldBinding,
     FieldInit,
     FieldInitRange,
+    // File-level attribute
+    FileAttr,
     Function,
     FunctionExp,
     FunctionExpKind,
@@ -87,6 +101,7 @@ pub use ast::{
     // Impl types
     ImplDef,
     ImplMethod,
+    ImportErrorKind,
     ImportPath,
     // List with spread types
     ListElement,
@@ -112,6 +127,8 @@ pub use ast::{
     StructField,
     StructLitField,
     StructLitFieldRange,
+    // Target conditional compilation
+    TargetAttr,
     TemplatePart,
     TemplatePartRange,
     TestDef,

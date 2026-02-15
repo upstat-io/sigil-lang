@@ -20,10 +20,14 @@
 //!
 //! Each arrow is a Salsa query with automatic caching and invalidation.
 
-// EvalError is a fundamental error type - boxing would add complexity across the crate
-#![allow(clippy::result_large_err)]
-// Arc is needed for sharing captures across closures in the evaluator
-#![allow(clippy::disallowed_types)]
+#![allow(
+    clippy::result_large_err,
+    reason = "EvalError is fundamental — boxing adds complexity across the crate"
+)]
+#![allow(
+    clippy::disallowed_types,
+    reason = "Arc needed for sharing captures across closures in evaluator"
+)]
 
 // Allow modules to use `oric::` paths for consistency with external consumers
 extern crate self as oric;
@@ -61,78 +65,23 @@ pub mod query;
 
 // Re-export lex function from the ori_lexer crate (single source of truth)
 pub use ori_lexer::lex;
-pub mod context;
 pub mod diagnostic;
 pub mod edit;
 pub mod eval;
 pub mod problem;
 pub mod reporting;
-pub mod suggest;
 pub mod test;
 pub mod testing;
 pub mod tracing_setup;
 pub mod typeck;
 
-// Re-exports for convenience
-pub use context::{shared_context, CompilerContext, SharedContext};
+// Re-exports: only types actually consumed by external crates (ori-lsp, benches)
+// and by internal modules via `oric::` paths. IR types are accessed internally
+// via `crate::ir::` — re-exporting them here would expose internal phase types
+// through the crate's public boundary.
 pub use db::{CompilerDb, Db};
-pub use diagnostic::{Diagnostic, ErrorCode, Label, Severity};
-pub use eval::{
-    Environment, EvalError, EvalErrorSnapshot, EvalOutput, EvalResult, Evaluator, FunctionValue,
-    ModuleEvalResult, RangeValue, Value,
-};
+pub use eval::{EvalOutput, ModuleEvalResult};
 pub use input::SourceFile;
-pub use ir::{
-    ArmRange,
-    BinaryOp,
-    BindingPattern,
-    // CallNamed types
-    CallArg,
-    CallArgRange,
-    DurationUnit,
-    Expr,
-    ExprArena,
-    ExprId,
-    ExprKind,
-    ExprRange,
-    FieldInit,
-    FieldInitRange,
-    Function,
-    FunctionExp,
-    FunctionExpKind,
-    FunctionSeq,
-    MapEntry,
-    MapEntryRange,
-    MatchArm,
-    MatchPattern,
-    Module,
-    Name,
-    Named,
-    // function_exp types
-    NamedExpr,
-    NamedExprRange,
-    Param,
-    ParamRange,
-    // function_seq types
-    SeqBinding,
-    SeqBindingRange,
-    SharedInterner,
-    SizeUnit,
-    Span,
-    Spanned,
-    Stmt,
-    StmtId,
-    StmtKind,
-    StmtRange,
-    StringInterner,
-    TestDef,
-    Token,
-    TokenKind,
-    TokenList,
-    TypeId,
-    Typed,
-    UnaryOp,
-};
 pub use query::evaluated;
 pub use test::{
     run_test_file, run_tests, TestOutcome, TestResult, TestRunner, TestRunnerConfig, TestSummary,

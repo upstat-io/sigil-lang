@@ -1,6 +1,8 @@
 #![deny(clippy::arithmetic_side_effects)]
-// EvalError is a fundamental error type - boxing would add complexity across the crate
-#![allow(clippy::result_large_err)]
+#![allow(
+    clippy::result_large_err,
+    reason = "EvalError is fundamental — boxing would add complexity across the crate"
+)]
 //! Ori Patterns - Pattern system for the Ori compiler.
 //!
 //! This crate provides:
@@ -34,6 +36,7 @@ mod value;
 // Pattern implementations
 mod builtins;
 mod cache;
+mod channel;
 mod parallel;
 mod recurse;
 mod spawn;
@@ -126,6 +129,9 @@ pub use errors::{
     range_bound_not_int,
     recursion_limit_exceeded,
     self_outside_method,
+    size_negative_divide,
+    size_negative_multiply,
+    size_would_be_negative,
     spread_requires_list,
     spread_requires_map,
     spread_requires_struct,
@@ -182,7 +188,10 @@ impl<'a> EvalContext<'a> {
     }
 
     /// Get a required property's `ExprId` by name.
-    #[allow(clippy::result_large_err)] // EvalError is fundamental error type
+    #[allow(
+        clippy::result_large_err,
+        reason = "EvalError is fundamental — boxing would add complexity across the crate"
+    )]
     pub fn get_prop(&self, name: &str) -> Result<ExprId, EvalError> {
         let target = self.interner.intern(name);
         for prop in self.props {

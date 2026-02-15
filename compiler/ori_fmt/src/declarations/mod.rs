@@ -25,6 +25,7 @@
 
 mod comments;
 mod configs;
+mod extern_def;
 mod functions;
 mod impls;
 mod imports;
@@ -33,12 +34,14 @@ mod tests_fmt;
 mod traits;
 mod types;
 
+pub(crate) use parsed_types::format_const_expr;
+
 use crate::comments::CommentIndex;
 use crate::context::{FormatConfig, FormatContext};
 use crate::emitter::StringEmitter;
 use crate::width::WidthCalculator;
 use ori_ir::ast::items::Module;
-use ori_ir::{CommentList, ExprArena, StringLookup};
+use ori_ir::{CommentList, ExprArena, FileAttr, Spanned, StringLookup};
 
 /// Format a complete module to a string with default config.
 pub fn format_module<I: StringLookup>(module: &Module, arena: &ExprArena, interner: &I) -> String {
@@ -101,8 +104,14 @@ pub fn format_module_with_comments_and_config<I: StringLookup>(
 fn collect_module_positions(module: &Module) -> Vec<u32> {
     let mut positions = Vec::new();
 
+    if let Some(attr) = &module.file_attr {
+        positions.push(attr.span().start);
+    }
     for import in &module.imports {
         positions.push(import.span.start);
+    }
+    for ext_import in &module.extension_imports {
+        positions.push(ext_import.span.start);
     }
     for const_def in &module.consts {
         positions.push(const_def.span.start);
@@ -132,6 +141,9 @@ fn collect_module_positions(module: &Module) -> Vec<u32> {
     }
     for test in &module.tests {
         positions.push(test.span.start);
+    }
+    for extern_block in &module.extern_blocks {
+        positions.push(extern_block.span.start);
     }
 
     positions.sort_unstable();
@@ -169,13 +181,118 @@ impl<'a, I: StringLookup> ModuleFormatter<'a, I> {
         self.ctx.finalize()
     }
 
+    /// Emit a file-level attribute (`#!target(...)` or `#!cfg(...)`).
+    fn format_file_attr(&mut self, attr: &FileAttr) {
+        match attr {
+            FileAttr::Target { attr: target, .. } => {
+                self.ctx.emit("#!target(");
+                let mut first = true;
+                for (key, val) in [
+                    ("os", &target.os),
+                    ("arch", &target.arch),
+                    ("family", &target.family),
+                    ("not_os", &target.not_os),
+                ] {
+                    if let Some(name) = val {
+                        if !first {
+                            self.ctx.emit(", ");
+                        }
+                        self.ctx.emit(key);
+                        self.ctx.emit(": \"");
+                        self.ctx.emit(self.interner.lookup(*name));
+                        self.ctx.emit("\"");
+                        first = false;
+                    }
+                }
+                if !target.any_os.is_empty() {
+                    if !first {
+                        self.ctx.emit(", ");
+                    }
+                    self.ctx.emit("any_os: [");
+                    for (i, name) in target.any_os.iter().enumerate() {
+                        if i > 0 {
+                            self.ctx.emit(", ");
+                        }
+                        self.ctx.emit("\"");
+                        self.ctx.emit(self.interner.lookup(*name));
+                        self.ctx.emit("\"");
+                    }
+                    self.ctx.emit("]");
+                    first = false;
+                }
+                let _ = first;
+                self.ctx.emit(")");
+            }
+            FileAttr::Cfg { attr: cfg, .. } => {
+                self.ctx.emit("#!cfg(");
+                let mut first = true;
+                for (flag, set) in [
+                    ("debug", &cfg.debug),
+                    ("release", &cfg.release),
+                    ("not_debug", &cfg.not_debug),
+                ] {
+                    if *set {
+                        if !first {
+                            self.ctx.emit(", ");
+                        }
+                        self.ctx.emit(flag);
+                        first = false;
+                    }
+                }
+                for (key, val) in [("feature", &cfg.feature), ("not_feature", &cfg.not_feature)] {
+                    if let Some(name) = val {
+                        if !first {
+                            self.ctx.emit(", ");
+                        }
+                        self.ctx.emit(key);
+                        self.ctx.emit(": \"");
+                        self.ctx.emit(self.interner.lookup(*name));
+                        self.ctx.emit("\"");
+                        first = false;
+                    }
+                }
+                if !cfg.any_feature.is_empty() {
+                    if !first {
+                        self.ctx.emit(", ");
+                    }
+                    self.ctx.emit("any_feature: [");
+                    for (i, name) in cfg.any_feature.iter().enumerate() {
+                        if i > 0 {
+                            self.ctx.emit(", ");
+                        }
+                        self.ctx.emit("\"");
+                        self.ctx.emit(self.interner.lookup(*name));
+                        self.ctx.emit("\"");
+                    }
+                    self.ctx.emit("]");
+                    first = false;
+                }
+                let _ = first;
+                self.ctx.emit(")");
+            }
+        }
+        self.ctx.emit_newline();
+    }
+
     /// Format a complete module.
     pub fn format_module(&mut self, module: &Module) {
         let mut first_item = true;
 
+        // File-level attribute
+        if let Some(attr) = &module.file_attr {
+            self.format_file_attr(attr);
+            first_item = false;
+        }
+
         // Imports first
         if !module.imports.is_empty() {
             self.format_imports(&module.imports);
+            first_item = false;
+        }
+
+        // Extension imports (after regular imports)
+        if !module.extension_imports.is_empty() {
+            self.format_extension_imports(&module.extension_imports);
             first_item = false;
         }
 
@@ -218,6 +335,16 @@ impl<'a, I: StringLookup> ModuleFormatter<'a, I> {
             first_item = false;
         }
 
+        // Extern blocks
+        for extern_block in &module.extern_blocks {
+            if !first_item {
+                self.ctx.emit_newline();
+            }
+            self.format_extern_block(extern_block);
+            self.ctx.emit_newline();
+            first_item = false;
+        }
+
         // Functions
         for func in &module.functions {
             if !first_item {
@@ -248,9 +375,25 @@ impl<'a, I: StringLookup> ModuleFormatter<'a, I> {
     ) {
         let mut first_item = true;
 
+        // File-level attribute
+        if let Some(attr) = &module.file_attr {
+            self.format_file_attr(attr);
+            first_item = false;
+        }
+
         // Imports first
         if !module.imports.is_empty() {
             self.format_imports_with_comments(&module.imports, comments, comment_index);
+            first_item = false;
+        }
+
+        // Extension imports (after regular imports)
+        if !module.extension_imports.is_empty() {
+            self.format_extension_imports_with_comments(
+                &module.extension_imports,
+                comments,
+                comment_index,
+            );
             first_item = false;
         }
 
@@ -292,6 +435,17 @@ impl<'a, I: StringLookup> ModuleFormatter<'a, I> {
             }
             self.emit_comments_before(impl_def.span.start, comments, comment_index);
             self.format_impl_with_comments(impl_def, comments, comment_index);
+            self.ctx.emit_newline();
+            first_item = false;
+        }
+
+        // Extern blocks
+        for extern_block in &module.extern_blocks {
+            if !first_item {
+                self.ctx.emit_newline();
+            }
+            self.emit_comments_before(extern_block.span.start, comments, comment_index);
+            self.format_extern_block(extern_block);
             self.ctx.emit_newline();
             first_item = false;
         }

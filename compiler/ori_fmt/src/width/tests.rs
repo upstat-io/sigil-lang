@@ -6,7 +6,7 @@ use literals::{bool_width, char_width, float_width, int_width, string_width};
 use operators::{binary_op_width, unary_op_width};
 use ori_ir::{
     ast::{Expr, ExprKind, Stmt, StmtKind},
-    BinaryOp, DurationUnit, ExprArena, SizeUnit, Span, StmtRange, StringInterner, UnaryOp,
+    BinaryOp, DurationUnit, ExprArena, Name, SizeUnit, Span, StmtRange, StringInterner, UnaryOp,
 };
 use patterns::binding_pattern_width;
 
@@ -475,7 +475,13 @@ fn test_width_break() {
     let mut arena = ExprArena::new();
     let interner = StringInterner::new();
 
-    let brk = make_expr(&mut arena, ExprKind::Break(ExprId::INVALID));
+    let brk = make_expr(
+        &mut arena,
+        ExprKind::Break {
+            label: Name::EMPTY,
+            value: ExprId::INVALID,
+        },
+    );
     let mut calc = WidthCalculator::new(&arena, &interner);
 
     assert_eq!(calc.width(brk), 5); // "break"
@@ -487,7 +493,13 @@ fn test_width_break_value() {
     let interner = StringInterner::new();
 
     let value = make_expr(&mut arena, ExprKind::Int(42));
-    let brk = make_expr(&mut arena, ExprKind::Break(value));
+    let brk = make_expr(
+        &mut arena,
+        ExprKind::Break {
+            label: Name::EMPTY,
+            value,
+        },
+    );
     let mut calc = WidthCalculator::new(&arena, &interner);
 
     assert_eq!(calc.width(brk), 8); // "break 42"
@@ -498,7 +510,13 @@ fn test_width_continue() {
     let mut arena = ExprArena::new();
     let interner = StringInterner::new();
 
-    let cont = make_expr(&mut arena, ExprKind::Continue(ExprId::INVALID));
+    let cont = make_expr(
+        &mut arena,
+        ExprKind::Continue {
+            label: Name::EMPTY,
+            value: ExprId::INVALID,
+        },
+    );
     let mut calc = WidthCalculator::new(&arena, &interner);
 
     assert_eq!(calc.width(cont), 8); // "continue"
@@ -613,7 +631,13 @@ fn test_width_loop() {
     let interner = StringInterner::new();
 
     let body = make_expr(&mut arena, ExprKind::Int(42));
-    let loop_expr = make_expr(&mut arena, ExprKind::Loop { body });
+    let loop_expr = make_expr(
+        &mut arena,
+        ExprKind::Loop {
+            label: Name::EMPTY,
+            body,
+        },
+    );
     let mut calc = WidthCalculator::new(&arena, &interner);
 
     // "loop(42)" = 5 + 2 + 1 = 8
@@ -736,8 +760,10 @@ fn test_always_stacked_run() {
     let result = make_expr(&mut arena, ExprKind::Int(1));
     let bindings = arena.alloc_seq_bindings([]);
     let seq_id = arena.alloc_function_seq(FunctionSeq::Run {
+        pre_checks: ori_ir::CheckRange::EMPTY,
         bindings,
         result,
+        post_checks: ori_ir::CheckRange::EMPTY,
         span: Span::new(0, 1),
     });
     let run = make_expr(&mut arena, ExprKind::FunctionSeq(seq_id));
@@ -877,7 +903,10 @@ fn test_with_capacity() {
 fn test_binding_pattern_name() {
     let interner = StringInterner::new();
     let name = interner.intern("foo");
-    let pattern = ori_ir::BindingPattern::Name(name);
+    let pattern = ori_ir::BindingPattern::Name {
+        name,
+        mutable: true,
+    };
 
     assert_eq!(binding_pattern_width(&pattern, &interner), 3); // "foo"
 }
@@ -896,8 +925,14 @@ fn test_binding_pattern_tuple() {
     let a = interner.intern("a");
     let b = interner.intern("b");
     let pattern = ori_ir::BindingPattern::Tuple(vec![
-        ori_ir::BindingPattern::Name(a),
-        ori_ir::BindingPattern::Name(b),
+        ori_ir::BindingPattern::Name {
+            name: a,
+            mutable: true,
+        },
+        ori_ir::BindingPattern::Name {
+            name: b,
+            mutable: true,
+        },
     ]);
 
     // "(a, b)" = 1 + 1 + 2 + 1 + 1 = 6
@@ -934,4 +969,96 @@ fn test_deeply_nested_binary() {
     let mut calc = WidthCalculator::new(&arena, &interner);
     // 10 x "1" = 10, 9 x " + " = 27, total = 37
     assert_eq!(calc.width(expr), 37);
+}
+
+#[test]
+fn test_width_break_labeled() {
+    let mut arena = ExprArena::new();
+    let interner = StringInterner::new();
+
+    let label = interner.intern("outer");
+    let brk = make_expr(
+        &mut arena,
+        ExprKind::Break {
+            label,
+            value: ExprId::INVALID,
+        },
+    );
+    let mut calc = WidthCalculator::new(&arena, &interner);
+
+    // "break:outer" = 5 + 1 + 5 = 11
+    assert_eq!(calc.width(brk), 11);
+}
+
+#[test]
+fn test_width_break_labeled_with_value() {
+    let mut arena = ExprArena::new();
+    let interner = StringInterner::new();
+
+    let label = interner.intern("outer");
+    let value = make_expr(&mut arena, ExprKind::Int(42));
+    let brk = make_expr(&mut arena, ExprKind::Break { label, value });
+    let mut calc = WidthCalculator::new(&arena, &interner);
+
+    // "break:outer 42" = 5 + 1 + 5 + 1 + 2 = 14
+    assert_eq!(calc.width(brk), 14);
+}
+
+#[test]
+fn test_width_continue_labeled() {
+    let mut arena = ExprArena::new();
+    let interner = StringInterner::new();
+
+    let label = interner.intern("inner");
+    let cont = make_expr(
+        &mut arena,
+        ExprKind::Continue {
+            label,
+            value: ExprId::INVALID,
+        },
+    );
+    let mut calc = WidthCalculator::new(&arena, &interner);
+
+    // "continue:inner" = 8 + 1 + 5 = 14
+    assert_eq!(calc.width(cont), 14);
+}
+
+#[test]
+fn test_width_loop_labeled() {
+    let mut arena = ExprArena::new();
+    let interner = StringInterner::new();
+
+    let label = interner.intern("main");
+    let body = make_expr(&mut arena, ExprKind::Int(42));
+    let loop_expr = make_expr(&mut arena, ExprKind::Loop { label, body });
+    let mut calc = WidthCalculator::new(&arena, &interner);
+
+    // "loop:main(42)" = 4 + 1 + 4 + 1 + 2 + 1 = 13
+    assert_eq!(calc.width(loop_expr), 13);
+}
+
+#[test]
+fn test_width_for_labeled() {
+    let mut arena = ExprArena::new();
+    let interner = StringInterner::new();
+
+    let label = interner.intern("row");
+    let binding = interner.intern("x");
+    let iter = make_expr(&mut arena, ExprKind::Ident(interner.intern("items")));
+    let body = make_expr(&mut arena, ExprKind::Ident(interner.intern("x")));
+    let for_expr = make_expr(
+        &mut arena,
+        ExprKind::For {
+            label,
+            binding,
+            iter,
+            guard: ExprId::INVALID,
+            body,
+            is_yield: false,
+        },
+    );
+    let mut calc = WidthCalculator::new(&arena, &interner);
+
+    // "for:row x in items do x" = 3 + 1 + 3 + 1 + 1 + 4 + 5 + 4 + 1 = 23
+    assert_eq!(calc.width(for_expr), 23);
 }

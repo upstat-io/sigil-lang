@@ -38,18 +38,30 @@ impl<'scx: 'ctx, 'ctx> ExprLowerer<'_, 'scx, 'ctx, '_> {
             FunctionExpKind::Catch => self.lower_exp_catch(props, expr_id),
             FunctionExpKind::Parallel => {
                 tracing::warn!("parallel expression not yet implemented");
+                self.builder.record_codegen_error();
                 None
             }
             FunctionExpKind::Spawn => {
                 tracing::warn!("spawn expression not yet implemented");
+                self.builder.record_codegen_error();
                 None
             }
             FunctionExpKind::Timeout => {
                 tracing::warn!("timeout expression not yet implemented");
+                self.builder.record_codegen_error();
                 None
             }
             FunctionExpKind::With => {
                 tracing::warn!("with expression not yet implemented");
+                self.builder.record_codegen_error();
+                None
+            }
+            FunctionExpKind::Channel
+            | FunctionExpKind::ChannelIn
+            | FunctionExpKind::ChannelOut
+            | FunctionExpKind::ChannelAll => {
+                tracing::warn!("{} expression not yet implemented", kind.name());
+                self.builder.record_codegen_error();
                 None
             }
         }
@@ -61,10 +73,8 @@ impl<'scx: 'ctx, 'ctx> ExprLowerer<'_, 'scx, 'ctx, '_> {
     /// based on the value type.
     fn lower_exp_print(&mut self, props: CanNamedExprRange) -> Option<ValueId> {
         let named_exprs = self.canon.arena.get_named_exprs(props);
-        let msg_expr = named_exprs.iter().find(|ne| {
-            let name = self.resolve_name(ne.name);
-            name == "msg"
-        })?;
+        let msg_name = self.prop_names.msg;
+        let msg_expr = named_exprs.iter().find(|ne| ne.name == msg_name)?;
 
         let val = self.lower(msg_expr.value)?;
         let val_type = self.expr_type(msg_expr.value);
@@ -124,10 +134,11 @@ impl<'scx: 'ctx, 'ctx> ExprLowerer<'_, 'scx, 'ctx, '_> {
     /// Calls `ori_panic` with the message string, then emits `unreachable`.
     fn lower_exp_panic(&mut self, props: CanNamedExprRange) -> Option<ValueId> {
         let named_exprs = self.canon.arena.get_named_exprs(props);
-        let msg_expr = named_exprs.iter().find(|ne| {
-            let name = self.resolve_name(ne.name);
-            name == "message" || name == "value"
-        });
+        let message_name = self.prop_names.message;
+        let value_name = self.prop_names.value;
+        let msg_expr = named_exprs
+            .iter()
+            .find(|ne| ne.name == message_name || ne.name == value_name);
 
         if let Some(ne) = msg_expr {
             let val = self.lower(ne.value)?;
@@ -212,13 +223,15 @@ impl<'scx: 'ctx, 'ctx> ExprLowerer<'_, 'scx, 'ctx, '_> {
     fn lower_exp_cache(&mut self, props: CanNamedExprRange, _expr_id: CanId) -> Option<ValueId> {
         // Simplified: just evaluate the value expression
         let named_exprs = self.canon.arena.get_named_exprs(props);
+        let value_name = self.prop_names.value;
+        let expr_name = self.prop_names.expr;
         for ne in named_exprs {
-            let name = self.resolve_name(ne.name);
-            if name == "value" || name == "expr" {
+            if ne.name == value_name || ne.name == expr_name {
                 return self.lower(ne.value);
             }
         }
         tracing::warn!("cache expression missing value property");
+        self.builder.record_codegen_error();
         None
     }
 
@@ -226,13 +239,15 @@ impl<'scx: 'ctx, 'ctx> ExprLowerer<'_, 'scx, 'ctx, '_> {
     fn lower_exp_catch(&mut self, props: CanNamedExprRange, _expr_id: CanId) -> Option<ValueId> {
         // Simplified: just evaluate the expr property
         let named_exprs = self.canon.arena.get_named_exprs(props);
+        let expr_name = self.prop_names.expr;
+        let value_name = self.prop_names.value;
         for ne in named_exprs {
-            let name = self.resolve_name(ne.name);
-            if name == "expr" || name == "value" {
+            if ne.name == expr_name || ne.name == value_name {
                 return self.lower(ne.value);
             }
         }
         tracing::warn!("catch expression missing expr property");
+        self.builder.record_codegen_error();
         None
     }
 

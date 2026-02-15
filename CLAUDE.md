@@ -65,11 +65,13 @@ For Ori syntax, types, patterns, and prelude:
 
 **Diagnostics**: All errors have spans; imperative suggestions ("try using X"); verb phrase fixes ("Replace X with Y"); no `panic!` on user errors; accumulate
 
-**Testing**: Verify behavior not implementation; tests based on spec, not current code; multiple test angles per feature (happy path, edge cases, error cases); inline < 200 lines; TDD is mandatory for bugs (see above)
+**Testing**: Verify behavior not implementation; tests based on spec, not current code; multiple test angles per feature (happy path, edge cases, error cases); TDD is mandatory for bugs (see above). **Test file locations**: tests live in sibling `tests.rs` files, not inline. Source files use `#[cfg(test)] mod tests;` (declaration only). Resolution: `foo.rs` → `foo/tests.rs`; `mod.rs` in `bar/` → `bar/tests.rs`; `lib.rs`/`main.rs` → `tests.rs` in same dir
 
 **Performance**: O(n²) → O(n) or O(n log n); hash lookups not linear scans; no allocation in hot loops; iterators over indexing
 
 **Style**: No `#[allow(clippy)]` without justification; functions < 50 lines (target < 30); no dead/commented code or banners; `//!`/`///` docs
+
+**File Size — 500 line recommended limit**: Source files (excluding tests) should stay under 500 lines. When writing code that would push a file past this limit, **stop and split first** — do not add the code and plan to split later. Extract logical groups (e.g., a set of related methods, a submodule's types, a match arm group) into a new sibling file/submodule. When touching a file already over 500 lines, take the opportunity to split it. Use `scripts/extract_tests.py` for test extraction; for production code, create submodules with `mod foo;` and move the extracted code there.
 
 **Tracing — ALWAYS USE FOR DEBUGGING**: `ORI_LOG` is your **first** debugging tool. Before `println!`, before reading code line-by-line, turn on tracing. Use `tracing` macros, not `println!`/`eprintln!`. Levels: `error` (never happen), `warn` (recoverable), `debug` (phases/queries), `trace` (per-expression). Targets by crate: `ori_types` (type checker), `ori_eval` (evaluator), `ori_llvm` (codegen), `oric` (Salsa queries). Use `#[tracing::instrument]` on public API functions. Salsa queries use manual `tracing::debug!()`. Setup: `compiler/oric/src/tracing_setup.rs`.
 
@@ -114,7 +116,7 @@ For Ori syntax, types, patterns, and prelude:
 
 ## Files & Tests
 
-`.ori` source, `.test.ori` in `_test/` | Attached: `@test tests @target () -> void` (runs on target/caller changes) | Floating: `tests _` (runs via `ori test`) | Private: `::` prefix | Every function (except `@main`) requires tests
+`.ori` source | Tests in `_test/` subdirectory: `foo.ori` → `_test/foo.test.ori` | Attached: `@test tests @target () -> void` (runs on target/caller changes) | Floating: `tests _` (runs via `ori test`) | Private: `::` prefix | Every function (except `@main`) requires tests
 
 ## Entry Points
 

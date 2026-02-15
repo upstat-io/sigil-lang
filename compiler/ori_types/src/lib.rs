@@ -17,12 +17,14 @@ mod flags;
 mod idx;
 mod infer;
 mod item;
+mod lifetime;
 mod output;
 mod pool;
 mod registry;
 mod tag;
 mod type_error;
 mod unify;
+mod value_category;
 
 pub use check::{
     check_module, check_module_with_imports, check_module_with_pool, check_module_with_registries,
@@ -32,8 +34,11 @@ pub use flags::{TypeCategory, TypeFlags};
 pub use idx::Idx;
 pub use infer::{check_expr, infer_expr, resolve_parsed_type, ExprIndex, InferEngine, TypeEnv};
 pub use item::Item;
+pub use lifetime::LifetimeId;
 pub use ori_ir::{PatternKey, PatternResolution};
-pub use output::{FnWhereClause, FunctionSig, TypeCheckResult, TypedModule};
+pub use output::{
+    ConstParamInfo, EffectClass, FnWhereClause, FunctionSig, TypeCheckResult, TypedModule,
+};
 pub use pool::{EnumVariant, Pool, VarState, DEFAULT_RANK};
 pub use registry::{
     // Method registry
@@ -65,10 +70,11 @@ pub use registry::{
 pub use tag::Tag;
 pub use type_error::{
     diff_types, edit_distance, find_closest_field, suggest_field_typo, ArityMismatchKind,
-    ContextKind, ErrorContext, Expected, ExpectedOrigin, SequenceKind, Severity, TypeCheckError,
-    TypeErrorKind, TypeProblem,
+    ContextKind, ErrorContext, Expected, ExpectedOrigin, ImportErrorKind, SequenceKind, Severity,
+    TypeCheckError, TypeErrorKind, TypeProblem,
 };
 pub use unify::{ArityKind, Rank, UnifyContext, UnifyEngine, UnifyError};
+pub use value_category::ValueCategory;
 
 // =============================================================================
 // Compile-time Salsa compatibility assertions
@@ -83,7 +89,10 @@ pub use unify::{ArityKind, Rank, UnifyContext, UnifyEngine, UnifyError};
 ///
 /// Evaluates to 0 if the bounds are satisfied. Produces a compile error otherwise.
 /// The type parameter is intentionally unused in the body — only the bounds matter.
-#[allow(clippy::extra_unused_type_parameters)]
+#[allow(
+    clippy::extra_unused_type_parameters,
+    reason = "type param exists only for trait bound checking"
+)]
 const fn assert_salsa_compatible<T: Clone + Eq + std::hash::Hash + std::fmt::Debug>() -> usize {
     0
 }
@@ -93,12 +102,15 @@ const _: usize = assert_salsa_compatible::<Idx>();
 const _: usize = assert_salsa_compatible::<Tag>();
 const _: usize = assert_salsa_compatible::<TypeFlags>();
 const _: usize = assert_salsa_compatible::<Rank>();
+const _: usize = assert_salsa_compatible::<LifetimeId>();
+const _: usize = assert_salsa_compatible::<ValueCategory>();
 
 // Output types (Salsa query results)
 const _: usize = assert_salsa_compatible::<TypeCheckResult>();
 const _: usize = assert_salsa_compatible::<TypedModule>();
 const _: usize = assert_salsa_compatible::<FunctionSig>();
 const _: usize = assert_salsa_compatible::<FnWhereClause>();
+const _: usize = assert_salsa_compatible::<ConstParamInfo>();
 const _: usize = assert_salsa_compatible::<TypeEntry>();
 
 // Error types (embedded in query results)

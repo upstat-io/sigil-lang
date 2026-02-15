@@ -19,7 +19,7 @@ pub use construct::*;
 
 use rustc_hash::FxHashMap;
 
-use crate::{Idx, Item, Rank, Tag, TypeFlags};
+use crate::{Idx, Item, LifetimeId, Rank, Tag, TypeFlags};
 
 /// The unified type pool - stores all types in the compilation.
 ///
@@ -117,7 +117,10 @@ impl Pool {
     }
 
     /// Pre-intern all primitive types at their fixed indices.
-    #[allow(clippy::cast_possible_truncation)]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "primitive count is a small constant, always fits u32"
+    )]
     fn intern_primitives(&mut self) {
         // Primitives must be interned in exact order to match Idx constants
         self.intern_primitive_at(Tag::Int, Idx::INT);
@@ -144,7 +147,10 @@ impl Pool {
     }
 
     /// Intern a primitive type at a specific index.
-    #[allow(clippy::cast_possible_truncation)]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "items.len() always fits u32 — pool indices are u32"
+    )]
     fn intern_primitive_at(&mut self, tag: Tag, expected_idx: Idx) {
         let idx = Idx::from_raw(self.items.len() as u32);
         debug_assert_eq!(idx, expected_idx, "Primitive index mismatch for {tag:?}");
@@ -247,7 +253,10 @@ impl Pool {
     /// Intern a simple type (no extra data).
     ///
     /// Returns the canonical index for this type.
-    #[allow(clippy::cast_possible_truncation)]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "items.len() always fits u32 — pool indices are u32"
+    )]
     pub fn intern(&mut self, tag: Tag, data: u32) -> Idx {
         let hash = Self::compute_hash(tag, data, &[]);
 
@@ -273,7 +282,10 @@ impl Pool {
     ///
     /// The `extra_data` slice is copied into the extra array.
     /// Returns the canonical index for this type.
-    #[allow(clippy::cast_possible_truncation)]
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "items.len() and extra.len() always fit u32 — pool storage is u32-indexed"
+    )]
     pub fn intern_complex(&mut self, tag: Tag, extra_data: &[u32]) -> Idx {
         let hash = Self::compute_hash(tag, 0, extra_data);
 
@@ -348,6 +360,12 @@ impl Pool {
                 TypeFlags::IS_CONTAINER
                     | TypeFlags::propagate_from(child1_flags)
                     | TypeFlags::propagate_from(child2_flags)
+            }
+
+            // Borrowed reference (reserved, never constructed)
+            Tag::Borrowed => {
+                let inner_flags = self.flags[extra[0] as usize];
+                TypeFlags::IS_CONTAINER | TypeFlags::propagate_from(inner_flags)
             }
 
             // Variables
@@ -556,6 +574,28 @@ impl Pool {
         debug_assert_eq!(self.tag(idx), Tag::Result);
         let extra_idx = self.data(idx) as usize;
         Idx::from_raw(self.extra[extra_idx + 1])
+    }
+
+    /// Get the inner type of a borrowed reference.
+    ///
+    /// For `&T`, returns `T`.
+    ///
+    /// # Panics
+    /// Panics if `idx` is not a Borrowed type.
+    pub fn borrowed_inner(&self, idx: Idx) -> Idx {
+        debug_assert_eq!(self.tag(idx), Tag::Borrowed);
+        let extra_idx = self.data(idx) as usize;
+        Idx::from_raw(self.extra[extra_idx])
+    }
+
+    /// Get the lifetime of a borrowed reference.
+    ///
+    /// # Panics
+    /// Panics if `idx` is not a Borrowed type.
+    pub fn borrowed_lifetime(&self, idx: Idx) -> LifetimeId {
+        debug_assert_eq!(self.tag(idx), Tag::Borrowed);
+        let extra_idx = self.data(idx) as usize;
+        LifetimeId::from_raw(self.extra[extra_idx + 1])
     }
 
     /// Get option inner type.
@@ -952,45 +992,4 @@ impl Default for Pool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn primitives_at_correct_indices() {
-        let pool = Pool::new();
-
-        assert_eq!(pool.tag(Idx::INT), Tag::Int);
-        assert_eq!(pool.tag(Idx::FLOAT), Tag::Float);
-        assert_eq!(pool.tag(Idx::BOOL), Tag::Bool);
-        assert_eq!(pool.tag(Idx::STR), Tag::Str);
-        assert_eq!(pool.tag(Idx::CHAR), Tag::Char);
-        assert_eq!(pool.tag(Idx::BYTE), Tag::Byte);
-        assert_eq!(pool.tag(Idx::UNIT), Tag::Unit);
-        assert_eq!(pool.tag(Idx::NEVER), Tag::Never);
-        assert_eq!(pool.tag(Idx::ERROR), Tag::Error);
-        assert_eq!(pool.tag(Idx::DURATION), Tag::Duration);
-        assert_eq!(pool.tag(Idx::SIZE), Tag::Size);
-        assert_eq!(pool.tag(Idx::ORDERING), Tag::Ordering);
-    }
-
-    #[test]
-    fn primitive_flags_correct() {
-        let pool = Pool::new();
-
-        let int_flags = pool.flags(Idx::INT);
-        assert!(int_flags.contains(TypeFlags::IS_PRIMITIVE));
-        assert!(int_flags.contains(TypeFlags::IS_RESOLVED));
-        assert!(int_flags.contains(TypeFlags::IS_MONO));
-        assert!(!int_flags.has_errors());
-
-        let error_flags = pool.flags(Idx::ERROR);
-        assert!(error_flags.contains(TypeFlags::IS_PRIMITIVE));
-        assert!(error_flags.has_errors());
-    }
-
-    #[test]
-    fn pool_starts_with_primitives() {
-        let pool = Pool::new();
-        assert_eq!(pool.len(), Idx::FIRST_DYNAMIC as usize);
-    }
-}
+mod tests;

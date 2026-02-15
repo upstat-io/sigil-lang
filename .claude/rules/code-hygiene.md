@@ -15,7 +15,7 @@ paths:
 6. Inherent `impl` blocks (immediately after their type)
 7. Trait `impl` blocks (immediately after inherent impls)
 8. Free functions
-9. `#[cfg(test)] mod tests` at bottom
+9. `#[cfg(test)] mod tests;` at bottom (declaration only — test body lives in sibling `tests.rs`)
 
 ## Import Organization (3 groups, blank-line separated)
 
@@ -86,6 +86,14 @@ Inline comments on struct fields when purpose isn't obvious from the name.
 - `pub(crate)` for cross-module internal use
 - No dead pub items (pub but unused outside crate)
 - No dead code (functions, imports, enum variants never used)
+
+## File Size
+
+- **500 line recommended limit** for source files (excluding `tests.rs`)
+- When adding code that would exceed 500 lines, **split first** — don't add then plan to split later
+- When touching a file already over 500 lines, take the opportunity to split it
+- Split by extracting logical groups into submodules: related methods, type groups, match arm handlers
+- Tests always in sibling `tests.rs` (use `scripts/extract_tests.py` for extraction)
 
 ## Style
 

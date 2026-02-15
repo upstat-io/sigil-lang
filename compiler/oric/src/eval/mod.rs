@@ -15,30 +15,29 @@
 //! methods on `Value`. See `ori_patterns::value` for details.
 
 mod evaluator;
-pub mod module;
+pub(crate) mod module;
 mod output;
 
-// Re-export exec module from ori_eval
-pub use ori_eval::exec;
+// Re-export exec module from ori_eval (used by eval tests)
+#[cfg(test)]
+pub(crate) use ori_eval::exec;
 
 /// Re-export Value types from `ori_patterns` (single source of truth).
 ///
 /// This module exists for import compatibility - files can continue using
 /// `super::value::Value` instead of changing all imports.
-pub mod value {
-    pub use ori_patterns::{
-        FunctionValFn, FunctionValue, Heap, RangeValue, StructLayout, StructValue, Value,
-    };
+pub(crate) mod value {
+    pub use ori_patterns::{FunctionValue, Value};
 }
 
 pub use evaluator::{Evaluator, EvaluatorBuilder, ScopedEvaluator};
-pub use ori_eval::{
-    dispatch_builtin_method_str, evaluate_binary, evaluate_unary, Environment, LocalScope,
-    Mutability, Scope, UserMethod, UserMethodRegistry,
-};
-pub use ori_patterns::{ControlAction, EvalError, EvalResult};
 pub use output::{EvalErrorSnapshot, EvalOutput, ModuleEvalResult};
-pub use value::{FunctionValFn, FunctionValue, Heap, RangeValue, StructLayout, StructValue, Value};
+
+// Crate-internal re-exports: used by sibling modules (testing/, query/) but not
+// part of oric's external API.
+pub(crate) use ori_eval::{Environment, Mutability};
+pub(crate) use ori_patterns::{EvalError, EvalResult};
+pub(crate) use value::{FunctionValue, Value};
 
 #[cfg(test)]
 mod tests;

@@ -9,8 +9,8 @@
 //! - Optional children handling
 
 use ori_ir::ast::{
-    BinaryOp, BindingPattern, Expr, ExprKind, Function, GenericParamRange, MatchArm, MatchPattern,
-    Module, Param, ParamRange, Visibility,
+    BinaryOp, Expr, ExprKind, Function, GenericParamRange, MatchArm, MatchPattern, Module, Param,
+    ParamRange, Visibility,
 };
 use ori_ir::visitor::{walk_expr, Visitor};
 use ori_ir::{ExprArena, ExprId, Name, Span};
@@ -207,6 +207,7 @@ fn test_visit_module() {
     };
 
     let module = Module {
+        file_attr: None,
         imports: vec![],
         consts: vec![],
         functions: vec![func1, func2],
@@ -216,6 +217,8 @@ fn test_visit_module() {
         impls: vec![],
         extends: vec![],
         def_impls: vec![],
+        extension_imports: vec![],
+        extern_blocks: vec![],
     };
 
     let mut counter = ExprCounter { count: 0 };
@@ -249,6 +252,7 @@ fn test_visitor_collect_idents() {
 fn test_visit_empty_module() {
     let arena = ExprArena::new();
     let module = Module {
+        file_attr: None,
         imports: vec![],
         consts: vec![],
         functions: vec![],
@@ -258,6 +262,8 @@ fn test_visit_empty_module() {
         impls: vec![],
         extends: vec![],
         def_impls: vec![],
+        extension_imports: vec![],
+        extern_blocks: vec![],
     };
 
     let mut counter = ExprCounter { count: 0 };

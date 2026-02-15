@@ -90,7 +90,10 @@ ORI_LOG=ori_types=debug,ori_eval=debug ori run f.ori    # Multiple targets
 
 ## Testing
 - TDD for bugs: tests first, verify fail, fix, tests pass unchanged
-- Inline < 200 lines; separate if larger
+- Tests live in sibling `tests.rs` files (not inline): `#[cfg(test)] mod tests;` declaration in source, test body in `tests.rs`
+  - `foo.rs` → `foo/tests.rs`
+  - `mod.rs` in `bar/` → `bar/tests.rs`
+  - `lib.rs` / `main.rs` → `tests.rs` in same directory
 - `cargo t` (all), `cargo st` (spec), `./test-all.sh` (full)
 
 ## Key Patterns

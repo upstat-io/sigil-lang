@@ -192,13 +192,14 @@ impl<'a, I: StringLookup> WidthCalculator<'a, I> {
             } => if_width(self, *cond, *then_branch, *else_branch),
             ExprKind::Match { .. } => ALWAYS_STACKED,
             ExprKind::For {
+                label,
                 binding,
                 iter,
                 guard,
                 body,
                 is_yield,
-            } => for_width(self, *binding, *iter, *guard, *body, *is_yield),
-            ExprKind::Loop { body } => loop_width(self, *body),
+            } => for_width(self, *label, *binding, *iter, *guard, *body, *is_yield),
+            ExprKind::Loop { label, body } => loop_width(self, *label, *body),
             ExprKind::Block { stmts, result } => block_width(self, *stmts, *result),
 
             // Let binding - complex, kept inline
@@ -277,8 +278,8 @@ impl<'a, I: StringLookup> WidthCalculator<'a, I> {
             ExprKind::None => 4, // "None"
 
             // Control flow jumps - delegated to control module
-            ExprKind::Break(val) => break_width(self, *val),
-            ExprKind::Continue(val) => continue_width(self, *val),
+            ExprKind::Break { label, value } => break_width(self, *label, *value),
+            ExprKind::Continue { label, value } => continue_width(self, *label, *value),
 
             // Postfix operators - delegated to wrappers module
             ExprKind::Await(inner) => await_width(self, *inner),
@@ -321,7 +322,11 @@ impl<'a, I: StringLookup> WidthCalculator<'a, I> {
                     | FunctionExpKind::Print
                     | FunctionExpKind::Panic
                     | FunctionExpKind::Todo
-                    | FunctionExpKind::Unreachable => {
+                    | FunctionExpKind::Unreachable
+                    | FunctionExpKind::Channel
+                    | FunctionExpKind::ChannelIn
+                    | FunctionExpKind::ChannelOut
+                    | FunctionExpKind::ChannelAll => {
                         let props = self.arena.get_named_exprs(exp.props);
                         let props_w = self.width_of_named_exprs(props);
                         if props_w == ALWAYS_STACKED {

@@ -76,7 +76,10 @@ impl DerefMut for ScopedEvaluator<'_, '_> {
 /// through the Salsa database.
 pub struct Evaluator<'a> {
     /// The underlying portable interpreter.
-    pub(crate) interpreter: Interpreter<'a>,
+    ///
+    /// Restricted to this module tree — external code should use the
+    /// public `Evaluator` methods which add Salsa integration.
+    pub(super) interpreter: Interpreter<'a>,
     /// Database reference for Salsa-tracked file loading.
     db: &'a dyn Db,
     /// Whether the prelude has been auto-loaded.
@@ -127,7 +130,7 @@ impl<'a> Evaluator<'a> {
     ///
     /// Returns the `CanId` for a named root (function or test body) if canonical
     /// IR is available and the name exists in the roots list.
-    pub fn canon_root_for(&self, name: ori_ir::Name) -> Option<ori_ir::canon::CanId> {
+    pub fn canon_root_for(&self, name: Name) -> Option<ori_ir::canon::CanId> {
         self.interpreter.canon_root_for(name)
     }
 

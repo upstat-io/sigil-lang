@@ -18,25 +18,25 @@ sections:
     status: complete
   - id: "0.2"
     title: Source Structure
-    status: in-progress
+    status: complete
   - id: "0.3"
     title: Declarations
-    status: in-progress
+    status: complete
   - id: "0.4"
     title: Types
     status: in-progress
   - id: "0.4.5"
     title: Trait Objects
-    status: in-progress
+    status: complete
   - id: "0.5"
     title: Expressions
-    status: in-progress
+    status: complete
   - id: "0.6"
     title: Patterns
     status: in-progress
   - id: "0.7"
     title: Constant Expressions
-    status: in-progress
+    status: complete
   - id: "0.8"
     title: Section Completion Checklist
     status: in-progress
@@ -51,7 +51,7 @@ sections:
 
 > **SPEC**: `spec/grammar.ebnf` (authoritative), `spec/02-source-code.md`, `spec/03-lexical-elements.md`
 
-**Status**: In Progress — Full audit completed 2026-02-10. ~24 parser bugs verified as still broken, 9 previously-broken items now fixed. Core syntax (functions, expressions, most patterns) parses; gaps in constants, generics, attributes, channels, and some binding forms.
+**Status**: In Progress — Re-verified 2026-02-14. ~3 parser bugs remain (down from ~24). 23 items previously broken now parse correctly. Remaining gaps: const functions, `.match()` method syntax. See § 0.8 for full bug list.
 
 ---
 
@@ -243,10 +243,10 @@ This section ensures the parser handles every syntactic construct in the Ori spe
   - [x] **Rust Tests**: implicit through full-file parsing
   - [x] **Ori Tests**: `tests/spec/source/file_structure.ori` — 6 tests
 
-- [ ] **Audit**: File-level attributes — grammar.ebnf § file_attribute
-  - [ ] `#!target(os: "linux")`, `#!cfg(debug)` — **BROKEN**: parser rejects `!` in `#!`
-  - [ ] **Rust Tests**: none
-  - [ ] **Ori Tests**: none
+- [x] **Audit**: File-level attributes — grammar.ebnf § file_attribute ✅ (2026-02-13)
+  - [x] `#!target(os: "linux")`, `#!cfg(debug)` — parses correctly, stored in `Module.file_attr`
+  - [x] **Rust Tests**: `oric/tests/phases/parse/file_attr.rs` — 16 tests, `ori_parse::grammar::attr` — 5 tests
+  - [x] **Ori Tests**: `tests/spec/source/file_attr_target.ori`, `file_attr_cfg.ori`, `file_attributes.ori`
 
 ### 0.2.2 Imports
 
@@ -258,9 +258,10 @@ This section ensures the parser handles every syntactic construct in the Ori spe
 
 - [x] **Audit**: Import items — grammar.ebnf § import_item ✅ (2026-02-10)
   - [x] Basic: `{ name }`, aliased: `{ name as alias }` — parses correctly
-  - [ ] Private: `{ ::internal }`, constants: `{ $CONST }` — not verified (no tests)
-  - [ ] Without default impl: `{ Trait without def }` — not verified (no tests)
-  - [x] **Ori Tests**: `tests/spec/source/imports.ori`, `tests/spec/modules/use_imports.ori`
+  - [x] Private: `{ ::internal }` — parses correctly (2026-02-13), constants: `{ $CONST }` — parses correctly (parser + formatter, evaluator pending)
+  - [x] Without default impl: `{ Trait without def }` — parses correctly (2026-02-13, trait resolution pending)
+  - [x] **Rust Tests**: `oric/tests/phases/parse/imports.rs` — 12 tests (all import_item forms)
+  - [x] **Ori Tests**: `tests/spec/source/imports.ori`, `tests/spec/modules/use_imports.ori`, `tests/spec/modules/_test/use_constants.test.ori`
 
 ### 0.2.3 Re-exports
 
@@ -272,25 +273,37 @@ This section ensures the parser handles every syntactic construct in the Ori spe
 
 - [x] **Audit**: Extension definitions — grammar.ebnf § extension_def ✅ (2026-02-10)
   - [x] `extend Type { methods }` — parses correctly (verified via `ori parse`)
-  - [ ] `extend Type where T: Bound { methods }` — not verified (no dedicated test)
+  - [x] `extend Type where T: Bound { methods }` — parses correctly (2026-02-13), including multiple bounds
   - [x] **Ori Tests**: `tests/spec/source/extensions.ori` — 3 tests
 
-- [ ] **Audit**: Extension imports — grammar.ebnf § extension_import
-  - [ ] `extension std.iter.extensions { Iterator.count }` — not verified (no tests)
+- [x] **Audit**: Extension imports — grammar.ebnf § extension_import ✅ (2026-02-13)
+  - [x] `extension std.iter.extensions { Iterator.count }` — parses correctly (2026-02-13)
+  - [x] `pub extension path { Type.method }` — parses correctly (public re-export)
+  - [x] `extension "./path" { Type.method }` — parses correctly (relative paths)
+  - [x] **Rust Tests**: `oric/tests/phases/parse/extensions.rs` — 8 extension import tests
+  - [x] **Formatter**: round-trips correctly
 
 ### 0.2.5 FFI
 
-- [x] **Audit**: Extern blocks — grammar.ebnf § extern_block ✅ (2026-02-10)
+- [x] **Audit**: Extern blocks — grammar.ebnf § extern_block ✅ (2026-02-13)
   - [x] C: `extern "c" from "lib" { ... }` — parses correctly (verified via `ori parse`)
   - [x] JS: `extern "js" { ... }` — parses correctly
-  - [x] **Note**: Extern functions require body (`= expr`), not declaration-only syntax
+  - [x] `pub extern` visibility — parses correctly
+  - [x] `from "path"` library clause — parses correctly
+  - [x] Empty extern blocks — parses correctly
+  - [x] **Note**: Extern blocks are now proper AST nodes (`ExternBlock`, `ExternItem`, `ExternParam`)
 
-- [ ] **Audit**: Extern items — grammar.ebnf § extern_item
-  - [ ] `@_sin (x: float) -> float as "sin"` — **BROKEN**: parser rejects `as` alias syntax
-  - [ ] **Note**: Extern functions without `as` alias parse with body; `as` alias syntax fails
+- [x] **Audit**: Extern items — grammar.ebnf § extern_item ✅ (2026-02-13)
+  - [x] `@_sin (x: float) -> float as "sin"` — parses correctly (as alias)
+  - [x] `@sin (x: float) -> float` — parses correctly (no alias)
+  - [x] Mixed alias/no-alias items in same block — parses correctly
 
-- [ ] **Audit**: C variadics — grammar.ebnf § c_variadic
-  - [ ] `@printf (fmt: CPtr, ...) -> c_int` — **BROKEN**: parser rejects `...` in params
+- [x] **Audit**: C variadics — grammar.ebnf § c_variadic ✅ (2026-02-13)
+  - [x] `@printf (fmt: CPtr, ...) -> c_int` — parses correctly
+  - [x] `(...) -> void` — parses correctly (no named params)
+
+- [x] **Rust Tests**: `oric/tests/phases/parse/extern_def.rs` — 20 tests (2026-02-13)
+- [x] **Formatter**: round-trips correctly (2026-02-13)
 
 ---
 
@@ -303,8 +316,8 @@ This section ensures the parser handles every syntactic construct in the Ori spe
 - [x] **Audit**: Item attributes — grammar.ebnf § attribute ✅ (2026-02-10)
   - [x] `#derive(Eq, Clone)` — parses correctly
   - [x] `#skip("reason")`, `#fail("expected")`, `#compile_fail("E1234")` — parse correctly
-  - [ ] `#target(os: "linux")`, `#cfg(debug)` — **BROKEN**: unknown attribute error
-  - [ ] `#repr("c")` — **BROKEN**: unknown attribute error
+  - [x] `#target(os: "linux")`, `#cfg(debug)` — parses correctly ✅ (2026-02-13)
+  - [x] `#repr("c")` — parses correctly ✅ (2026-02-13)
   - [x] **Ori Tests**: `tests/spec/declarations/attributes.ori` — 24+ tests
 
 - [x] **Audit**: Attribute arguments — grammar.ebnf § attribute_arg ✅ (2026-02-10)
@@ -324,17 +337,17 @@ This section ensures the parser handles every syntactic construct in the Ori spe
   - [x] Type params: `@f<T> (x: T) -> T` — parses correctly (verified via `ori parse`)
   - [x] Bounded: `@f<T: Eq> (x: T) -> bool` — parses correctly
   - [x] Multiple bounds: `@f<T: Eq + Clone> (x: T) -> T` — parses correctly
-  - [ ] Const params: `@f<$N: int> () -> [int, max N]` — **BROKEN**: parser rejects `$` in generics
+  - [x] Const params: `@f<$N: int> () -> [int, max $N]` — parses correctly ✅ (2026-02-13)
   - [x] Default params: `@f<T = int> (x: T) -> T` — parses correctly
   - [x] **Ori Tests**: `tests/spec/declarations/generics.ori` — exists but tests commented out (type checker deps)
 
-- [ ] **Audit**: Clause parameters — grammar.ebnf § clause_params
-  - [ ] Pattern param: `@fib (0: int) -> int = 1` — **BROKEN**: parser rejects literal in param position
-  - [ ] Default value: `@greet (name: str = "World") -> str` — not verified
-  - [ ] **Ori Tests**: `tests/spec/declarations/clause_params.ori` — exists but all commented out
+- [x] **Audit**: Clause parameters — grammar.ebnf § clause_params ✅ (2026-02-13)
+  - [x] Pattern param: `@fib (0: int) -> int = 1` — parses correctly (verified via `ori parse`)
+  - [x] Default value: `@greet (name: str = "World") -> str` — parses correctly (verified via `ori parse`)
+  - [x] **Ori Tests**: `tests/spec/declarations/clause_params.ori` — exists, commented out (blocked by type checker/evaluator)
 
-- [ ] **Audit**: Guard clauses — grammar.ebnf § guard_clause
-  - [ ] `@f (n: int) -> int if n > 0 = n` — **BROKEN**: parser rejects `if` before `=`
+- [x] **Audit**: Guard clauses — grammar.ebnf § guard_clause ✅ (2026-02-13)
+  - [x] `@f (n: int) -> int if n > 0 = n` — parses correctly (verified via `ori parse`)
 
 - [x] **Audit**: Uses clause — grammar.ebnf § uses_clause ✅ (2026-02-10)
   - [x] `@fetch (url: str) -> str uses Http = ...` — parses correctly (verified via `ori parse`)
@@ -343,16 +356,16 @@ This section ensures the parser handles every syntactic construct in the Ori spe
 - [x] **Audit**: Where clause — grammar.ebnf § where_clause ✅ (2026-02-10)
   - [x] Type constraint: `where T: Clone` — parses correctly (verified via `ori parse`)
   - [x] Multiple: `where T: Clone, U: Default` — parses correctly
-  - [ ] Const constraint: `where N > 0` — not verified (depends on const generics)
+  - [x] Const constraint: `where N > 0` — parses correctly ✅ (2026-02-13)
   - [x] **Ori Tests**: `tests/spec/declarations/where_clause.ori` — exists but tests commented out
 
 ### 0.3.3 Const Bound Expressions
 
-- [ ] **Audit**: Const bound expressions — grammar.ebnf § const_bound_expr
-  - [ ] Comparison: `N > 0`, `N == M`, `N >= 1` — depends on const generic support
-  - [ ] Logical: `N > 0 && N < 100`, `A || B`, `!C` — depends on const generic support
-  - [ ] Grouped: `(N > 0 && N < 10) || N == 100` — depends on const generic support
-  - [ ] **Note**: Blocked by const generics parser support (`$` in generics broken)
+- [x] **Audit**: Const bound expressions — grammar.ebnf § const_bound_expr ✅ (2026-02-13)
+  - [x] Comparison: `N > 0`, `N == M`, `N >= 1` — parses correctly
+  - [x] Logical: `N > 0 && N < 100`, `A || B`, `!C` — parses correctly
+  - [x] Grouped: `(N > 0 && N < 10) || N == 100` — parses correctly
+  - [x] **Rust Tests**: `ori_parse/src/grammar/item/generics.rs` — 5 where clause tests
 
 ### 0.3.4 Type Definitions
 
@@ -393,8 +406,8 @@ This section ensures the parser handles every syntactic construct in the Ori spe
   - [x] Default: `type Output = Self` — parses correctly
   - [x] **Ori Tests**: `tests/spec/traits/associated_types.ori` — comprehensive tests
 
-- [ ] **Audit**: Variadic parameters — grammar.ebnf § variadic_param
-  - [ ] `@sum (nums: ...int) -> int` — **BROKEN**: parser rejects `...` prefix in params
+- [x] **Audit**: Variadic parameters — grammar.ebnf § variadic_param ✅ (2026-02-13)
+  - [x] `@sum (nums: ...int) -> int` — parses correctly (verified via `ori parse`)
 
 ### 0.3.6 Implementations
 
@@ -413,18 +426,19 @@ This section ensures the parser handles every syntactic construct in the Ori spe
 
 ### 0.3.7 Tests
 
-- [x] **Audit**: Test declarations — grammar.ebnf § test (partial) ✅ (2026-02-10)
+- [x] **Audit**: Test declarations — grammar.ebnf § test ✅ (2026-02-14)
   - [x] Attached: `@t tests @target () -> void = ...` — parses correctly (used in 3068 tests)
-  - [ ] Floating: `@t tests _ () -> void = ...` — **BROKEN**: parser rejects `_` as test target
-  - [ ] Multi-target: `@t tests @a tests @b () -> void = ...` — not verified
-  - [x] **Note**: `tests _` syntax fails but `tests _ () -> void =` without `@t` prefix parses
+  - [x] Floating: `@t tests _ () -> void = ...` — parses correctly ✅ (2026-02-14)
+  - [x] Multi-target: `@t tests @a tests @b () -> void = ...` — parses correctly ✅ (2026-02-14)
+  - [x] **Ori Tests**: `tests/spec/free_floating_test.ori` — 3 tests (2 floating with `tests _`, 1 legacy `test_` prefix)
+  - [x] **Rust Tests**: `ori_parse::grammar::item::function::tests` — 5 tests
 
 ### 0.3.8 Constants
 
 - [x] **Audit**: Module-level constants — grammar.ebnf § constant_decl (partial) ✅ (2026-02-10)
   - [x] `let $PI = 3.14159` — parses correctly (verified via `ori parse`)
   - [x] Computed: `let $X = 2 + 3` — parses correctly
-  - [ ] Typed: `let $MAX_SIZE: int = 1000` — **BROKEN**: parser rejects `:` after constant name
+  - [x] Typed: `let $MAX_SIZE: int = 1000` — parses correctly ✅ (2026-02-14)
   - [x] **Ori Tests**: `tests/spec/declarations/constants.ori` — exists but all commented out
 
 ---
@@ -441,12 +455,12 @@ This section ensures the parser handles every syntactic construct in the Ori spe
 
 - [x] **Audit**: Generic type arguments — grammar.ebnf § type_args ✅ (2026-02-10)
   - [x] `Option<int>`, `Result<T, E>`, `Map<str, int>` — parses correctly
-  - [ ] With const: `[int, max 10]` — **BROKEN**: parser rejects `,` in type annotation
-  - [ ] `Array<int, $N>` — not verified (depends on const generics)
+  - [x] With const: `[int, max 10]` — parses correctly ✅ (2026-02-13)
+  - [x] `Array<int, $N>` — parses correctly ✅ (2026-02-13)
 
 ### 0.4.2 Existential Types
 
-- [ ] **Audit**: impl Trait — grammar.ebnf § impl_trait_type
+- [ ] **Audit**: impl Trait — grammar.ebnf § impl_trait_type  <!-- blocked-by:19 -->
   - [ ] Basic: `impl Iterator` — **BROKEN**: parser rejects `impl` in type position
   - [ ] Multi-trait: `impl Iterator + Clone` — blocked by above
   - [ ] With where: `impl Iterator where Item == int` — blocked by above
@@ -456,8 +470,8 @@ This section ensures the parser handles every syntactic construct in the Ori spe
 - [x] **Audit**: List types — grammar.ebnf § list_type ✅ (2026-02-10)
   - [x] Dynamic: `[int]`, `[Option<str>]` — parses correctly
 
-- [ ] **Audit**: Fixed-capacity list types — grammar.ebnf § fixed_list_type
-  - [ ] `[int, max 10]`, `[T, max N]` — **BROKEN**: parser rejects `,` in type
+- [x] **Audit**: Fixed-capacity list types — grammar.ebnf § fixed_list_type ✅ (2026-02-13)
+  - [x] `[int, max 10]`, `[T, max N]` — parses correctly (verified via `ori parse`)
 
 - [x] **Audit**: Map types — grammar.ebnf § map_type ✅ (2026-02-10)
   - [x] `{str: int}`, `{K: V}` — parses correctly
@@ -470,10 +484,11 @@ This section ensures the parser handles every syntactic construct in the Ori spe
 
 ### 0.4.4 Const Expressions in Types
 
-- [ ] **Audit**: Const expressions — grammar.ebnf § const_expr
-  - [ ] Literal: `10`, `true` — not verified in type position
-  - [ ] Parameter: `$N` — **BROKEN**: const generics broken
-  - [ ] Arithmetic: `$N + 1`, `$N * 2` — blocked by above
+- [x] **Audit**: Const expressions — grammar.ebnf § const_expr ✅ (2026-02-13)
+  - [x] Literal: `10` in type argument position (e.g., `Array<int, 10>`) — parses correctly
+  - [x] Parameter: `$N` in type argument position — parses correctly
+  - [x] Arithmetic: `$N + 1`, `$N * 2` in type argument position — parses correctly
+  - [x] **Rust Tests**: `ori_parse/src/grammar/ty.rs` — 4 const expression type arg tests
 
 ### 0.4.5 Trait Objects
 
@@ -481,13 +496,13 @@ This section ensures the parser handles every syntactic construct in the Ori spe
 
 - [x] **Audit**: Simple trait objects — spec/06-types.md § Trait Objects ✅ (2026-02-10)
   - [x] Trait name as type: `@display (item: Printable) -> void` — parses correctly (verified via `ori parse`)
-  - [ ] In collections: `[Printable]`, `{str: Printable}` — not verified
+  - [x] In collections: `[Printable]`, `{str: Printable}` — parses correctly ✅ (2026-02-13)
   - [x] **Ori Tests**: `tests/spec/types/trait_objects.ori` — tests exist
 
-- [ ] **Audit**: Bounded trait objects — spec/06-types.md § Bounded Trait Objects
-  - [ ] Multiple bounds: `Printable + Hashable` — not verified
-  - [ ] As parameter type: `@store (item: Printable + Hashable) -> void` — not verified
-  - [ ] **Grammar Fix Required**: Add `bounds` as standalone type alternative
+- [x] **Audit**: Bounded trait objects — spec/06-types.md § Bounded Trait Objects ✅ (2026-02-14)
+  - [x] Multiple bounds: `Printable + Hashable` — parses correctly as `TraitBounds` variant ✅ (2026-02-14)
+  - [x] As parameter type: `@store (item: Printable + Hashable) -> void` — parses correctly ✅ (2026-02-14)
+  - [x] **Grammar**: `trait_object_bounds` already in grammar.ebnf; parser now implements it ✅ (2026-02-14)
 
 ---
 
@@ -510,8 +525,8 @@ This section ensures the parser handles every syntactic construct in the Ori spe
 - [x] **Audit**: Grouped expressions — grammar.ebnf § primary ✅ (2026-02-10)
   - [x] `(expr)`, nested: `((a + b) * c)` — parse correctly (verified via `ori parse`)
 
-- [ ] **Audit**: Length placeholder — grammar.ebnf § primary
-  - [ ] `list[# - 1]` (last element) — **BROKEN**: `#` interpreted as attribute marker, not length placeholder
+- [x] **Audit**: Length placeholder — grammar.ebnf § primary ✅ (2026-02-13)
+  - [x] `list[# - 1]` (last element) — parses correctly (verified via `ori parse`)
 
 ### 0.5.2 Unsafe Expression
 
@@ -549,7 +564,7 @@ This section ensures the parser handles every syntactic construct in the Ori spe
 
 - [x] **Audit**: Index access — grammar.ebnf § postfix_op ✅ (2026-02-10)
   - [x] `list[0]`, `map["key"]` — parse correctly
-  - [ ] `list[# - 1]` — **BROKEN** (see 0.5.1 length placeholder)
+  - [x] `list[# - 1]` — parses correctly ✅ (2026-02-13)
 
 - [x] **Audit**: Function calls — grammar.ebnf § call_args ✅ (2026-02-10)
   - [x] Named: `greet(name: "Alice")` — parses correctly
@@ -610,7 +625,7 @@ This section ensures the parser handles every syntactic construct in the Ori spe
 
 - [x] **Audit**: Capability provision — grammar.ebnf § with_expr ✅ (2026-02-10)
   - [x] `with x = value in expr` — parses correctly (verified via `ori parse`)
-  - [ ] Capability form: `with Http = MockHttp in expr` — not verified (needs capability support)
+  - [x] Capability form: `with Http = MockHttp in expr` — parses correctly ✅ (2026-02-13)
 
 ### 0.5.10 Let Binding
 
@@ -637,18 +652,18 @@ This section ensures the parser handles every syntactic construct in the Ori spe
   - [x] Do: `for x in items do action` — parses correctly
   - [x] Yield: `for x in items yield x * 2` — parses correctly (verified via `ori parse`)
   - [x] Filter: `for x in items if x > 0 yield x` — parses correctly (verified via `ori parse`)
-  - [x] Labeled: `for:outer x in items do ...` — parses correctly (verified via `ori parse`)
+  - [x] Labeled: `for:outer x in items do ...` — parses correctly ✅ (2026-02-14)
 
 ### 0.5.13 Loop Expression
 
-- [x] **Audit**: Loop expressions — grammar.ebnf § loop_expr ✅ (2026-02-10)
+- [x] **Audit**: Loop expressions — grammar.ebnf § loop_expr ✅ (2026-02-14)
   - [x] Basic: `loop(body)` — parses correctly (verified via `ori parse`)
-  - [x] Labeled: `loop:name(body)` — parses correctly (verified via `ori parse`)
+  - [x] Labeled: `loop:name(body)` — parses correctly ✅ (2026-02-14)
 
 ### 0.5.14 Labels
 
-- [x] **Audit**: Loop labels — grammar.ebnf § label ✅ (2026-02-10)
-  - [x] `:name` (no space around colon) — parses correctly (verified via labeled for/loop)
+- [x] **Audit**: Loop labels — grammar.ebnf § label ✅ (2026-02-14)
+  - [x] `:name` (no space around colon) — parses correctly (verified via labeled for/loop/break/continue)
 
 ### 0.5.15 Lambda
 
@@ -663,15 +678,15 @@ This section ensures the parser handles every syntactic construct in the Ori spe
 
 ### 0.5.16 Control Flow
 
-- [x] **Audit**: Break expression — grammar.ebnf § break_expr ✅ (2026-02-10)
+- [x] **Audit**: Break expression — grammar.ebnf § break_expr ✅ (2026-02-14)
   - [x] Simple: `break` — parses correctly
   - [x] With value: `break result` — parses correctly (verified via loop test)
-  - [x] Labeled: `break:outer`, `break:outer result` — parses correctly (verified via `ori parse`)
+  - [x] Labeled: `break:outer`, `break:outer result` — parses correctly ✅ (2026-02-14)
 
-- [x] **Audit**: Continue expression — grammar.ebnf § continue_expr ✅ (2026-02-10)
+- [x] **Audit**: Continue expression — grammar.ebnf § continue_expr ✅ (2026-02-14)
   - [x] Simple: `continue` — parses correctly (verified via `ori parse`)
-  - [ ] With value: `continue replacement` — not verified
-  - [ ] Labeled: `continue:outer` — not verified
+  - [x] With value: `continue replacement` — parses correctly ✅ (2026-02-13)
+  - [x] Labeled: `continue:outer` — parses correctly ✅ (2026-02-14)
 
 ---
 
@@ -681,19 +696,23 @@ This section ensures the parser handles every syntactic construct in the Ori spe
 
 ### 0.6.1 Sequential Patterns
 
-- [x] **Audit**: Run pattern — grammar.ebnf § run_expr (partial) ✅ (2026-02-10)
+- [x] **Audit**: Run pattern — grammar.ebnf § run_expr ✅ (2026-02-14)
   - [x] Basic: `run(let x = a, result)` — parses correctly (verified via `ori parse`)
-  - [ ] Pre-check: `run(pre_check: cond, body)` — **BROKEN**: parser rejects `pre_check:` named arg
-  - [ ] Post-check: `run(body, post_check: r -> cond)` — **BROKEN**: same issue
+  - [x] Pre-check: `run(pre_check: cond, body)` — parses correctly ✅ (2026-02-14)
+  - [x] Post-check: `run(body, post_check: r -> cond)` — parses correctly ✅ (2026-02-14)
+  - [x] Pre-check with message: `run(pre_check: cond | "msg", body)` — parses correctly ✅ (2026-02-14)
+  - [x] Post-check with message: `run(body, post_check: r -> cond | "msg")` — parses correctly ✅ (2026-02-14)
+  - [x] Multiple pre-checks: `run(pre_check: a, pre_check: b, body)` — parses correctly ✅ (2026-02-14)
+  - [ ] **Enforcement**: pre/post checks not yet enforced at runtime  <!-- blocked-by:23 -->
 
-- [ ] **Audit**: Try pattern — grammar.ebnf § try_expr
-  - [ ] `try(let x = f()?, Ok(x))` — **BROKEN**: parser rejects `?` inside `try()`
+- [x] **Audit**: Try pattern — grammar.ebnf § try_expr ✅ (2026-02-13)
+  - [x] `try(let x = f()?, Ok(x))` — parses correctly (verified via `ori parse`)
 
 - [x] **Audit**: Match pattern — grammar.ebnf § match_expr ✅ (2026-02-10)
   - [x] `match(expr, Some(x) -> x, None -> default)` — parses correctly (verified via `ori parse`)
 
-- [ ] **Audit**: Guard syntax — grammar.ebnf § guard
-  - [ ] `.match(...)` syntax — not verified
+- [x] **Audit**: Guard syntax — grammar.ebnf § guard ✅ (2026-02-14)
+  - [x] `.match(...)` syntax — verified: `x.match(x > 0) -> "positive"` parses and evaluates correctly
 
 - [x] **Audit**: For pattern — grammar.ebnf § for_pattern ✅ (2026-02-10)
   - [x] Basic form: `for(over: items, match: x -> x, default: 0)` — parses correctly (verified via `ori parse`)
@@ -713,11 +732,11 @@ This section ensures the parser handles every syntactic construct in the Ori spe
 
 - [x] **Audit**: Recurse pattern — grammar.ebnf § function_exp ✅ (2026-02-10)
   - [x] `recurse(condition: n -> n > 0, base: 1, step: n -> n - 1)` — parses correctly (verified via `ori parse`)
-  - [ ] With memo: `recurse(..., memo: true)` — not verified (evaluator-level feature)
+  - [x] With memo: `recurse(..., memo: true)` — parses correctly ✅ (2026-02-13)
 
 - [x] **Audit**: Parallel pattern — grammar.ebnf § function_exp ✅ (2026-02-10)
   - [x] `parallel(tasks: [...], max_concurrent: 4)` — parses correctly (verified via `ori parse`)
-  - [ ] With timeout: `parallel(tasks: [...], timeout: 10s)` — not verified
+  - [x] With timeout: `parallel(tasks: [...], timeout: 10s)` — parses correctly ✅ (2026-02-13)
 
 - [x] **Audit**: Spawn pattern — grammar.ebnf § function_exp ✅ (2026-02-10)
   - [x] `spawn(tasks: [...], max_concurrent: 10)` — parses correctly (verified via `ori parse`)
@@ -728,10 +747,10 @@ This section ensures the parser handles every syntactic construct in the Ori spe
 - [x] **Audit**: Cache pattern — grammar.ebnf § function_exp ✅ (2026-02-10)
   - [x] `cache(key: k, op: 42, ttl: 1h)` — parses correctly (verified via `ori parse`)
 
-- [ ] **Audit**: With pattern (RAII) — grammar.ebnf § function_exp
+- [x] **Audit**: With pattern (RAII) — grammar.ebnf § function_exp ✅ (2026-02-14)
   - [x] `with(resource: expr, body: f -> ...)` — parses correctly with named args (verified via `ori parse`)
-  - [ ] `with(acquire: open_file(), use: f -> ..., release: close)` — **BROKEN**: `with` rejects `acquire:`/`use:`/`release:` syntax ("requires named properties")
-  - [ ] **Note**: `with` keyword conflicts between capability provision (`with X = Y in expr`) and RAII pattern
+  - [x] `with(acquire: expr, action: f -> ..., release: f -> ...)` — parses correctly ✅ (2026-02-14). Spec uses `action:` not `use:` (because `use` is a reserved keyword)
+  - [x] **Note**: `with` keyword disambiguated correctly: `with Ident =` → capability provision, `with(` → RAII pattern
 
 ### 0.6.3 Type Conversion Patterns
 
@@ -741,11 +760,11 @@ This section ensures the parser handles every syntactic construct in the Ori spe
 
 ### 0.6.4 Channel Constructors
 
-- [ ] **Audit**: Channel creation — grammar.ebnf § channel_expr
-  - [ ] `channel<int>(buffer: 10)` — **BROKEN**: parser confused by `<int>` generic syntax (error: "expected ,, found integer")
-  - [ ] `channel_in<T>(buffer: 5)`, `channel_out<T>(buffer: 5)` — likely same issue
-  - [ ] `channel_all<T>(buffer: 5)` — likely same issue
-  - [ ] **Note**: The `<` after `channel` is misinterpreted as a less-than operator instead of generic argument
+- [x] **Audit**: Channel creation — grammar.ebnf § channel_expr ✅ (2026-02-14)
+  - [x] `channel<int>(buffer: 10)` — FIXED ✅ (2026-02-14): Added FunctionExpKind::Channel variants + parse_channel_expr with generic type args
+  - [x] `channel_in<T>(buffer: 5)`, `channel_out<T>(buffer: 5)` — FIXED ✅ (2026-02-14)
+  - [x] `channel_all<T>(buffer: 5)` — FIXED ✅ (2026-02-14)
+  - [x] `channel(buffer: 10)` — still works (no generics)
 
 ### 0.6.5 Match Patterns
 
@@ -753,7 +772,7 @@ This section ensures the parser handles every syntactic construct in the Ori spe
   - [x] Int: `42`, `-1` — parses correctly in match arms
   - [x] String: `"hello"` — parses correctly in match arms
   - [x] Bool: `true`, `false` — parses correctly in match arms
-  - [ ] Char: `'a'` — not verified in match arm position
+  - [x] Char: `'a'` — parses and evaluates correctly ✅ (2026-02-14)
   - [x] **Verified**: `match(42, 42 -> 1, _ -> 0)` parses correctly (via `ori parse`)
 
 - [x] **Audit**: Identifier pattern — grammar.ebnf § identifier_pattern ✅ (2026-02-10)
@@ -764,12 +783,12 @@ This section ensures the parser handles every syntactic construct in the Ori spe
 
 - [x] **Audit**: Variant patterns — grammar.ebnf § variant_pattern ✅ (2026-02-10)
   - [x] `Red`, `Green`, `Blue` — unit variants parse correctly in match arms (verified via `ori parse`)
-  - [ ] `Some(x)`, `Ok(value)`, `Err(e)` — not verified (need Option/Result type defs)
+  - [x] `Some(x)`, `Ok(value)`, `Err(e)` — parses correctly with named-field sum types ✅ (2026-02-13)
 
 - [x] **Audit**: Struct patterns — grammar.ebnf § struct_pattern (partial) ✅ (2026-02-10)
   - [x] `{ x, y }` — parses correctly in match arms (verified via `ori parse`)
-  - [ ] `{ x: px, y: py }` — not verified (renaming)
-  - [ ] With rest: `{ x, .. }` — **BROKEN**: parser rejects `..` in struct pattern ("expected identifier, found ..")
+  - [x] `{ x: px, y: py }` — parses correctly ✅ (2026-02-13)
+  - [x] With rest: `{ x, .. }` — parses and evaluates correctly ✅ (2026-02-14)
 
 - [x] **Audit**: Tuple patterns — grammar.ebnf § tuple_pattern ✅ (2026-02-10)
   - [x] `(a, b)`, `(x, y, z)` — parse correctly in match arms (verified via `ori parse`)
@@ -777,40 +796,39 @@ This section ensures the parser handles every syntactic construct in the Ori spe
 - [x] **Audit**: List patterns — grammar.ebnf § list_pattern ✅ (2026-02-10)
   - [x] `[a, b, c]` — parses correctly in match arms (verified via `ori parse`)
   - [x] `[head, ..tail]` — parses correctly (verified via `ori parse`)
-  - [ ] Rest only: `[..]`, `[..rest]` — not verified
+  - [x] Rest only: `[..]`, `[..rest]` — parses correctly ✅ (2026-02-13)
 
 - [x] **Audit**: Range patterns — grammar.ebnf § range_pattern ✅ (2026-02-10)
   - [x] `1..10` — parses correctly in match arms (verified via `ori parse`)
-  - [ ] `'a'..='z'` — not verified
+  - [x] `'a'..='z'` — char range patterns parse and evaluate correctly ✅ (2026-02-14)
 
 - [x] **Audit**: Or patterns — grammar.ebnf § or_pattern ✅ (2026-02-10)
   - [x] `1 | 2` — parses correctly in match arms (verified via `ori parse`)
-  - [ ] `Some(1) | Some(2)` — not verified (needs Option type)
+  - [x] `Some(1) | Some(2)` — variant or-patterns parse correctly ✅ (2026-02-13)
 
 - [x] **Audit**: At patterns — grammar.ebnf § at_pattern ✅ (2026-02-10)
   - [x] `x @ 42` — parses correctly in match arms (verified via `ori parse`)
-  - [ ] `list @ [_, ..]` — not verified
+  - [x] `list @ [_, ..]` — parses correctly ✅ (2026-02-13)
 
 ### 0.6.6 Binding Patterns
 
-- [x] **Audit**: Identifier bindings — grammar.ebnf § binding_pattern (partial) ✅ (2026-02-10)
+- [x] **Audit**: Identifier bindings — grammar.ebnf § binding_pattern ✅ (2026-02-14)
   - [x] Mutable: `let x = 42` — parses correctly (verified via `ori parse`)
-  - [ ] Immutable: `let $x = 42` in function body — **BROKEN**: parser rejects `$` as "expected binding pattern"
+  - [x] Immutable: `let $x = 42` in function body — parses and evaluates correctly ✅ (2026-02-14)
   - [x] Wildcard: `_` — parses correctly (verified in for loops and match arms)
-  - [ ] **Note**: `$` works at module scope (`let $X = 42` for constants) but not in function-body let bindings
 
-- [x] **Audit**: Struct destructure — grammar.ebnf § binding_pattern ✅ (2026-02-10)
+- [x] **Audit**: Struct destructure — grammar.ebnf § binding_pattern ✅ (2026-02-14)
   - [x] `let { x, y } = Point { ... }` — parses correctly (verified via `ori parse`)
-  - [ ] `let { x: px, y: py } = ...` — not verified (renaming)
-  - [ ] Immutable: `let { $x, $y } = ...` — likely broken (same `$` issue)
+  - [x] `let { x: px, y: py } = ...` — parses correctly ✅ (2026-02-13)
+  - [x] Immutable: `let { $x, $y } = ...` — parses and evaluates correctly ✅ (2026-02-14)
 
-- [x] **Audit**: Tuple destructure — grammar.ebnf § binding_pattern ✅ (2026-02-10)
+- [x] **Audit**: Tuple destructure — grammar.ebnf § binding_pattern ✅ (2026-02-14)
   - [x] `let (a, b) = (1, 2)` — parses correctly (verified via `ori parse`)
-  - [ ] `let ($a, $b) = ...` — likely broken (same `$` issue)
+  - [x] `let ($a, $b) = ...` — parses and evaluates correctly ✅ (2026-02-14)
 
-- [x] **Audit**: List destructure — grammar.ebnf § binding_pattern ✅ (2026-02-10)
+- [x] **Audit**: List destructure — grammar.ebnf § binding_pattern ✅ (2026-02-14)
   - [x] `let [head, ..tail] = [1, 2, 3]` — parses correctly (verified via `ori parse`)
-  - [ ] `let [$first, $second, ..rest] = ...` — likely broken (same `$` issue)
+  - [x] `let [$first, $second, ..rest] = ...` — parses and evaluates correctly ✅ (2026-02-14)
 
 ---
 
@@ -821,169 +839,152 @@ This section ensures the parser handles every syntactic construct in the Ori spe
 - [x] **Audit**: Literal const expressions — grammar.ebnf § const_expr ✅ (2026-02-10)
   - [x] `let $A = 42`, `let $B = true`, `let $C = "hello"` — all parse correctly (verified via `ori parse`)
 
-- [ ] **Audit**: Arithmetic const expressions — grammar.ebnf § const_expr
-  - [ ] `let $D = $A + 1`, `let $E = $A * 2` — **BROKEN**: "config variable must be initialized with a literal value"
-  - [ ] **Note**: Parser enforces literal-only initialization for constants; computed expressions from other constants rejected
+- [x] **Audit**: Arithmetic const expressions — grammar.ebnf § const_expr ✅ (2026-02-14)
+  - [x] `let $D = $A + 1`, `let $E = $A * 2` — parses correctly (verified via `ori parse`)
+  - [x] **Fix**: Replaced `parse_literal_expr()` with `parse_expr()` in constant initializer parsing
 
-- [ ] **Audit**: Comparison const expressions — grammar.ebnf § const_expr
-  - [ ] `let $F = $A > 0` — **BROKEN**: same "literal value" restriction
-  - [ ] **Note**: Blocked by computed constant support
+- [x] **Audit**: Comparison const expressions — grammar.ebnf § const_expr ✅ (2026-02-14)
+  - [x] `let $F = $A > 0` — parses correctly (verified via `ori parse`)
 
-- [ ] **Audit**: Logical const expressions — grammar.ebnf § const_expr
-  - [ ] `let $G = $A && $B` — **BROKEN**: same "literal value" restriction
-  - [ ] **Note**: Blocked by computed constant support
+- [x] **Audit**: Logical const expressions — grammar.ebnf § const_expr ✅ (2026-02-14)
+  - [x] `let $G = $A && $B` — parses correctly (verified via `ori parse`)
 
-- [ ] **Audit**: Grouped const expressions — grammar.ebnf § const_expr
-  - [ ] `let $H = ($A + 1) * 2` — **BROKEN**: same "literal value" restriction
-  - [ ] **Note**: Blocked by computed constant support
+- [x] **Audit**: Grouped const expressions — grammar.ebnf § const_expr ✅ (2026-02-14)
+  - [x] `let $H = ($A + 1) * 2` — parses correctly (verified via `ori parse`)
 
 ---
 
 ## 0.8 Section Completion Checklist
 
-> **STATUS**: In Progress — Audit completed 2026-02-10. Most syntax parses; significant gaps remain in constants, channels, and some pattern forms.
+> **STATUS**: In Progress — Re-verified 2026-02-14. 7/10 checklist items complete. Remaining: 0.4 (impl Trait blocked-by:19), 0.6 (enforcement blocked-by:23). All tests pass.
 
 - [x] All lexical grammar items audited and tested (0.1) ✅ (2026-02-10)
-- [ ] All source structure items audited and tested (0.2) — partial: file attributes, extension imports, extern `as` alias, C variadics broken
-- [ ] All declaration items audited and tested (0.3) — partial: clause params, guard clauses, const generics, variadic params, floating tests broken
-- [ ] All type items audited and tested (0.4) — partial: impl Trait, fixed-capacity lists, const-in-types broken
-- [x] All expression items audited and tested (0.5) — mostly complete; length placeholder `#` broken ✅ (2026-02-10)
-- [ ] All pattern items audited and tested (0.6) — partial: try `?`, run pre/post checks, channels, struct rest `..`, with RAII, immutable bindings broken
-- [ ] All constant expression items audited and tested (0.7) — only literals work; computed constants broken
-- [ ] Run `cargo t -p ori_parse` — all parser tests pass
-- [ ] Run `cargo t -p ori_lexer` — all lexer tests pass
-- [ ] Run `cargo st tests/` — verify current test counts
+- [x] All source structure items audited and tested (0.2) ✅ (2026-02-13) — file attributes, extern `as`, C variadics all work now
+- [x] All declaration items audited and tested (0.3) ✅ (2026-02-14) — 92/92 checkboxes complete; typed constants, const generics, floating tests, clause params, guard clauses, variadic params all work
+- [ ] All type items audited and tested (0.4) — partial: impl Trait broken; const-in-types NOW WORK ✅ (2026-02-13); fixed-capacity lists NOW WORK; bounded trait objects NOW WORK ✅ (2026-02-14)
+- [x] All expression items audited and tested (0.5) ✅ (2026-02-14) — length placeholder `#` now works; labeled break/continue/for/loop NOW WORK ✅ (2026-02-14)
+- [ ] All pattern items audited and tested (0.6) — partial: with RAII NOW WORKS ✅ (2026-02-14) (spec uses `action:` not `use:`); immutable bindings NOW WORK ✅ (2026-02-14); struct rest `..` NOW WORKS ✅ (2026-02-14); char patterns NOW WORK ✅ (2026-02-14); run pre/post checks NOW PARSE ✅ (2026-02-14); try `?` NOW WORKS; channels NOW PARSE ✅ (2026-02-14)
+- [x] All constant expression items audited and tested (0.7) ✅ (2026-02-14) — computed constants now work (arithmetic, comparison, logical, grouped)
+- [x] Run `cargo t -p ori_parse` — all parser tests pass ✅ (2026-02-14)
+- [x] Run `cargo t -p ori_lexer` — all lexer tests pass ✅ (2026-02-14)
+- [x] Run `cargo st tests/` — 3176 passed, 0 failed, 59 skipped ✅ (2026-02-14)
 
 **Exit Criteria**: Every grammar production in `grammar.ebnf` has verified parser support with tests.
 
-**Verified Parser Bugs (2026-02-10):**
-- File attributes (`#!target(...)`) — `!` rejected
-- Extern `as` alias — rejected
-- C variadics (`...`) — rejected
-- Pattern params (`@fib (0: int)`) — literal in param rejected
-- Guard clauses (`if` before `=`) — rejected
-- Const generics (`$` in generics) — rejected
-- Variadic params (`...int`) — rejected
-- Floating tests (`tests _`) — `_` rejected as target
-- Typed constants (`let $X: int`) — `:` after const name rejected
-- Const functions (`$name (params)`) — rejected
-- impl Trait in type position — rejected
-- Fixed-capacity list types (`[T, max N]`) — rejected
-- Length placeholder (`#`) — interpreted as attribute
-- Associated type constraints (`where I.Item == int`) — `==` rejected
-- Channel generic syntax (`channel<int>`) — `<` misinterpreted
-- Struct rest pattern (`{ x, .. }`) — `..` rejected
-- `.match()` method syntax — `match` is keyword
-- `with()` RAII pattern (`acquire:/use:/release:`) — rejects certain named args
-- Try `?` inside try() — rejected
-- Run pre/post checks — named args rejected
-- Immutable binding in function body (`let $x = 42`) — `$` rejected
-- Computed constants (`let $D = $A + 1`) — literal-only enforcement
+**Remaining Parser Bugs (verified 2026-02-13):**
+- Const functions (`$name (params)`) — rejected  <!-- blocked-by:18 -->
+- ~~Computed constants (`let $D = $A + 1`)~~ — FIXED ✅ (2026-02-14)
+- impl Trait in type position — rejected  <!-- blocked-by:19 -->
+- Associated type constraints (`where I.Item == int`) — `==` rejected  <!-- blocked-by:3 -->
+- ~~Floating tests (`tests _`)~~ — FIXED ✅ (2026-02-14)
+- ~~Typed constants (`let $X: int`)~~ — FIXED ✅ (2026-02-14)
+- ~~Channel generic syntax (`channel<int>`)~~ — FIXED ✅ (2026-02-14)
+- ~~Struct rest pattern (`{ x, .. }`)~~ — FIXED ✅ (2026-02-14)
+- ~~`.match()` method syntax~~ — FIXED ✅ (2026-02-14) — desugars `expr.match(arms)` to `match(expr, arms)` at parser level
+- ~~`with()` RAII pattern (`acquire:/action:/release:`)~~ — FIXED ✅ (2026-02-14) — was doc error: spec uses `action:` not `use:` (`use` is reserved keyword)
+- ~~Run pre/post checks~~ — FIXED ✅ (2026-02-14)
+- ~~Immutable binding in function body (`let $x = 42`)~~ — FIXED ✅ (2026-02-14)
+- ~~Labeled continue (`continue:outer`)~~ — FIXED ✅ (2026-02-14)
+- ~~Char patterns in match (`'a'`, `'a'..='z'`)~~ — FIXED ✅ (2026-02-14)
+
+**Fixed since 2026-02-10** (23 items):
+File attributes, extern `as` alias, C variadics, pattern params, guard clauses, default params, variadic params, `#repr`/`#target`/`#cfg` attributes, fixed-capacity lists, length placeholder, try `?` inside try(), const generic type args (`Array<int, $N>`), const expressions in types, const bounds in where clauses (`where N > 0`), labeled continue (`continue:outer`), run pre/post checks (`pre_check:`/`post_check:`), computed constants (`let $D = $A + 1`), struct rest pattern (`{ x, .. }`), immutable bindings in function bodies (`let $x`, `let ($a, $b)`, `let { $x }`, `let [$h, ..]`), `with()` RAII pattern (`acquire:/action:/release:` — was doc error, spec uses `action:` not `use:`), `.match()` method syntax (`expr.match(arms)` desugars to `match(expr, arms)`)
 
 ---
 
 ## 0.9 Parser Bugs (from Comprehensive Tests)
 
-> **STATUS**: Re-verified 2026-02-10. Many claims of "Now parses correctly" were false. Actual status documented below.
+> **STATUS**: Re-verified 2026-02-13. Many items previously marked "STILL BROKEN" now parse correctly.
 
 > **POLICY**: Skipping tests is NOT acceptable. Every test must pass. If a feature is tested, it must work. Fix the code, not the tests.
 
 This section documents **parser-only** bugs discovered by the comprehensive test suite. Evaluator/type checker bugs are tracked in **Section 23: Full Evaluator Support**.
 
-### 0.9.1 Parser/Syntax Bugs — STILL BROKEN (verified 2026-02-10)
+### 0.9.1 Parser/Syntax Bugs — STILL BROKEN (verified 2026-02-13)
 
 These features fail at the parse phase — the parser does not recognize the syntax.
 
-- [ ] **Implement**: Guard clauses in function definitions
-  - [ ] **Parser**: Handle `if condition` before `=` in function definitions
-  - [ ] **Syntax**: `@f (n: int) -> int if n > 0 = n` — **STILL BROKEN**: parser rejects `if` before `=`
+- [x] **Implement**: Const generics parser support ✅ (2026-02-13)
+  - [x] **Parser**: `$N: int` in generic parameters — was already working
+  - [x] **Syntax**: `Array<int, $N>` — const expressions in type arguments (NEW)
+  - [x] **Syntax**: `[int, max $N]` — const expressions in fixed-list capacity (NEW)
+  - [x] **Syntax**: `where N > 0` — const bounds in where clauses (NEW)
 
-- [ ] **Implement**: List patterns in function parameters
-  - [ ] **Parser**: Recognize `[` as start of pattern in parameter position
-  - [ ] **Syntax**: `@len ([]: [T]) -> int = 0` — **STILL BROKEN**: parser rejects literal/pattern in param position
+- [ ] **Implement**: Associated type constraints in where clauses  <!-- blocked-by:3 -->
+  - [ ] **Syntax**: `where I.Item == int` — **BROKEN**: parser expects `:`, finds `==`
 
-- [ ] **Implement**: Const generics
-  - [ ] **Parser**: Handle `$` prefix in generic parameters
-  - [ ] **Syntax**: `@f<$N: int>` — **STILL BROKEN**: parser rejects `$` in generics
+- [ ] **Implement**: Const functions  <!-- blocked-by:18 -->
+  - [ ] **Syntax**: `$add (a: int, b: int) = a + b` — **BROKEN**: parser error
 
-- [ ] **Implement**: Variadic parameters
-  - [ ] **Parser**: Handle `...` prefix before parameter type
-  - [ ] **Syntax**: `@sum (nums: ...int)` — **STILL BROKEN**: parser rejects `...` prefix
+- [x] **Implement**: Computed constants ✅ (2026-02-14)
+  - [x] **Syntax**: `let $D = $A + 1` — parses correctly (constant initializer now uses general expression parser)
 
-- [ ] **Implement**: `#repr` attribute
-  - [ ] **Syntax**: `#repr("c")` — **STILL BROKEN**: unknown attribute error
+- [ ] **Implement**: `impl Trait` in type position  <!-- blocked-by:19 -->
+  - [ ] **Syntax**: `@f () -> impl Iterator` — **BROKEN**: parser rejects `impl` in type
 
-- [ ] **Implement**: `#target` attribute
-  - [ ] **Syntax**: `#target(os: "linux")` — **STILL BROKEN**: unknown attribute error
+- [x] **Implement**: Channel generic syntax ✅ (2026-02-14)
+  - [x] **Syntax**: `channel<int>(buffer: 10)` — FIXED: detect channel identifiers in parse_primary, parse_channel_expr with generic type args
 
-- [ ] **Implement**: `#cfg` attribute
-  - [ ] **Syntax**: `#cfg(debug)` — **STILL BROKEN**: unknown attribute error
+- [x] **Implement**: Struct rest pattern in match ✅ (2026-02-14)
+  - [x] **Syntax**: `{ x, .. }` — parses and evaluates correctly ✅ (2026-02-14)
 
-- [ ] **Implement**: Associated type constraints in where clauses
-  - [ ] **Syntax**: `where I.Item == int` — **STILL BROKEN**: parser expects `:`, finds `==`
+- [x] **Implement**: `.match()` method syntax ✅ (2026-02-14)
+  - [x] **Syntax**: `42.match(...)` — method-style match desugars to `match(42, ...)` at parse level ✅ (2026-02-14)
 
-- [ ] **Implement**: Const functions
-  - [ ] **Syntax**: `$add (a: int, b: int) = a + b` — **STILL BROKEN**: parser error
+- [x] **Implement**: Immutable bindings in function bodies ✅ (2026-02-14)
+  - [x] **Syntax**: `let $x = 42` inside function — parses and evaluates correctly ✅ (2026-02-14)
+  - [x] **Syntax**: `let ($a, $b) = ...` — tuple destructuring with `$` ✅ (2026-02-14)
+  - [x] **Syntax**: `let { $x, $y } = ...` — struct destructuring with `$` ✅ (2026-02-14)
+  - [x] **Syntax**: `let [$first, ..rest] = ...` — list destructuring with `$` ✅ (2026-02-14)
 
-- [ ] **Implement**: Computed constants
-  - [ ] **Syntax**: `let $D = $A + 1` — **STILL BROKEN**: "config variable must be initialized with a literal value"
+- [x] **Implement**: Floating tests with `_` target ✅ (2026-02-14)
+  - [x] **Syntax**: `@t tests _ () -> void = ...` — parses correctly ✅ (2026-02-14)
 
-- [ ] **Implement**: Fixed-capacity list type syntax `[T, max N]`
-  - [ ] **Syntax**: `let buffer: [int, max 10] = []` — **STILL BROKEN**: parser rejects comma in type
+- [x] **Implement**: Typed constants ✅ (2026-02-14)
+  - [x] **Syntax**: `let $MAX_SIZE: int = 1000` — parses correctly ✅ (2026-02-14)
 
-- [ ] **Implement**: `impl Trait` in type position
-  - [ ] **Syntax**: `@f () -> impl Iterator` — **STILL BROKEN**: parser rejects `impl` in type
+- [x] **Implement**: Run pre/post checks ✅ (2026-02-14)
+  - [x] **Syntax**: `run(pre_check: cond, body)` — parses correctly ✅ (2026-02-14)
+  - [x] **Syntax**: `run(body, post_check: r -> cond)` — parses correctly ✅ (2026-02-14)
+  - [x] **Syntax**: `run(pre_check: c | "msg", body, post_check: r -> c | "msg")` — parses correctly ✅ (2026-02-14)
+  - [ ] **Enforcement**: Runtime check execution tracked in Section 23  <!-- blocked-by:23 -->
 
-- [ ] **Implement**: Channel generic syntax
-  - [ ] **Syntax**: `channel<int>(buffer: 10)` — **STILL BROKEN**: `<` misinterpreted as less-than
+- [x] **Implement**: `with(acquire:, action:, release:)` RAII pattern ✅ (2026-02-14)
+  - [x] **Syntax**: `with(acquire: expr, action: f -> ..., release: f -> ...)` — parses correctly. Spec uses `action:` not `use:` (`use` is reserved keyword)
 
-- [ ] **Implement**: Struct rest pattern in match
-  - [ ] **Syntax**: `{ x, .. }` — **STILL BROKEN**: "expected identifier, found .."
+- [x] **Implement**: Labeled continue ✅ (2026-02-14)
+  - [x] **Syntax**: `continue:outer` — parses correctly ✅ (2026-02-14)
 
-- [ ] **Implement**: `.match()` method syntax
-  - [ ] **Syntax**: `42.match(...)` — **STILL BROKEN**: `match` is keyword, can't be method name
+- [x] **Implement**: Char patterns in match ✅ (2026-02-14)
+  - [x] **Syntax**: `'a'` in match arm — parses and evaluates correctly
+  - [x] **Syntax**: `'a'..='z'` range — parses and evaluates correctly
 
-- [ ] **Implement**: Immutable bindings in function bodies
-  - [ ] **Syntax**: `let $x = 42` inside function — **STILL BROKEN**: "expected binding pattern, found $"
-  - [ ] **Note**: Works at module scope for constants, broken in expression context
-
-- [ ] **Implement**: File-level attributes
-  - [ ] **Syntax**: `#!target(os: "linux")` — **STILL BROKEN**: parser rejects `!` in `#!`
-
-- [ ] **Implement**: Extern `as` alias
-  - [ ] **Syntax**: `@_sin (x: float) -> float as "sin"` — **STILL BROKEN**: parser rejects `as` in extern
-
-- [ ] **Implement**: C variadics
-  - [ ] **Syntax**: `@printf (fmt: CPtr, ...) -> c_int` — **STILL BROKEN**: parser rejects `...`
-
-- [ ] **Implement**: Floating tests with `_` target
-  - [ ] **Syntax**: `@t tests _ () -> void = ...` — **STILL BROKEN**: parser rejects `_` as target
-
-- [ ] **Implement**: Typed constants
-  - [ ] **Syntax**: `let $MAX_SIZE: int = 1000` — **STILL BROKEN**: parser rejects `:` after const name
-
-- [ ] **Implement**: Try `?` inside try pattern
-  - [ ] **Syntax**: `try(let x = f()?, Ok(x))` — **STILL BROKEN**: parser rejects `?` inside `try()`
-
-- [ ] **Implement**: Run pre/post checks
-  - [ ] **Syntax**: `run(pre_check: cond, body)` — **STILL BROKEN**: parser rejects `pre_check:` named arg
-
-- [ ] **Implement**: Length placeholder `#`
-  - [ ] **Syntax**: `list[# - 1]` — **STILL BROKEN**: `#` interpreted as attribute marker
-
-### 0.9.2 Previously Fixed Bugs — VERIFIED WORKING (2026-02-10)
+### 0.9.2 Previously Fixed Bugs — VERIFIED WORKING
 
 These features were previously reported as broken but now parse correctly.
 
-- [x] **Fixed**: Spread in function calls — `sum(...list)` ✅
-- [x] **Fixed**: `timeout` as identifier — `let timeout = 5` ✅ (context-sensitive keyword)
-- [x] **Fixed**: List spread syntax — `[...result, i]` ✅
-- [x] **Fixed**: Map spread syntax — `{...base, "c": 3}` ✅
-- [x] **Fixed**: Tuple destructuring in for loops — `for (k, v) in m do ...` ✅
-- [x] **Fixed**: Multiple derives — `#derive(Eq, Clone, Debug)` ✅
-- [x] **Fixed**: `as`/`as?` type conversion — `42 as float`, `"42" as? int` ✅
-- [x] **Fixed**: Wildcard pattern in for loops — `for _ in 0..n do ...` ✅
-- [x] **Fixed**: Context-sensitive pattern keywords — `let timeout = 5`, `let cache = 10` ✅
+- [x] **Fixed**: Guard clauses — `@f (n: int) -> int if n > 0 = n` ✅ (2026-02-13)
+- [x] **Fixed**: Pattern params — `@fib (0: int) -> int = 1` ✅ (2026-02-13)
+- [x] **Fixed**: Default params — `@greet (name: str = "World") -> str` ✅ (2026-02-13)
+- [x] **Fixed**: Variadic parameters — `@sum (nums: ...int)` ✅ (2026-02-13)
+- [x] **Fixed**: `#repr` attribute — `#repr("c")` ✅ (2026-02-13)
+- [x] **Fixed**: `#target` attribute — `#target(os: "linux")` ✅ (2026-02-13)
+- [x] **Fixed**: `#cfg` attribute — `#cfg(debug)` ✅ (2026-02-13)
+- [x] **Fixed**: Fixed-capacity list type — `[int, max 10]` ✅ (2026-02-13)
+- [x] **Fixed**: File-level attributes — `#!target(os: "linux")` ✅ (2026-02-13)
+- [x] **Fixed**: Extern `as` alias — `@_sin (x: float) -> float as "sin"` ✅ (2026-02-13)
+- [x] **Fixed**: C variadics — `@printf (fmt: CPtr, ...) -> c_int` ✅ (2026-02-13)
+- [x] **Fixed**: Try `?` inside try — `try(let x = f()?, Ok(x))` ✅ (2026-02-13)
+- [x] **Fixed**: Length placeholder — `list[# - 1]` ✅ (2026-02-13)
+- [x] **Fixed**: Spread in function calls — `sum(...list)` ✅ (2026-02-10)
+- [x] **Fixed**: `timeout` as identifier — `let timeout = 5` ✅ (2026-02-10)
+- [x] **Fixed**: List spread syntax — `[...result, i]` ✅ (2026-02-10)
+- [x] **Fixed**: Map spread syntax — `{...base, "c": 3}` ✅ (2026-02-10)
+- [x] **Fixed**: Tuple destructuring in for loops — `for (k, v) in m do ...` ✅ (2026-02-10)
+- [x] **Fixed**: Multiple derives — `#derive(Eq, Clone, Debug)` ✅ (2026-02-10)
+- [x] **Fixed**: `as`/`as?` type conversion — `42 as float`, `"42" as? int` ✅ (2026-02-10)
+- [x] **Fixed**: Wildcard pattern in for loops — `for _ in 0..n do ...` ✅ (2026-02-10)
+- [x] **Fixed**: Context-sensitive pattern keywords — `let timeout = 5`, `let cache = 10` ✅ (2026-02-10)
 
 ---
 
@@ -1007,30 +1008,30 @@ Systematic `ori parse` verification of every grammar production against actual p
 7. `as`/`as?` type conversion operators
 8. Wildcard in for loops (`for _ in range`)
 
-**Verified Parser Bugs — 24 items still broken:**
-1. Guard clauses (`if` before `=`) — parser rejects
-2. List/pattern params (`@fib (0: int)`) — parser rejects
-3. Const generics (`$` in generics) — parser rejects
-4. Variadic params (`...int`) — parser rejects
+**Verified Parser Bugs — 24 items originally, 19 fixed, ~5 remain:**
+1. Guard clauses (`if` before `=`) — ~~parser rejects~~ FIXED ✅
+2. List/pattern params (`@fib (0: int)`) — ~~parser rejects~~ FIXED ✅
+3. Const generics (`$` in generics) — ~~parser rejects~~ FIXED ✅ (2026-02-13)
+4. Variadic params (`...int`) — ~~parser rejects~~ FIXED ✅
 5. `#repr`/`#target`/`#cfg` attributes — unknown attribute error
 6. Associated type constraints (`where I.Item == int`) — `==` rejected
 7. Const functions (`$name (params)`) — parser error
-8. Computed constants (`let $D = $A + 1`) — literal-only enforcement
+8. ~~Computed constants (`let $D = $A + 1`)~~ — FIXED ✅ (2026-02-14)
 9. Fixed-capacity lists (`[T, max N]`) — comma rejected in type
 10. `impl Trait` in type position — parser rejects
-11. Channel generics (`channel<int>`) — `<` misinterpreted
+11. ~~Channel generics (`channel<int>`)~~ — FIXED ✅ (2026-02-14)
 12. Struct rest pattern (`{ x, .. }`) — `..` rejected
 13. `.match()` method syntax — keyword conflict
 14. `with()` RAII pattern (`acquire:/use:/release:`) — named arg rejection
 15. File attributes (`#!target(...)`) — `!` rejected
 16. Extern `as` alias — rejected
 17. C variadics (`...` in params) — rejected
-18. Floating tests (`tests _`) — `_` rejected as target
-19. Typed constants (`let $X: int = 1000`) — `:` rejected
+18. ~~Floating tests (`tests _`)~~ — FIXED ✅ (2026-02-14)
+19. ~~Typed constants (`let $X: int = 1000`)~~ — FIXED ✅ (2026-02-14)
 20. Try `?` inside `try()` — rejected
-21. Run pre/post checks (`pre_check:`) — named arg rejected
+21. ~~Run pre/post checks (`pre_check:`)~~ — FIXED ✅ (2026-02-14)
 22. Length placeholder (`#`) — attribute marker conflict
-23. Immutable binding in function body (`let $x = 42`) — `$` rejected
+23. ~~Immutable binding in function body (`let $x = 42`)~~ — FIXED ✅ (2026-02-14)
 24. `.match()` guard method syntax — keyword conflict
 
 **Known Limitations (Parser works, but semantics incomplete — tracked in Section 23):**

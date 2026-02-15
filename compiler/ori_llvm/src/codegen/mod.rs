@@ -20,7 +20,7 @@
 //!
 //! ```text
 //! codegen/
-//! ├── ir_builder.rs       — ID-based LLVM instruction builder (Section 02)
+//! ├── ir_builder/          — ID-based LLVM instruction builder (Section 02)
 //! ├── scope.rs            — Persistent-map variable scoping
 //! ├── type_info.rs        — TypeInfo enum + TypeInfoStore (Section 01)
 //! ├── value_id.rs         — Opaque ID newtypes + ValueArena
@@ -47,6 +47,7 @@ pub mod value_id;
 
 // -- Function compilation (Section 04) --
 pub mod abi;
+pub mod derive_codegen;
 pub mod function_compiler;
 pub mod runtime_decl;
 pub mod type_registration;

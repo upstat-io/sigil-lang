@@ -4,9 +4,15 @@
 //! work correctly in all valid positions. This catches edge cases that individual
 //! tests might miss.
 
-#![allow(clippy::unwrap_used, clippy::expect_used)]
-// Tests use format strings with loop variables for constructing test code
-#![allow(clippy::uninlined_format_args)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "test assertions use unwrap/expect for clarity"
+)]
+#![allow(
+    clippy::uninlined_format_args,
+    reason = "format strings use loop variables for constructing test code"
+)]
 
 use crate::{parse, ParseOutput};
 use ori_ir::StringInterner;
@@ -191,6 +197,12 @@ mod pattern_matrix {
         "true",
         "false",
         r#""hello""#,
+        // Char literal patterns
+        "'a'",
+        "'\\n'",
+        // Char range patterns
+        "'a'..='z'",
+        "'a'..'z'",
         // Variant patterns
         "Some(x)",
         "None",
@@ -788,6 +800,34 @@ mod mixed_expressions {
             assert!(
                 !result.has_errors(),
                 "Complex match expression failed:\n{}\nErrors: {:?}",
+                source,
+                result.errors
+            );
+        }
+    }
+
+    #[test]
+    fn test_method_style_match() {
+        let sources = &[
+            // Basic method-style match
+            "@test () -> int = x.match(0 -> 1, _ -> 2)",
+            // With guards
+            "@test () -> str = n.match(x.match(x > 0) -> \"pos\", _ -> \"neg\")",
+            // Nested method-style match
+            "@test () -> str = x.match(0 -> y.match(0 -> \"a\", _ -> \"b\"), _ -> \"c\")",
+            // Expression as receiver
+            "@test () -> int = (a + b).match(0 -> 1, _ -> 2)",
+            // Chained with postfix ops
+            "@test () -> int = x.match(0 -> [1], _ -> [2]).len()",
+            // Method-style equivalent of match(x, ...)
+            "@test () -> int = val.match(Some(n) -> n, None -> 0)",
+        ];
+
+        for source in sources {
+            let result = parse_source(source);
+            assert!(
+                !result.has_errors(),
+                "Method-style match failed:\n{}\nErrors: {:?}",
                 source,
                 result.errors
             );
@@ -1539,6 +1579,36 @@ mod mixed_types {
     }
 
     #[test]
+    fn test_channel_generic_syntax() {
+        let sources = &[
+            // Basic generic channel
+            "@test () -> void = channel<int>(buffer: 10)",
+            // Channel with string type arg
+            "@test () -> void = channel_in<str>(buffer: 5)",
+            // Channel out
+            "@test () -> void = channel_out<bool>(buffer: 1)",
+            // Cloneable channel
+            "@test () -> void = channel_all<float>(buffer: 20)",
+            // Channel with nested generic type arg
+            "@test () -> void = channel<Result<int, str>>(buffer: 100)",
+            // Channel without generics still works
+            "@test () -> void = channel(buffer: 10)",
+            // Channel in let binding
+            "@test () -> void = let pair = channel<int>(buffer: 5)",
+        ];
+
+        for source in sources {
+            let result = parse_source(source);
+            assert!(
+                !result.has_errors(),
+                "Channel generic syntax failed:\n{}\nErrors: {:?}",
+                source,
+                result.errors
+            );
+        }
+    }
+
+    #[test]
     fn test_never_type() {
         let sources = &[
             // Never in Result (always Err)
@@ -1813,13 +1883,12 @@ mod mixed_imports {
     }
 
     #[test]
-    #[ignore = "extension import parsing not yet implemented (grammar §Extensions)"]
     fn test_extension_imports() {
         let sources = &[
             // Basic extension import
             "extension std.iter.extensions { Iterator.count }",
             // Multiple extension methods
-            "extension std.str.extensions { str.trim, str.split, str.join }",
+            "extension std.text.extensions { Text.trim, Text.split, Text.join }",
             // Public extension import
             "pub extension std.collections.extensions { Vec.sort, Vec.reverse }",
         ];

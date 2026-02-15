@@ -13,6 +13,14 @@ use crate::{ExprId, Name, ParsedType, ParsedTypeRange, Span, Spanned};
 ///
 /// Default type parameters allow trait definitions like `trait Add<Rhs = Self>`.
 /// Const generics allow compile-time values: `@f<$N: int>`, `@f<$B: bool = true>`.
+///
+/// # Future Refactor
+///
+/// This struct uses `is_const` as a discriminator with optional fields for each
+/// variant. A proper enum (`GenericParamKind::Type { .. } | Const { .. }`) would
+/// provide compile-time exhaustiveness checking, preventing bugs where consumers
+/// forget to check `is_const`. Deferred because it touches parser, type checker,
+/// formatter, and incremental compilation.
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct GenericParam {
     pub name: Name,
@@ -61,17 +69,60 @@ impl TraitBound {
     }
 }
 
-/// Where clause constraint: `T: Clone`, `U: Default`, or `T.Item: Eq`.
+/// Where clause constraint: type bounds (`T: Clone`) or const bounds (`N > 0`).
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
-pub struct WhereClause {
-    /// The type parameter being constrained (e.g., `T` in `T: Clone` or `T.Item: Eq`).
-    pub param: Name,
-    /// Optional associated type projection (e.g., `Item` in `T.Item: Eq`).
-    /// If `Some`, this is a constraint on an associated type: `param.projection: bounds`.
-    pub projection: Option<Name>,
-    /// The trait bounds that must be satisfied.
-    pub bounds: Vec<TraitBound>,
-    pub span: Span,
+pub enum WhereClause {
+    /// Type bound: `T: Clone`, `U: Default`, or `T.Item: Eq`.
+    TypeBound {
+        /// The type parameter being constrained (e.g., `T` in `T: Clone`).
+        param: Name,
+        /// Optional associated type projection (e.g., `Item` in `T.Item: Eq`).
+        projection: Option<Name>,
+        /// The trait bounds that must be satisfied.
+        bounds: Vec<TraitBound>,
+        span: Span,
+    },
+    /// Const bound: `N > 0`, `N + M == 10`.
+    ConstBound {
+        /// The const expression that must hold.
+        expr: ExprId,
+        span: Span,
+    },
+}
+
+impl WhereClause {
+    /// Get the span of this where clause.
+    pub fn span(&self) -> Span {
+        match self {
+            WhereClause::TypeBound { span, .. } | WhereClause::ConstBound { span, .. } => *span,
+        }
+    }
+
+    /// Check if this is a type bound.
+    pub fn is_type_bound(&self) -> bool {
+        matches!(self, WhereClause::TypeBound { .. })
+    }
+
+    /// Check if this is a const bound.
+    pub fn is_const_bound(&self) -> bool {
+        matches!(self, WhereClause::ConstBound { .. })
+    }
+
+    /// Extract type bound fields, returning `None` for const bounds.
+    ///
+    /// This is the primary accessor for consumers that process type bounds
+    /// and skip const bounds (which are not yet evaluated).
+    pub fn as_type_bound(&self) -> Option<(Name, Option<Name>, &[TraitBound], Span)> {
+        match self {
+            WhereClause::TypeBound {
+                param,
+                projection,
+                bounds,
+                span,
+            } => Some((*param, *projection, bounds, *span)),
+            WhereClause::ConstBound { .. } => None,
+        }
+    }
 }
 
 /// Trait definition.
@@ -250,6 +301,18 @@ pub struct ImplMethod {
     pub return_ty: ParsedType,
     pub body: ExprId,
     pub span: Span,
+}
+
+impl From<&TraitDefaultMethod> for ImplMethod {
+    fn from(default: &TraitDefaultMethod) -> Self {
+        Self {
+            name: default.name,
+            params: default.params,
+            return_ty: default.return_ty.clone(),
+            body: default.body,
+            span: default.span,
+        }
+    }
 }
 
 /// Associated type definition in an impl block.

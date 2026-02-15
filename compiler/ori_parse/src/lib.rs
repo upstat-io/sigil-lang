@@ -28,8 +28,8 @@ pub use series::{SeriesConfig, TrailingSeparator};
 // They're automatically available at crate root via #[macro_export]
 
 use ori_ir::{
-    ExprArena, Function, Module, ModuleExtra, Span, StringInterner, TestDef, TokenKind, TokenList,
-    Visibility,
+    ExprArena, Function, Module, ModuleExtra, Name, SharedArena, Span, StringInterner, TestDef,
+    TokenKind, TokenList, Visibility,
 };
 use tracing::debug;
 
@@ -43,12 +43,62 @@ enum FunctionOrTest {
 // Re-export ParsedAttrs from grammar module.
 pub(crate) use grammar::ParsedAttrs;
 
+/// Pre-interned `Name` values for contextual keywords used in identifier comparisons.
+///
+/// Avoids acquiring interner read-locks during parsing by comparing `Name` values
+/// (u32 equality) instead of looking up strings via `interner().lookup()`.
+pub(crate) struct KnownNames {
+    // Channel constructors
+    pub channel: Name,
+    pub channel_in: Name,
+    pub channel_out: Name,
+    pub channel_all: Name,
+    // Check properties
+    pub pre_check: Name,
+    pub post_check: Name,
+    // For-pattern properties
+    pub over: Name,
+    pub map: Name,
+    pub match_: Name,
+    pub default: Name,
+    // Type syntax
+    pub max: Name,
+}
+
+impl KnownNames {
+    /// Intern all known contextual keywords once.
+    fn new(interner: &StringInterner) -> Self {
+        Self {
+            channel: interner.intern("channel"),
+            channel_in: interner.intern("channel_in"),
+            channel_out: interner.intern("channel_out"),
+            channel_all: interner.intern("channel_all"),
+            pre_check: interner.intern("pre_check"),
+            post_check: interner.intern("post_check"),
+            over: interner.intern("over"),
+            map: interner.intern("map"),
+            match_: interner.intern("match"),
+            default: interner.intern("default"),
+            max: interner.intern("max"),
+        }
+    }
+}
+
 /// Parser state.
 pub struct Parser<'a> {
     pub(crate) cursor: Cursor<'a>,
     arena: ExprArena,
     /// Current parsing context flags.
     pub(crate) context: ParseContext,
+    /// Pre-interned names for contextual keyword comparisons.
+    pub(crate) known: KnownNames,
+    /// Errors from sub-parsers that lack `&mut Vec<ParseError>` access
+    /// (e.g., `parse_type()` detecting reserved syntax like `&T`).
+    /// Drained into the main error list in `parse_module()`.
+    pub(crate) deferred_errors: Vec<ParseError>,
+    /// Warnings from sub-parsers (e.g., unknown calling conventions).
+    /// Drained into `ParseOutput.warnings` alongside post-parse warnings.
+    pub(crate) deferred_warnings: Vec<ParseWarning>,
 }
 
 impl<'a> Parser<'a> {
@@ -60,6 +110,9 @@ impl<'a> Parser<'a> {
             cursor: Cursor::new(tokens, interner),
             arena: ExprArena::with_capacity(estimated_source_len),
             context: ParseContext::new(),
+            known: KnownNames::new(interner),
+            deferred_errors: Vec::new(),
+            deferred_warnings: Vec::new(),
         }
     }
 
@@ -86,7 +139,7 @@ impl<'a> Parser<'a> {
 
     /// Get the current parsing context.
     #[inline]
-    #[allow(dead_code)] // Used in tests and future parser extensions
+    #[allow(dead_code, reason = "API for tests and future parser extensions")]
     pub(crate) fn context(&self) -> ParseContext {
         self.context
     }
@@ -124,7 +177,7 @@ impl<'a> Parser<'a> {
     /// })?;
     /// ```
     #[inline]
-    #[allow(dead_code)] // Used in tests and future parser extensions
+    #[allow(dead_code, reason = "API for tests and future parser extensions")]
     pub(crate) fn without_context<T, F>(&mut self, remove: ParseContext, f: F) -> T
     where
         F: FnOnce(&mut Self) -> T,
@@ -138,7 +191,7 @@ impl<'a> Parser<'a> {
 
     /// Check if a context flag is set.
     #[inline]
-    #[allow(dead_code)] // Used in tests and future parser extensions
+    #[allow(dead_code, reason = "API for tests and future parser extensions")]
     pub(crate) fn has_context(&self, flag: ParseContext) -> bool {
         self.context.has(flag)
     }
@@ -213,7 +266,10 @@ impl<'a> Parser<'a> {
     /// let (expr, capture) = parser.with_capture(|p| p.parse_expr())?;
     /// ```
     #[inline]
-    #[allow(dead_code)] // Infrastructure for formatters and future macros
+    #[allow(
+        dead_code,
+        reason = "infrastructure for formatters and macro expansion"
+    )]
     pub(crate) fn with_capture<T, F>(&mut self, f: F) -> (T, ori_ir::TokenCapture)
     where
         F: FnOnce(&mut Self) -> T,
@@ -236,7 +292,10 @@ impl<'a> Parser<'a> {
     /// let (expr, capture) = parser.capture_if(needs_tokens, |p| p.parse_expr())?;
     /// ```
     #[inline]
-    #[allow(dead_code)] // Infrastructure for formatters and future macros
+    #[allow(
+        dead_code,
+        reason = "infrastructure for conditional token capture in formatters"
+    )]
     pub(crate) fn capture_if<T, F>(
         &mut self,
         needs_capture: bool,
@@ -257,7 +316,7 @@ impl<'a> Parser<'a> {
     /// Unlike `cursor.check()`, this tests against multiple token kinds at once.
     /// Returns `true` if any match is found.
     #[inline]
-    #[allow(dead_code)] // Infrastructure for enhanced error messages
+    #[allow(dead_code, reason = "infrastructure for multi-token error recovery")]
     pub(crate) fn check_one_of(&self, expected: &TokenSet) -> bool {
         expected.contains(self.cursor.current_kind())
     }
@@ -269,7 +328,10 @@ impl<'a> Parser<'a> {
     ///
     /// Returns the matched token kind on success.
     #[cold]
-    #[allow(dead_code)] // Infrastructure for enhanced error messages
+    #[allow(
+        dead_code,
+        reason = "infrastructure for multi-token expect with rich errors"
+    )]
     pub(crate) fn expect_one_of(&mut self, expected: &TokenSet) -> Result<TokenKind, ParseError> {
         let current = self.cursor.current_kind();
         if expected.contains(current) {
@@ -352,7 +414,10 @@ impl<'a> Parser<'a> {
     /// Ok(TypeOrExpr::Expr(expr))
     /// ```
     #[inline]
-    #[allow(dead_code)] // Will be used for disambiguation in future work
+    #[allow(
+        dead_code,
+        reason = "reserved for grammar disambiguation with backtracking"
+    )]
     pub(crate) fn try_parse<T, F>(&mut self, f: F) -> Option<T>
     where
         F: FnOnce(&mut Self) -> Result<T, ParseError>,
@@ -387,7 +452,10 @@ impl<'a> Parser<'a> {
     /// }
     /// ```
     #[inline]
-    #[allow(dead_code)] // Will be used for disambiguation in future work
+    #[allow(
+        dead_code,
+        reason = "reserved for non-consuming lookahead in grammar disambiguation"
+    )]
     pub(crate) fn look_ahead<T, F>(&mut self, f: F) -> T
     where
         F: FnOnce(&mut Self) -> T,
@@ -438,7 +506,11 @@ impl<'a> Parser<'a> {
         let mut module = Module::with_capacity_hint(self.estimated_source_len());
         let mut errors = Vec::new();
 
-        self.parse_imports(&mut module.imports, &mut errors);
+        // File-level attribute must appear before imports and declarations.
+        // Grammar: source_file = [ file_attribute ] { import } { declaration } .
+        module.file_attr = self.parse_file_attribute(&mut errors);
+
+        self.parse_imports(&mut module, &mut errors);
 
         // Parse declarations (functions, tests, traits, impls, types, etc.)
         while !self.cursor.is_at_end() {
@@ -458,11 +530,15 @@ impl<'a> Parser<'a> {
             self.dispatch_declaration(attrs, visibility, &mut module, &mut errors);
         }
 
+        // Drain deferred errors/warnings from sub-parsers.
+        errors.append(&mut self.deferred_errors);
+        let warnings = self.deferred_warnings;
+
         ParseOutput {
             module,
-            arena: self.arena,
+            arena: SharedArena::new(self.arena),
             errors,
-            warnings: Vec::new(),
+            warnings,
             // Note: For metadata support, use parse_with_metadata() which
             // overwrites this with lexer-captured metadata
             metadata: ModuleExtra::new(),
@@ -472,8 +548,8 @@ impl<'a> Parser<'a> {
     /// Parse the import block at the top of a module.
     ///
     /// Imports must appear at the beginning of the file per spec.
-    /// Parses both `use ...` and `pub use ...` (re-export) statements.
-    fn parse_imports(&mut self, imports: &mut Vec<ori_ir::UseDef>, errors: &mut Vec<ParseError>) {
+    /// Parses `use`, `pub use`, `extension`, and `pub extension` statements.
+    fn parse_imports(&mut self, module: &mut Module, errors: &mut Vec<ParseError>) {
         while !self.cursor.is_at_end() {
             self.cursor.skip_newlines();
             if self.cursor.is_at_end() {
@@ -483,6 +559,9 @@ impl<'a> Parser<'a> {
             let is_pub_use = self.cursor.check(&TokenKind::Pub)
                 && matches!(self.cursor.peek_next_kind(), TokenKind::Use);
 
+            let is_pub_extension = self.cursor.check(&TokenKind::Pub)
+                && matches!(self.cursor.peek_next_kind(), TokenKind::Extension);
+
             if self.cursor.check(&TokenKind::Use) || is_pub_use {
                 let visibility = if is_pub_use {
                     self.cursor.advance();
@@ -491,7 +570,26 @@ impl<'a> Parser<'a> {
                     Visibility::Private
                 };
                 let outcome = self.parse_use(visibility);
-                self.handle_outcome(outcome, imports, errors, Self::recover_to_next_statement);
+                self.handle_outcome(
+                    outcome,
+                    &mut module.imports,
+                    errors,
+                    Self::recover_to_next_statement,
+                );
+            } else if self.cursor.check(&TokenKind::Extension) || is_pub_extension {
+                let visibility = if is_pub_extension {
+                    self.cursor.advance();
+                    Visibility::Public
+                } else {
+                    Visibility::Private
+                };
+                let outcome = self.parse_extension_import(visibility);
+                self.handle_outcome(
+                    outcome,
+                    &mut module.extension_imports,
+                    errors,
+                    Self::recover_to_next_statement,
+                );
             } else {
                 break;
             }
@@ -606,6 +704,14 @@ impl<'a> Parser<'a> {
                 errors,
                 Self::recover_to_function,
             );
+        } else if self.cursor.check(&TokenKind::Extern) {
+            let outcome = self.parse_extern_block(visibility);
+            self.handle_outcome(
+                outcome,
+                &mut module.extern_blocks,
+                errors,
+                Self::recover_to_function,
+            );
         } else {
             self.handle_declaration_error(&attrs, errors);
         }
@@ -617,14 +723,14 @@ impl<'a> Parser<'a> {
     /// (`return`), foreign keywords (`fn`, `func`, etc.), orphaned attributes,
     /// and unknown tokens at module level.
     fn handle_declaration_error(&mut self, attrs: &ParsedAttrs, errors: &mut Vec<ParseError>) {
-        if self.cursor.check(&TokenKind::Use) {
-            // Import after declarations
+        if self.cursor.check(&TokenKind::Use) || self.cursor.check(&TokenKind::Extension) {
+            // Import or extension import after declarations
             errors.push(ParseError::new(
                 ori_diagnostic::ErrorCode::E1002,
                 "import statements must appear at the beginning of the file",
                 self.cursor.current_span(),
             ));
-            // Skip the entire use statement to avoid infinite loop
+            // Skip the entire import statement to avoid infinite loop
             self.cursor.advance();
             while !self.cursor.is_at_end()
                 && !self.cursor.check(&TokenKind::At)
@@ -632,6 +738,7 @@ impl<'a> Parser<'a> {
                 && !self.cursor.check(&TokenKind::Impl)
                 && !self.cursor.check(&TokenKind::Type)
                 && !self.cursor.check(&TokenKind::Use)
+                && !self.cursor.check(&TokenKind::Extension)
             {
                 self.cursor.advance();
             }
@@ -722,7 +829,7 @@ impl<'a> Parser<'a> {
         let mut errors = Vec::new();
 
         // Imports always get re-parsed since they affect resolution
-        self.parse_imports(&mut module.imports, &mut errors);
+        self.parse_imports(&mut module, &mut errors);
 
         // Parse remaining declarations with potential reuse
         while !self.cursor.is_at_end() {
@@ -780,6 +887,16 @@ impl<'a> Parser<'a> {
                             let new_const = copier.copy_const(old_const, &mut self.arena);
                             module.consts.push(new_const);
                         }
+                        DeclKind::ExtensionImport => {
+                            let old_ext = &state.cursor.module().extension_imports[decl_ref.index];
+                            let new_ext = copier.copy_extension_import(old_ext);
+                            module.extension_imports.push(new_ext);
+                        }
+                        DeclKind::ExternBlock => {
+                            let old_block = &state.cursor.module().extern_blocks[decl_ref.index];
+                            let new_block = copier.copy_extern_block(old_block, &mut self.arena);
+                            module.extern_blocks.push(new_block);
+                        }
                         DeclKind::Import => {
                             unreachable!("imports should not appear in declaration list");
                         }
@@ -805,11 +922,15 @@ impl<'a> Parser<'a> {
             self.dispatch_declaration(attrs, visibility, &mut module, &mut errors);
         }
 
+        // Drain deferred errors/warnings from sub-parsers.
+        errors.append(&mut self.deferred_errors);
+        let warnings = self.deferred_warnings;
+
         ParseOutput {
             module,
-            arena: self.arena,
+            arena: SharedArena::new(self.arena),
             errors,
-            warnings: Vec::new(),
+            warnings,
             // Note: Incremental metadata merging not yet implemented.
             // For now, caller should re-lex with lex_with_comments() and
             // pass to parse_with_metadata() for full metadata support.
@@ -834,7 +955,7 @@ impl<'a> Parser<'a> {
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct ParseOutput {
     pub module: Module,
-    pub arena: ExprArena,
+    pub arena: SharedArena,
     pub errors: Vec<ParseError>,
     /// Non-fatal warnings (e.g., detached doc comments).
     pub warnings: Vec<ParseWarning>,
@@ -878,6 +999,9 @@ impl ParseOutput {
         }
         for impl_def in &self.module.impls {
             decl_starts.push(impl_def.span.start);
+        }
+        for ext_import in &self.module.extension_imports {
+            decl_starts.push(ext_import.span.start);
         }
 
         // Sort for binary search efficiency (though unattached_doc_comments does linear scan)

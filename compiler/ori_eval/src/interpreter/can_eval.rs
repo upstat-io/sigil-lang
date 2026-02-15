@@ -235,14 +235,15 @@ impl Interpreter<'_> {
                 guard,
                 body,
                 is_yield,
+                ..
             } => {
                 let iter_val = self.eval_can(iter)?;
                 let span = self.can_span(can_id);
                 self.eval_can_for(binding, &iter_val, guard, body, is_yield)
                     .map_err(|e| Self::attach_span(e, span))
             }
-            CanExpr::Loop { body } => self.eval_can_loop(body),
-            CanExpr::Break(v) => {
+            CanExpr::Loop { body, .. } => self.eval_can_loop(body),
+            CanExpr::Break { value: v, .. } => {
                 let val = if v.is_valid() {
                     self.eval_can(v)?
                 } else {
@@ -250,7 +251,7 @@ impl Interpreter<'_> {
                 };
                 Err(ControlAction::Break(val))
             }
-            CanExpr::Continue(v) => {
+            CanExpr::Continue { value: v, .. } => {
                 let val = if v.is_valid() {
                     self.eval_can(v)?
                 } else {
@@ -582,8 +583,16 @@ impl Interpreter<'_> {
         mutability: Mutability,
     ) -> EvalResult {
         match pattern {
-            CanBindingPattern::Name(name) => {
-                self.env.define(*name, value, mutability);
+            CanBindingPattern::Name { name, mutable } => {
+                // Per-binding mutability: use the flag from the pattern itself,
+                // not the inherited top-level mutability. This enables `let ($x, y) = ...`
+                // where `x` is immutable and `y` is mutable.
+                let binding_mutability = if *mutable {
+                    Mutability::Mutable
+                } else {
+                    Mutability::Immutable
+                };
+                self.env.define(*name, value, binding_mutability);
                 Ok(Value::Void)
             }
             CanBindingPattern::Wildcard => Ok(Value::Void),
@@ -1107,6 +1116,16 @@ impl Interpreter<'_> {
                     let _ = self.eval_call(&release_fn, std::slice::from_ref(&resource));
                 }
                 result
+            }
+            FunctionExpKind::Channel
+            | FunctionExpKind::ChannelIn
+            | FunctionExpKind::ChannelOut
+            | FunctionExpKind::ChannelAll => {
+                tracing::warn!(
+                    "pattern '{}' is a stub — channels are not yet implemented",
+                    kind.name()
+                );
+                Ok(Value::Void)
             }
         }
     }

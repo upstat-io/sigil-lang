@@ -144,6 +144,17 @@ impl TypedModule {
     }
 }
 
+/// Info about a const generic parameter (e.g., `$N: int`).
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
+pub struct ConstParamInfo {
+    /// Parameter name (e.g., `N`).
+    pub name: Name,
+    /// The type of this const param (INT or BOOL).
+    pub const_type: Idx,
+    /// Optional default value expression.
+    pub default_value: Option<ori_ir::ExprId>,
+}
+
 /// Function signature.
 ///
 /// Contains all information needed to type-check calls to this function
@@ -161,6 +172,10 @@ pub struct FunctionSig {
 
     /// Generic type parameter names (e.g., `T`, `U` in `fn foo<T, U>`).
     pub type_params: Vec<Name>,
+
+    /// Const generic parameters (e.g., `$N: int` in `@f<$N: int>`).
+    /// Empty for non-const-generic functions.
+    pub const_params: Vec<ConstParamInfo>,
 
     /// Parameter names.
     pub param_names: Vec<Name>,
@@ -233,7 +248,39 @@ impl FunctionSig {
         Self {
             name,
             type_params: Vec::new(),
+            const_params: Vec::new(),
             param_names: Vec::new(),
+            param_types,
+            return_type,
+            capabilities: Vec::new(),
+            is_public: false,
+            is_test: false,
+            is_main: false,
+            type_param_bounds: Vec::new(),
+            where_clauses: Vec::new(),
+            generic_param_mapping: Vec::new(),
+            required_params,
+            param_defaults: Vec::new(),
+        }
+    }
+
+    /// Create a synthetic function signature for compiler-generated methods.
+    ///
+    /// Like [`simple`](Self::simple) but includes parameter names, which are
+    /// needed for ABI computation in derived trait methods. All other fields
+    /// (generics, capabilities, flags) default to empty/false.
+    pub fn synthetic(
+        name: Name,
+        param_names: Vec<Name>,
+        param_types: Vec<Idx>,
+        return_type: Idx,
+    ) -> Self {
+        let required_params = param_types.len();
+        Self {
+            name,
+            type_params: Vec::new(),
+            const_params: Vec::new(),
+            param_names,
             param_types,
             return_type,
             capabilities: Vec::new(),
@@ -262,14 +309,58 @@ impl FunctionSig {
 
     /// Check if this function is generic.
     pub fn is_generic(&self) -> bool {
-        !self.type_params.is_empty()
+        !self.type_params.is_empty() || !self.const_params.is_empty()
     }
 
     /// Check if this function uses capabilities.
     pub fn has_capabilities(&self) -> bool {
         !self.capabilities.is_empty()
     }
+
+    /// Classify this function's effect level based on its declared capabilities.
+    ///
+    /// Requires the `StringInterner` to resolve capability `Name`s to strings
+    /// for classification against the known capability categories.
+    pub fn effect_class(&self, interner: &ori_ir::StringInterner) -> EffectClass {
+        if self.capabilities.is_empty() {
+            return EffectClass::Pure;
+        }
+
+        for &cap in &self.capabilities {
+            let cap_str = interner.lookup(cap);
+            if !READ_ONLY_CAPABILITIES.contains(&cap_str) {
+                return EffectClass::HasEffects;
+            }
+        }
+
+        EffectClass::ReadsOnly
+    }
 }
+
+/// Classification of a function's effect level based on its capabilities.
+///
+/// Used for incremental test intelligence: pure functions produce deterministic
+/// results, enabling aggressive caching of their test outcomes.
+///
+/// # Ordering
+///
+/// `Pure < ReadsOnly < HasEffects` — more effects means less cacheability.
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug, Ord, PartialOrd)]
+pub enum EffectClass {
+    /// No capabilities — fully deterministic, safely parallelizable.
+    Pure,
+    /// Only reads external state (Env, Clock, Random) — may vary between runs
+    /// but has no observable side effects.
+    ReadsOnly,
+    /// Performs I/O or mutation (`Http`, `FileSystem`, `Print`, etc.).
+    HasEffects,
+}
+
+/// Capability names that are classified as read-only (no side effects).
+///
+/// These capabilities read external state but don't mutate it.
+/// From the spec: Clock (time), Random (entropy), Env (environment variables).
+const READ_ONLY_CAPABILITIES: &[&str] = &["Env", "Clock", "Random"];
 
 /// Type check result with typed module and error guarantee.
 ///
@@ -339,167 +430,4 @@ impl TypeCheckResult {
 
 #[cfg(test)]
 #[expect(clippy::unwrap_used, reason = "Tests use unwrap for brevity")]
-mod tests {
-    use super::*;
-    use crate::Pool;
-
-    #[test]
-    fn typed_module_basic() {
-        let mut module = TypedModule::new();
-
-        // Store expression types
-        module.expr_types.push(Idx::INT);
-        module.expr_types.push(Idx::STR);
-        module.expr_types.push(Idx::BOOL);
-
-        assert_eq!(module.expr_type(0), Some(Idx::INT));
-        assert_eq!(module.expr_type(1), Some(Idx::STR));
-        assert_eq!(module.expr_type(2), Some(Idx::BOOL));
-        assert_eq!(module.expr_type(99), None);
-        assert!(!module.has_errors());
-    }
-
-    #[test]
-    fn function_sig_simple() {
-        let mut pool = Pool::new();
-        let name = Name::from_raw(1);
-
-        let sig = FunctionSig::simple(name, vec![Idx::INT, Idx::STR], Idx::BOOL);
-
-        assert_eq!(sig.name, name);
-        assert_eq!(sig.arity(), 2);
-        assert!(!sig.is_generic());
-        assert!(!sig.has_capabilities());
-
-        let func_ty = sig.to_function_type(&mut pool);
-        assert_eq!(pool.tag(func_ty), crate::Tag::Function);
-    }
-
-    #[test]
-    fn function_sig_generic() {
-        let name = Name::from_raw(1);
-        let t_param = Name::from_raw(2);
-
-        let sig = FunctionSig {
-            name,
-            type_params: vec![t_param],
-            param_names: vec![Name::from_raw(3)],
-            param_types: vec![Idx::INT],
-            return_type: Idx::INT,
-            capabilities: vec![],
-            is_public: true,
-            is_test: false,
-            is_main: false,
-            type_param_bounds: vec![vec![]],
-            where_clauses: vec![],
-            generic_param_mapping: vec![None],
-            required_params: 1,
-            param_defaults: vec![],
-        };
-
-        assert!(sig.is_generic());
-        assert!(sig.is_public);
-    }
-
-    #[test]
-    fn type_check_result_ok() {
-        let module = TypedModule::new();
-        let result = TypeCheckResult::ok(module);
-
-        assert!(!result.has_errors());
-        assert!(result.error_guarantee.is_none());
-    }
-
-    #[test]
-    fn type_check_result_from_typed() {
-        // No errors
-        let module = TypedModule::new();
-        let result = TypeCheckResult::from_typed(module);
-        assert!(!result.has_errors());
-
-        // With errors
-        let mut module_with_errors = TypedModule::new();
-        module_with_errors
-            .errors
-            .push(TypeCheckError::undefined_identifier(
-                Name::from_raw(1),
-                ori_ir::Span::DUMMY,
-            ));
-        let result = TypeCheckResult::from_typed(module_with_errors);
-        assert!(result.has_errors());
-    }
-
-    #[test]
-    fn typed_module_with_capacity() {
-        let module = TypedModule::with_capacity(100, 10);
-        assert_eq!(module.expr_types.capacity(), 100);
-        assert_eq!(module.functions.capacity(), 10);
-    }
-
-    #[test]
-    fn function_lookup() {
-        let mut module = TypedModule::new();
-        let foo = Name::from_raw(1);
-        let bar = Name::from_raw(2);
-
-        module
-            .functions
-            .push(FunctionSig::simple(foo, vec![], Idx::UNIT));
-        module
-            .functions
-            .push(FunctionSig::simple(bar, vec![Idx::INT], Idx::STR));
-
-        assert!(module.function(foo).is_some());
-        assert!(module.function(bar).is_some());
-        assert!(module.function(Name::from_raw(99)).is_none());
-
-        assert_eq!(module.function(foo).map(FunctionSig::arity), Some(0));
-        assert_eq!(module.function(bar).map(FunctionSig::arity), Some(1));
-    }
-
-    #[test]
-    fn type_def_export() {
-        use crate::registry::{FieldDef, StructDef, TypeKind, Visibility};
-
-        let mut module = TypedModule::new();
-        let point_name = Name::from_raw(10);
-        let x_name = Name::from_raw(11);
-        let y_name = Name::from_raw(12);
-
-        module.types.push(TypeEntry {
-            name: point_name,
-            idx: Idx::from_raw(100),
-            kind: TypeKind::Struct(StructDef {
-                fields: vec![
-                    FieldDef {
-                        name: x_name,
-                        ty: Idx::INT,
-                        span: Span::DUMMY,
-                        visibility: Visibility::Public,
-                    },
-                    FieldDef {
-                        name: y_name,
-                        ty: Idx::INT,
-                        span: Span::DUMMY,
-                        visibility: Visibility::Public,
-                    },
-                ],
-            }),
-            span: Span::DUMMY,
-            type_params: vec![],
-            visibility: Visibility::Public,
-        });
-
-        assert_eq!(module.type_count(), 1);
-        assert!(module.type_def(point_name).is_some());
-        assert!(module.type_def(Name::from_raw(99)).is_none());
-
-        let entry = module.type_def(point_name).unwrap();
-        assert!(matches!(entry.kind, TypeKind::Struct(_)));
-
-        if let TypeKind::Struct(ref s) = entry.kind {
-            assert_eq!(s.fields.len(), 2);
-            assert_eq!(s.fields[0].ty, Idx::INT);
-        }
-    }
-}
+mod tests;

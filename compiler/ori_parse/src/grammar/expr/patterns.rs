@@ -5,11 +5,13 @@
 //! Match pattern parsing uses `one_of!` for automatic backtracking across
 //! pattern alternatives (wildcard, literal, ident, struct, list, variant, tuple).
 
+use crate::context::ParseContext;
 use crate::recovery::TokenSet;
 use crate::{committed, one_of, require, ParseError, ParseOutcome, Parser};
 use ori_ir::{
     Expr, ExprId, ExprKind, FunctionExp, FunctionExpKind, FunctionSeq, MatchArm, MatchPattern,
-    MatchPatternId, MatchPatternRange, Name, NamedExpr, ParsedTypeId, SeqBinding, TokenKind,
+    MatchPatternId, MatchPatternRange, Name, NamedExpr, ParsedTypeId, ParsedTypeRange, SeqBinding,
+    TokenKind,
 };
 
 /// Kind of `function_seq` expression.
@@ -27,7 +29,8 @@ const PATTERN_LITERAL_TOKENS: TokenSet = TokenSet::new()
     .with(TokenKind::Int(0))
     .with(TokenKind::True)
     .with(TokenKind::False)
-    .with(TokenKind::String(Name::EMPTY));
+    .with(TokenKind::String(Name::EMPTY))
+    .with(TokenKind::Char('\0'));
 
 /// Tokens that start a builtin variant pattern.
 const PATTERN_VARIANT_TOKENS: TokenSet = TokenSet::new()
@@ -52,17 +55,49 @@ impl Parser<'_> {
     }
 
     /// Internal implementation for parsing run/try expressions.
+    ///
+    /// For `run()`, supports `pre_check:` and `post_check:` named properties:
+    /// ```text
+    /// run(
+    ///     pre_check: condition | "message",
+    ///     let x = value,
+    ///     result,
+    ///     post_check: r -> r > 0 | "message",
+    /// )
+    /// ```
     fn parse_function_seq_internal(&mut self, kind: FunctionSeqKind) -> ParseOutcome<ExprId> {
         let is_try = matches!(kind, FunctionSeqKind::Try);
+        let is_run = !is_try;
         let start_span = self.cursor.previous_span();
         committed!(self.cursor.expect(&TokenKind::LParen));
         self.cursor.skip_newlines();
 
+        let pre_check_start = self.arena.start_checks();
         let mut bindings = Vec::new();
         let mut result_expr = None;
 
+        // Phase 1: Parse pre_checks (only for run, not try)
+        if is_run {
+            while self.is_check_start(self.known.pre_check) {
+                let check = committed!(self.parse_named_check("pre_check"));
+                self.arena.push_check(check);
+                self.cursor.skip_newlines();
+                if !self.cursor.check(&TokenKind::RParen) {
+                    committed!(self.cursor.expect(&TokenKind::Comma));
+                    self.cursor.skip_newlines();
+                }
+            }
+        }
+        let pre_check_range = self.arena.finish_checks(pre_check_start);
+
+        // Phase 2: Parse bindings and result expression
         while !self.cursor.check(&TokenKind::RParen) && !self.cursor.is_at_end() {
             self.cursor.skip_newlines();
+
+            // Check for post_check (only for run) — switches to phase 3
+            if is_run && self.is_check_start(self.known.post_check) {
+                break;
+            }
 
             if self.cursor.check(&TokenKind::Let) {
                 let binding_span = self.cursor.current_span();
@@ -114,6 +149,9 @@ impl Parser<'_> {
 
                     if self.cursor.check(&TokenKind::RParen) {
                         result_expr = Some(expr);
+                    } else if is_run && self.is_check_start(self.known.post_check) {
+                        // Result followed by post_check
+                        result_expr = Some(expr);
                     } else {
                         bindings.push(SeqBinding::Stmt {
                             expr,
@@ -132,6 +170,21 @@ impl Parser<'_> {
                 self.cursor.skip_newlines();
             }
         }
+
+        // Phase 3: Parse post_checks (only for run, not try)
+        let post_check_start = self.arena.start_checks();
+        if is_run {
+            while self.is_check_start(self.known.post_check) {
+                let check = committed!(self.parse_named_check("post_check"));
+                self.arena.push_check(check);
+                self.cursor.skip_newlines();
+                if !self.cursor.check(&TokenKind::RParen) {
+                    committed!(self.cursor.expect(&TokenKind::Comma));
+                    self.cursor.skip_newlines();
+                }
+            }
+        }
+        let post_check_range = self.arena.finish_checks(post_check_start);
 
         self.cursor.skip_newlines();
         committed!(self.cursor.expect(&TokenKind::RParen));
@@ -161,8 +214,10 @@ impl Parser<'_> {
             }
         } else {
             FunctionSeq::Run {
+                pre_checks: pre_check_range,
                 bindings: bindings_range,
                 result,
+                post_checks: post_check_range,
                 span,
             }
         };
@@ -172,6 +227,50 @@ impl Parser<'_> {
             self.arena
                 .alloc_expr(Expr::new(ExprKind::FunctionSeq(func_seq_id), span)),
         )
+    }
+
+    /// Check if the current position starts a check property (`pre_check:` or `post_check:`).
+    fn is_check_start(&self, expected: Name) -> bool {
+        if let TokenKind::Ident(n) = self.cursor.current_kind() {
+            *n == expected && self.cursor.next_is_colon()
+        } else {
+            false
+        }
+    }
+
+    /// Parse a named check (`pre_check: expr | "msg"` or `post_check: expr | "msg"`).
+    ///
+    /// Assumes the cursor is at the check name identifier. Consumes the name, colon,
+    /// expression, and optional `| "message"`.
+    fn parse_named_check(&mut self, _check_name: &str) -> Result<ori_ir::CheckExpr, ParseError> {
+        let check_span = self.cursor.current_span();
+        self.cursor.advance(); // consume check name
+        self.cursor.expect(&TokenKind::Colon)?;
+
+        // Parse condition with `|` as separator (not bitwise OR).
+        // In check context, `x > 0 | "msg"` means condition `x > 0` with message `"msg"`.
+        let expr = self
+            .with_context(ParseContext::PIPE_IS_SEPARATOR, Self::parse_expr)
+            .into_result()?;
+
+        // Optional custom message: `| "message"`
+        let message = if self.cursor.check(&TokenKind::Pipe) {
+            self.cursor.advance();
+            Some(self.parse_expr().into_result()?)
+        } else {
+            None
+        };
+
+        let end = message.map_or_else(
+            || self.arena.get_expr(expr).span,
+            |m| self.arena.get_expr(m).span,
+        );
+
+        Ok(ori_ir::CheckExpr {
+            expr,
+            message,
+            span: check_span.merge(end),
+        })
     }
 
     /// Parse match as `function_seq`: match(scrutinee, Pattern -> expr, ...)
@@ -193,12 +292,27 @@ impl Parser<'_> {
 
         self.cursor.skip_newlines();
         committed!(self.cursor.expect(&TokenKind::Comma));
+
+        let result = committed!(self.parse_match_arms_with_scrutinee(scrutinee, start_span));
+        ParseOutcome::consumed_ok(result)
+    }
+
+    /// Parse match arms with a known scrutinee and construct a Match expression.
+    ///
+    /// Expects `(` has already been consumed. Parses comma-separated match arms
+    /// and the closing `)`. Used by both `match(scrutinee, arms...)` and
+    /// `scrutinee.match(arms...)` method-style syntax.
+    pub(crate) fn parse_match_arms_with_scrutinee(
+        &mut self,
+        scrutinee: ExprId,
+        start_span: ori_ir::Span,
+    ) -> Result<ExprId, ParseError> {
         self.cursor.skip_newlines();
 
         // Match arms use a Vec because nested match expressions share
         // the same `arms` buffer, causing same-buffer nesting conflicts.
         let mut arms: Vec<MatchArm> = Vec::new();
-        committed!(self.paren_series_direct(|p| {
+        self.paren_series_direct(|p| {
             if p.cursor.check(&TokenKind::RParen) {
                 return Ok(false);
             }
@@ -220,18 +334,15 @@ impl Parser<'_> {
                 span: arm_span.merge(end_span),
             });
             Ok(true)
-        }));
+        })?;
         let end_span = self.cursor.previous_span();
 
         if arms.is_empty() {
-            return ParseOutcome::consumed_err(
-                ParseError::new(
-                    ori_diagnostic::ErrorCode::E1002,
-                    "match requires at least one arm".to_string(),
-                    end_span,
-                ),
-                start_span,
-            );
+            return Err(ParseError::new(
+                ori_diagnostic::ErrorCode::E1002,
+                "match requires at least one arm",
+                end_span,
+            ));
         }
 
         let arms_range = self.arena.alloc_arms(arms);
@@ -243,10 +354,9 @@ impl Parser<'_> {
         };
 
         let func_seq_id = self.arena.alloc_function_seq(func_seq);
-        ParseOutcome::consumed_ok(
-            self.arena
-                .alloc_expr(Expr::new(ExprKind::FunctionSeq(func_seq_id), span)),
-        )
+        Ok(self
+            .arena
+            .alloc_expr(Expr::new(ExprKind::FunctionSeq(func_seq_id), span)))
     }
 
     /// Parse for pattern: for(over: items, [map: transform,] match: Pattern -> expr, default: value)
@@ -269,64 +379,57 @@ impl Parser<'_> {
                 return ParseOutcome::consumed_err(
                     ParseError::new(
                         ori_diagnostic::ErrorCode::E1013,
-                        "`for` pattern requires named properties (over:, match:, default:)"
-                            .to_string(),
+                        "`for` pattern requires named properties (over:, match:, default:)",
                         self.cursor.current_span(),
                     ),
                     start_span,
                 );
             }
 
-            let name = committed!(self.cursor.expect_ident_or_keyword());
+            let prop = committed!(self.cursor.expect_ident_or_keyword());
             committed!(self.cursor.expect(&TokenKind::Colon));
-            let name_str = self.cursor.interner().lookup(name);
 
-            match name_str {
-                "over" => {
-                    over = Some(require!(
-                        self,
-                        self.parse_expr(),
-                        "`over:` expression in for pattern"
-                    ));
-                }
-                "map" => {
-                    map = Some(require!(
-                        self,
-                        self.parse_expr(),
-                        "`map:` expression in for pattern"
-                    ));
-                }
-                "match" => {
-                    let arm_span = self.cursor.current_span();
-                    let pattern = committed!(self.parse_match_pattern());
-                    let guard = committed!(self.parse_pattern_guard());
-                    committed!(self.cursor.expect(&TokenKind::Arrow));
-                    let body = require!(self, self.parse_expr(), "match body in for pattern");
-                    let end_span = self.arena.get_expr(body).span;
-                    match_arm = Some(MatchArm {
-                        pattern,
-                        guard,
-                        body,
-                        span: arm_span.merge(end_span),
-                    });
-                }
-                "default" => {
-                    default = Some(require!(
-                        self,
-                        self.parse_expr(),
-                        "`default:` expression in for pattern"
-                    ));
-                }
-                unknown => {
-                    return ParseOutcome::consumed_err(
-                        ParseError::new(
-                            ori_diagnostic::ErrorCode::E1013,
-                            format!("`for` pattern does not accept property `{unknown}`"),
-                            self.cursor.previous_span(),
-                        ),
-                        start_span,
-                    );
-                }
+            if prop == self.known.over {
+                over = Some(require!(
+                    self,
+                    self.parse_expr(),
+                    "`over:` expression in for pattern"
+                ));
+            } else if prop == self.known.map {
+                map = Some(require!(
+                    self,
+                    self.parse_expr(),
+                    "`map:` expression in for pattern"
+                ));
+            } else if prop == self.known.match_ {
+                let arm_span = self.cursor.current_span();
+                let pattern = committed!(self.parse_match_pattern());
+                let guard = committed!(self.parse_pattern_guard());
+                committed!(self.cursor.expect(&TokenKind::Arrow));
+                let body = require!(self, self.parse_expr(), "match body in for pattern");
+                let end_span = self.arena.get_expr(body).span;
+                match_arm = Some(MatchArm {
+                    pattern,
+                    guard,
+                    body,
+                    span: arm_span.merge(end_span),
+                });
+            } else if prop == self.known.default {
+                default = Some(require!(
+                    self,
+                    self.parse_expr(),
+                    "`default:` expression in for pattern"
+                ));
+            } else {
+                let unknown = self.cursor.interner().lookup(prop);
+                return ParseOutcome::consumed_err(
+                    ParseError::new(
+                        ori_diagnostic::ErrorCode::E1013,
+                        format!("`for` pattern does not accept property `{unknown}`"),
+                        self.cursor.previous_span(),
+                    ),
+                    start_span,
+                );
             }
 
             self.cursor.skip_newlines();
@@ -345,7 +448,7 @@ impl Parser<'_> {
             return ParseOutcome::consumed_err(
                 ParseError::new(
                     ori_diagnostic::ErrorCode::E1013,
-                    "`for` pattern requires `over:` property".to_string(),
+                    "`for` pattern requires `over:` property",
                     span,
                 ),
                 start_span,
@@ -355,7 +458,7 @@ impl Parser<'_> {
             return ParseOutcome::consumed_err(
                 ParseError::new(
                     ori_diagnostic::ErrorCode::E1013,
-                    "`for` pattern requires `match:` property".to_string(),
+                    "`for` pattern requires `match:` property",
                     span,
                 ),
                 start_span,
@@ -365,7 +468,7 @@ impl Parser<'_> {
             return ParseOutcome::consumed_err(
                 ParseError::new(
                     ori_diagnostic::ErrorCode::E1013,
-                    "`for` pattern requires `default:` property".to_string(),
+                    "`for` pattern requires `default:` property",
                     span,
                 ),
                 start_span,
@@ -455,7 +558,7 @@ impl Parser<'_> {
                         return ParseOutcome::consumed_err(
                             ParseError::new(
                                 ori_diagnostic::ErrorCode::E1002,
-                                "integer literal too large".to_string(),
+                                "integer literal too large",
                                 start_span,
                             ),
                             start_span,
@@ -470,7 +573,7 @@ impl Parser<'_> {
                     ParseOutcome::consumed_err(
                         ParseError::new(
                             ori_diagnostic::ErrorCode::E1002,
-                            "expected integer after `-` in pattern".to_string(),
+                            "expected integer after `-` in pattern",
                             self.cursor.current_span(),
                         ),
                         start_span,
@@ -486,7 +589,7 @@ impl Parser<'_> {
                     return ParseOutcome::consumed_err(
                         ParseError::new(
                             ori_diagnostic::ErrorCode::E1002,
-                            "integer literal too large".to_string(),
+                            "integer literal too large",
                             pat_span,
                         ),
                         pat_span,
@@ -546,6 +649,42 @@ impl Parser<'_> {
                     ExprKind::String(name),
                     self.cursor.previous_span(),
                 ))))
+            }
+            TokenKind::Char(c) => {
+                let pat_span = self.cursor.current_span();
+                self.cursor.advance();
+
+                // Check for range pattern: 'a'..'z' or 'a'..='z'
+                if self.cursor.check(&TokenKind::DotDot) || self.cursor.check(&TokenKind::DotDotEq)
+                {
+                    let inclusive = self.cursor.check(&TokenKind::DotDotEq);
+                    self.cursor.advance();
+                    let start_expr = self
+                        .arena
+                        .alloc_expr(Expr::new(ExprKind::Char(c), pat_span));
+
+                    let end = if self.is_range_bound_start() {
+                        match self.parse_range_bound() {
+                            Ok(e) => Some(e),
+                            Err(err) => {
+                                return ParseOutcome::consumed_err(err, pat_span);
+                            }
+                        }
+                    } else {
+                        None
+                    };
+
+                    return ParseOutcome::consumed_ok(MatchPattern::Range {
+                        start: Some(start_expr),
+                        end,
+                        inclusive,
+                    });
+                }
+
+                ParseOutcome::consumed_ok(MatchPattern::Literal(
+                    self.arena
+                        .alloc_expr(Expr::new(ExprKind::Char(c), self.cursor.previous_span())),
+                ))
             }
             _ => ParseOutcome::empty_err(
                 PATTERN_LITERAL_TOKENS,
@@ -784,6 +923,64 @@ impl Parser<'_> {
         let func_exp = FunctionExp {
             kind,
             props: props_range,
+            type_args: ParsedTypeRange::EMPTY,
+            span: start_span.merge(end_span),
+        };
+
+        let func_exp_id = self.arena.alloc_function_exp(func_exp);
+        ParseOutcome::consumed_ok(self.arena.alloc_expr(Expr::new(
+            ExprKind::FunctionExp(func_exp_id),
+            start_span.merge(end_span),
+        )))
+    }
+
+    /// Parse a channel expression: `channel<int>(buffer: 10)` or `channel(buffer: 10)`.
+    ///
+    /// Called after the channel identifier has been consumed by `parse_primary`.
+    /// Parses optional generic type arguments, then named properties in parens.
+    pub(crate) fn parse_channel_expr(&mut self, kind: FunctionExpKind) -> ParseOutcome<ExprId> {
+        let start_span = self.cursor.previous_span();
+
+        // Parse optional generic type arguments: <int>, <str>, <Result<int, str>>
+        let type_args = self.parse_optional_generic_args_range();
+
+        committed!(self.cursor.expect(&TokenKind::LParen));
+        self.cursor.skip_newlines();
+
+        let mut props: Vec<NamedExpr> = Vec::new();
+        committed!(self.paren_series_direct(|p| {
+            if p.cursor.check(&TokenKind::RParen) {
+                return Ok(false);
+            }
+
+            if !p.cursor.is_named_arg_start() {
+                return Err(crate::ParseError::new(
+                    ori_diagnostic::ErrorCode::E1013,
+                    format!("`{}` requires named properties (name: value)", kind.name()),
+                    p.cursor.current_span(),
+                ));
+            }
+
+            let name = p.cursor.expect_ident_or_keyword()?;
+            let prop_span = p.cursor.previous_span();
+            p.cursor.expect(&TokenKind::Colon)?;
+            let value = p.parse_expr().into_result()?;
+            let end_span = p.arena.get_expr(value).span;
+
+            props.push(NamedExpr {
+                name,
+                value,
+                span: prop_span.merge(end_span),
+            });
+            Ok(true)
+        }));
+        let end_span = self.cursor.previous_span();
+
+        let props_range = self.arena.alloc_named_exprs(props);
+        let func_exp = FunctionExp {
+            kind,
+            props: props_range,
+            type_args,
             span: start_span.merge(end_span),
         };
 
@@ -820,12 +1017,22 @@ impl Parser<'_> {
         }
     }
 
-    /// Parse struct pattern fields: `{ x, y: pattern, ... }`
+    /// Parse struct pattern fields: `{ x, y: pattern }` or `{ x, .. }`.
     fn parse_struct_pattern_fields(&mut self) -> Result<MatchPattern, ParseError> {
         self.cursor.advance(); // consume {
 
-        let fields: Vec<(ori_ir::Name, Option<MatchPatternId>)> = self.brace_series(|p| {
+        let mut fields: Vec<(ori_ir::Name, Option<MatchPatternId>)> = Vec::new();
+        let mut rest = false;
+
+        self.brace_series(|p| {
             if p.cursor.check(&TokenKind::RBrace) {
+                return Ok(None);
+            }
+
+            // Check for `..` rest pattern
+            if p.cursor.check(&TokenKind::DotDot) {
+                p.cursor.advance();
+                rest = true;
                 return Ok(None);
             }
 
@@ -840,17 +1047,18 @@ impl Parser<'_> {
                 None // Shorthand: field name is also the binding
             };
 
-            Ok(Some((field_name, pattern_id)))
+            fields.push((field_name, pattern_id));
+            Ok(Some(()))
         })?;
 
-        Ok(MatchPattern::Struct { fields })
+        Ok(MatchPattern::Struct { fields, rest })
     }
 
-    /// Check if current token can start a range bound (integer or minus).
+    /// Check if current token can start a range bound (integer, char, or minus).
     fn is_range_bound_start(&self) -> bool {
         matches!(
             self.cursor.current_kind(),
-            TokenKind::Int(_) | TokenKind::Minus
+            TokenKind::Int(_) | TokenKind::Char(_) | TokenKind::Minus
         )
     }
 
@@ -876,7 +1084,7 @@ impl Parser<'_> {
             // Not a guard, could be a field access (but that's not valid here)
             return Err(ParseError::new(
                 ori_diagnostic::ErrorCode::E1002,
-                "expected `match` after `.` in pattern guard".to_string(),
+                "expected `match` after `.` in pattern guard",
                 self.cursor.current_span(),
             ));
         }
@@ -910,7 +1118,7 @@ impl Parser<'_> {
                 let value = i64::try_from(n).map_err(|_| {
                     ParseError::new(
                         ori_diagnostic::ErrorCode::E1002,
-                        "integer literal too large".to_string(),
+                        "integer literal too large",
                         start_span,
                     )
                 })?;
@@ -921,7 +1129,7 @@ impl Parser<'_> {
             } else {
                 Err(ParseError::new(
                     ori_diagnostic::ErrorCode::E1002,
-                    "expected integer after `-` in range pattern".to_string(),
+                    "expected integer after `-` in range pattern",
                     self.cursor.current_span(),
                 ))
             }
@@ -930,17 +1138,22 @@ impl Parser<'_> {
             let value = i64::try_from(n).map_err(|_| {
                 ParseError::new(
                     ori_diagnostic::ErrorCode::E1002,
-                    "integer literal too large".to_string(),
+                    "integer literal too large",
                     start_span,
                 )
             })?;
             Ok(self
                 .arena
                 .alloc_expr(Expr::new(ExprKind::Int(value), self.cursor.previous_span())))
+        } else if let TokenKind::Char(c) = *self.cursor.current_kind() {
+            self.cursor.advance();
+            Ok(self
+                .arena
+                .alloc_expr(Expr::new(ExprKind::Char(c), self.cursor.previous_span())))
         } else {
             Err(ParseError::new(
                 ori_diagnostic::ErrorCode::E1002,
-                "expected integer in range pattern".to_string(),
+                "expected integer or char literal in range pattern",
                 self.cursor.current_span(),
             ))
         }

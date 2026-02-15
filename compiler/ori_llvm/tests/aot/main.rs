@@ -7,9 +7,11 @@
 pub mod cli;
 pub mod codegen;
 pub mod cross;
+pub mod derives;
 pub mod linking;
 pub mod lto;
 pub mod spec;
+pub mod traits;
 pub mod wasm;
 
 // Re-export test utilities

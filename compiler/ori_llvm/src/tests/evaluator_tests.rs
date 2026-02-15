@@ -1,5 +1,12 @@
 //! Tests for `OwnedLLVMEvaluator` and evaluator types.
 
+#![allow(
+    clippy::manual_assert,
+    clippy::uninlined_format_args,
+    clippy::default_trait_access,
+    reason = "test ergonomics — relaxed style for clarity"
+)]
+
 use ori_ir::StringInterner;
 use ori_types::Pool;
 
@@ -67,6 +74,7 @@ fn test_compile_module_with_tests_empty() {
     let interner = StringInterner::new();
 
     let module = ori_ir::ast::Module {
+        file_attr: None,
         imports: vec![],
         consts: vec![],
         functions: vec![],
@@ -76,6 +84,8 @@ fn test_compile_module_with_tests_empty() {
         impls: vec![],
         extends: vec![],
         def_impls: vec![],
+        extension_imports: vec![],
+        extern_blocks: vec![],
     };
 
     let canon = ori_ir::canon::CanonResult {
@@ -85,6 +95,7 @@ fn test_compile_module_with_tests_empty() {
         root: ori_ir::canon::CanId::INVALID,
         roots: vec![],
         method_roots: vec![],
+        problems: vec![],
     };
     let result =
         evaluator.compile_module_with_tests(&module, &[], &canon, &interner, &[], &[], &[], &[]);

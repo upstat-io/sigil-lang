@@ -55,6 +55,35 @@ pub(crate) struct LoopContext {
 }
 
 // ---------------------------------------------------------------------------
+// PropNames
+// ---------------------------------------------------------------------------
+
+/// Pre-interned `FunctionExp` property names for O(1) lookup.
+///
+/// Interned once per `ExprLowerer` so that property dispatch in
+/// `lower_constructs.rs` compares `Name` values directly (`u32 == u32`)
+/// instead of deinterning to `&str` on every named expression.
+#[derive(Clone, Copy)]
+pub(crate) struct PropNames {
+    pub(crate) msg: Name,
+    pub(crate) message: Name,
+    pub(crate) value: Name,
+    pub(crate) expr: Name,
+}
+
+impl PropNames {
+    /// Pre-intern all property names used by construct lowering.
+    fn new(interner: &StringInterner) -> Self {
+        Self {
+            msg: interner.intern("msg"),
+            message: interner.intern("message"),
+            value: interner.intern("value"),
+            expr: interner.intern("expr"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // ExprLowerer
 // ---------------------------------------------------------------------------
 
@@ -81,8 +110,7 @@ pub struct ExprLowerer<'a, 'scx, 'ctx, 'tcx> {
     pub(crate) canon: &'a CanonResult,
     /// String interner for `Name` → `&str` resolution.
     pub(crate) interner: &'a StringInterner,
-    /// Type pool for structural queries (used by future lowering extensions).
-    #[allow(dead_code)]
+    /// Type pool for structural queries (debug info, type-dependent emission).
     pub(crate) pool: &'a Pool,
     /// The LLVM function currently being compiled.
     pub(crate) current_function: FunctionId,
@@ -98,6 +126,12 @@ pub struct ExprLowerer<'a, 'scx, 'ctx, 'tcx> {
     pub(crate) type_idx_to_name: &'a FxHashMap<Idx, Name>,
     /// Active loop context for break/continue (None outside loops).
     pub(crate) loop_ctx: Option<LoopContext>,
+    /// Resolved `#` (hash length) value for the current index expression.
+    ///
+    /// Set by `lower_index` before lowering the index sub-expression,
+    /// so that `CanExpr::HashLength` resolves to the collection's length
+    /// instead of zero. Mirrors the interpreter's `eval_can_with_hash_length`.
+    pub(crate) hash_length: Option<ValueId>,
     /// Module-wide lambda counter for unique lambda function names.
     ///
     /// Shared via `&Cell<u32>` so that nested lambdas (which create new
@@ -108,11 +142,16 @@ pub struct ExprLowerer<'a, 'scx, 'ctx, 'tcx> {
     pub(crate) module_path: &'a str,
     /// Debug info context (None for JIT, Some for AOT with debug info enabled).
     pub(crate) debug_context: Option<&'a DebugContext<'ctx>>,
+    /// Pre-interned property names for `FunctionExp` dispatch (`u32 == u32`).
+    pub(crate) prop_names: PropNames,
 }
 
 impl<'a, 'scx: 'ctx, 'ctx, 'tcx> ExprLowerer<'a, 'scx, 'ctx, 'tcx> {
     /// Create a new expression lowerer.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "lowerer needs all compiler contexts; grouping would add indirection"
+    )]
     pub fn new(
         builder: &'a mut IrBuilder<'scx, 'ctx>,
         type_info: &'a TypeInfoStore<'tcx>,
@@ -129,6 +168,7 @@ impl<'a, 'scx: 'ctx, 'ctx, 'tcx> ExprLowerer<'a, 'scx, 'ctx, 'tcx> {
         module_path: &'a str,
         debug_context: Option<&'a DebugContext<'ctx>>,
     ) -> Self {
+        let prop_names = PropNames::new(interner);
         Self {
             builder,
             type_info,
@@ -142,9 +182,11 @@ impl<'a, 'scx: 'ctx, 'ctx, 'tcx> ExprLowerer<'a, 'scx, 'ctx, 'tcx> {
             method_functions,
             type_idx_to_name,
             loop_ctx: None,
+            hash_length: None,
             lambda_counter,
             module_path,
             debug_context,
+            prop_names,
         }
     }
 
@@ -181,9 +223,21 @@ impl<'a, 'scx: 'ctx, 'ctx, 'tcx> ExprLowerer<'a, 'scx, 'ctx, 'tcx> {
     ///
     /// Every `CanExpr` variant is listed explicitly — no catch-all — so
     /// adding a new variant to the canonical IR causes a compile error here.
-    #[allow(clippy::too_many_lines)] // Exhaustive dispatch over all CanExpr variants
+    #[allow(
+        clippy::too_many_lines,
+        reason = "exhaustive match over all CanExpr variants; splitting would obscure dispatch"
+    )]
     pub fn lower(&mut self, id: CanId) -> Option<ValueId> {
         if !id.is_valid() {
+            return None;
+        }
+
+        // Early bailout: once any codegen error has occurred in this module,
+        // stop building further LLVM instructions. Continuing after a type
+        // mismatch produces values with wrong types (e.g., i64 where a struct
+        // is expected), which cascades into LLVM heap corruption (munmap_chunk).
+        // The module will be rejected at the codegen_errors check anyway.
+        if self.builder.has_codegen_errors() {
             return None;
         }
 
@@ -203,14 +257,23 @@ impl<'a, 'scx: 'ctx, 'ctx, 'tcx> ExprLowerer<'a, 'scx, 'ctx, 'tcx> {
 
         match kind {
             // --- Literals & identifiers (lower_literals.rs) ---
-            CanExpr::Int(n) => Some(self.lower_int(n)),
+            CanExpr::Int(n) => Some(self.lower_int_typed(n, id)),
             CanExpr::Float(bits) => Some(self.lower_float(bits)),
             CanExpr::Bool(b) => Some(self.lower_bool(b)),
             CanExpr::Char(c) => Some(self.lower_char(c)),
             CanExpr::Str(name) => self.lower_string(name),
             CanExpr::Duration { value, unit } => Some(self.lower_duration(value, unit)),
             CanExpr::Size { value, unit } => Some(self.lower_size(value, unit)),
-            CanExpr::Unit | CanExpr::HashLength => Some(self.lower_unit()),
+            CanExpr::Unit => Some(self.lower_unit()),
+            CanExpr::HashLength => {
+                if let Some(len) = self.hash_length {
+                    Some(len)
+                } else {
+                    tracing::warn!("HashLength (#) used outside index expression");
+                    self.builder.record_codegen_error();
+                    None
+                }
+            }
             CanExpr::Ident(name) | CanExpr::TypeRef(name) => self.lower_ident(name, id),
             CanExpr::Const(name) => self.lower_const(name, id),
             CanExpr::FunctionRef(name) => self.lower_function_ref(name),
@@ -237,16 +300,17 @@ impl<'a, 'scx: 'ctx, 'ctx, 'tcx> ExprLowerer<'a, 'scx, 'ctx, 'tcx> {
                 init,
                 mutable,
             } => self.lower_let(pattern, init, mutable),
-            CanExpr::Loop { body } => self.lower_loop(body, id),
+            CanExpr::Loop { body, .. } => self.lower_loop(body, id),
             CanExpr::For {
                 binding,
                 iter,
                 guard,
                 body,
                 is_yield,
+                ..
             } => self.lower_for(binding, iter, guard, body, is_yield, id),
-            CanExpr::Break(value) => self.lower_break(value),
-            CanExpr::Continue(value) => self.lower_continue(value),
+            CanExpr::Break { value, .. } => self.lower_break(value),
+            CanExpr::Continue { value, .. } => self.lower_continue(value),
             CanExpr::Assign { target, value } => self.lower_assign(target, value),
             CanExpr::Match {
                 scrutinee,
@@ -297,6 +361,7 @@ impl<'a, 'scx: 'ctx, 'ctx, 'tcx> ExprLowerer<'a, 'scx, 'ctx, 'tcx> {
             // --- Error placeholder (should not reach codegen) ---
             CanExpr::Error => {
                 tracing::warn!("CanExpr::Error reached codegen");
+                self.builder.record_codegen_error();
                 None
             }
         }

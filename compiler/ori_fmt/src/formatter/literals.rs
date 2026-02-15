@@ -5,6 +5,7 @@
 use ori_ir::{ParsedType, StringLookup};
 
 use super::Formatter;
+use crate::declarations::format_const_expr;
 
 impl<I: StringLookup> Formatter<'_, I> {
     pub(super) fn emit_int(&mut self, n: i64) {
@@ -115,7 +116,7 @@ impl<I: StringLookup> Formatter<'_, I> {
                 let elem_ty = self.arena.get_parsed_type(*elem);
                 self.emit_type(elem_ty);
                 self.ctx.emit(", max ");
-                self.ctx.emit(&capacity.to_string());
+                format_const_expr(*capacity, self.arena, self.interner, &mut self.ctx);
                 self.ctx.emit("]");
             }
             ParsedType::Map { key, value } => {
@@ -160,6 +161,19 @@ impl<I: StringLookup> Formatter<'_, I> {
                 self.emit_type(base_ty);
                 self.ctx.emit(".");
                 self.ctx.emit(self.interner.lookup(*assoc_name));
+            }
+            ParsedType::ConstExpr(expr_id) => {
+                format_const_expr(*expr_id, self.arena, self.interner, &mut self.ctx);
+            }
+            ParsedType::TraitBounds(bounds) => {
+                let bound_ids = self.arena.get_parsed_type_list(*bounds);
+                for (i, bound_id) in bound_ids.iter().enumerate() {
+                    if i > 0 {
+                        self.ctx.emit(" + ");
+                    }
+                    let bound = self.arena.get_parsed_type(*bound_id);
+                    self.emit_type(bound);
+                }
             }
         }
     }

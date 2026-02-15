@@ -3,7 +3,7 @@
 //! Methods for emitting expressions inline (single line).
 //! Used when expressions fit within the line width.
 
-use ori_ir::{BinaryOp, ExprId, ExprKind, StringLookup};
+use ori_ir::{BinaryOp, ExprId, ExprKind, Name, StringLookup};
 
 use super::{binary_op_str, unary_op_str, Formatter};
 
@@ -281,16 +281,17 @@ impl<I: StringLookup> Formatter<'_, I> {
                 }
             }
             ExprKind::Tuple(items) => {
-                let items_vec: Vec<_> = self.arena.get_expr_list(*items).to_vec();
+                let items_slice = self.arena.get_expr_list(*items);
+                let items_len = items_slice.len();
                 self.ctx.emit("(");
-                for (i, item) in items_vec.iter().enumerate() {
+                for (i, &item) in items_slice.iter().enumerate() {
                     if i > 0 {
                         self.ctx.emit(", ");
                     }
-                    self.emit_inline(*item);
+                    self.emit_inline(item);
                 }
                 // Single-element tuples need trailing comma: (42,) vs (42)
-                if items_vec.len() == 1 {
+                if items_len == 1 {
                     self.ctx.emit(",");
                 }
                 self.ctx.emit(")");
@@ -325,18 +326,26 @@ impl<I: StringLookup> Formatter<'_, I> {
             ExprKind::None => self.ctx.emit("None"),
 
             // Control flow jumps
-            ExprKind::Break(val) => {
+            ExprKind::Break { label, value } => {
                 self.ctx.emit("break");
-                if val.is_present() {
+                if *label != Name::EMPTY {
+                    self.ctx.emit(":");
+                    self.ctx.emit(self.interner.lookup(*label));
+                }
+                if value.is_present() {
                     self.ctx.emit_space();
-                    self.emit_inline(*val);
+                    self.emit_inline(*value);
                 }
             }
-            ExprKind::Continue(val) => {
+            ExprKind::Continue { label, value } => {
                 self.ctx.emit("continue");
-                if val.is_present() {
+                if *label != Name::EMPTY {
+                    self.ctx.emit(":");
+                    self.ctx.emit(self.interner.lookup(*label));
+                }
+                if value.is_present() {
                     self.ctx.emit_space();
-                    self.emit_inline(*val);
+                    self.emit_inline(*value);
                 }
             }
 
@@ -382,13 +391,19 @@ impl<I: StringLookup> Formatter<'_, I> {
 
             // For loop
             ExprKind::For {
+                label,
                 binding,
                 iter,
                 guard,
                 body,
                 is_yield,
             } => {
-                self.ctx.emit("for ");
+                self.ctx.emit("for");
+                if *label != Name::EMPTY {
+                    self.ctx.emit(":");
+                    self.ctx.emit(self.interner.lookup(*label));
+                }
+                self.ctx.emit(" ");
                 self.ctx.emit(self.interner.lookup(*binding));
                 self.ctx.emit(" in ");
                 self.emit_iter_inline(*iter);
@@ -405,8 +420,13 @@ impl<I: StringLookup> Formatter<'_, I> {
             }
 
             // Loop
-            ExprKind::Loop { body } => {
-                self.ctx.emit("loop(");
+            ExprKind::Loop { label, body } => {
+                self.ctx.emit("loop");
+                if *label != Name::EMPTY {
+                    self.ctx.emit(":");
+                    self.ctx.emit(self.interner.lookup(*label));
+                }
+                self.ctx.emit("(");
                 self.emit_inline(*body);
                 self.ctx.emit(")");
             }

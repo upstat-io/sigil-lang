@@ -62,7 +62,10 @@ pub struct ArcIrEmitter<'a, 'scx, 'ctx, 'tcx> {
 
 impl<'a, 'scx: 'ctx, 'ctx, 'tcx> ArcIrEmitter<'a, 'scx, 'ctx, 'tcx> {
     /// Create a new ARC IR emitter.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "ARC emitter needs all codegen contexts; grouping would add indirection"
+    )]
     pub fn new(
         builder: &'a mut IrBuilder<'scx, 'ctx>,
         type_info: &'a TypeInfoStore<'tcx>,
@@ -93,9 +96,17 @@ impl<'a, 'scx: 'ctx, 'ctx, 'tcx> ArcIrEmitter<'a, 'scx, 'ctx, 'tcx> {
     }
 
     /// Look up the LLVM value for an ARC variable.
+    ///
+    /// Returns `ValueId::NONE` and logs a warning if the variable is not yet
+    /// defined — this is an internal invariant violation but should not crash
+    /// the compiler. The malformed IR will be caught by `codegen_error_count`.
     fn var(&self, v: ArcVarId) -> ValueId {
-        self.var_map[v.index()]
-            .unwrap_or_else(|| panic!("ArcIrEmitter: variable v{} not yet defined", v.raw()))
+        if let Some(Some(val)) = self.var_map.get(v.index()) {
+            *val
+        } else {
+            tracing::error!(var = v.raw(), "ArcIrEmitter: variable not yet defined");
+            ValueId::NONE
+        }
     }
 
     /// Bind an ARC variable to an LLVM value.
@@ -215,7 +226,12 @@ impl<'a, 'scx: 'ctx, 'ctx, 'tcx> ArcIrEmitter<'a, 'scx, 'ctx, 'tcx> {
                 // Record phi incoming values for the target block's parameters
                 let target_idx = target.index();
                 if !args.is_empty() {
-                    let source_block = self.builder.current_block().expect("no current block");
+                    let Some(source_block) = self.builder.current_block() else {
+                        tracing::error!("ARC jump: no current block — skipping phi incoming");
+                        self.builder.record_codegen_error();
+                        self.builder.br(self.block(*target));
+                        return;
+                    };
                     for (i, &arg) in args.iter().enumerate() {
                         let val = self.var(arg);
                         self.phi_incoming.push((target_idx, i, val, source_block));
@@ -348,6 +364,7 @@ impl<'a, 'scx: 'ctx, 'ctx, 'tcx> ArcIrEmitter<'a, 'scx, 'ctx, 'tcx> {
                 name = callee_name_str,
                 "ArcIrEmitter: unresolved function in apply"
             );
+            self.builder.record_codegen_error();
             None
         };
 
@@ -489,7 +506,7 @@ impl<'a, 'scx: 'ctx, 'ctx, 'tcx> ArcIrEmitter<'a, 'scx, 'ctx, 'tcx> {
                 ctor,
                 args,
             } => {
-                let val = self.emit_construct(*ty, ctor, args, func);
+                let val = self.emit_construct(*ty, ctor, args);
                 self.def_var(*dst, val);
             }
 
@@ -544,7 +561,7 @@ impl<'a, 'scx: 'ctx, 'ctx, 'tcx> ArcIrEmitter<'a, 'scx, 'ctx, 'tcx> {
                 // After expansion by Section 09, this is the "fast path" —
                 // the token's memory is already allocated.
                 // For the initial scaffold, just construct normally.
-                let val = self.emit_construct(*ty, ctor, args, func);
+                let val = self.emit_construct(*ty, ctor, args);
                 self.def_var(*dst, val);
                 // Token is consumed but not needed for the basic path.
                 let _ = token;
@@ -554,8 +571,6 @@ impl<'a, 'scx: 'ctx, 'ctx, 'tcx> ArcIrEmitter<'a, 'scx, 'ctx, 'tcx> {
                 // In-place field update (only valid when uniquely owned)
                 let base_val = self.var(*base);
                 let new_val = self.var(*value);
-                let base_ty = func.var_type(*base);
-                let _llvm_base_ty = self.resolve_type(base_ty);
 
                 // insert_value for value-typed structs
                 let updated =
@@ -730,13 +745,7 @@ impl<'a, 'scx: 'ctx, 'ctx, 'tcx> ArcIrEmitter<'a, 'scx, 'ctx, 'tcx> {
     // -----------------------------------------------------------------------
 
     /// Emit a `Construct` instruction.
-    fn emit_construct(
-        &mut self,
-        ty: Idx,
-        ctor: &CtorKind,
-        args: &[ArcVarId],
-        _func: &ArcFunction,
-    ) -> ValueId {
+    fn emit_construct(&mut self, ty: Idx, ctor: &CtorKind, args: &[ArcVarId]) -> ValueId {
         let arg_vals: Vec<ValueId> = args.iter().map(|a| self.var(*a)).collect();
         let llvm_ty = self.resolve_type(ty);
 
@@ -757,18 +766,42 @@ impl<'a, 'scx: 'ctx, 'ctx, 'tcx> ArcIrEmitter<'a, 'scx, 'ctx, 'tcx> {
             }
 
             CtorKind::ListLiteral => {
-                // List construction: allocate and populate
-                // For now, use the runtime list_new helper
-                let elem_count = self.builder.const_i64(arg_vals.len() as i64);
-                let elem_size = self.builder.const_i64(8); // sizeof(i64)
-                if let Some(list_new) = self.builder.scx().llmod.get_function("ori_list_new") {
-                    let func_id = self.builder.intern_function(list_new);
-                    if let Some(list) = self.builder.call(func_id, &[elem_count, elem_size], "list")
-                    {
-                        return list;
-                    }
+                // List construction: allocate data, store elements, build struct
+                let count = arg_vals.len();
+                let type_info = self.type_info.get(ty);
+                let elem_idx = match &type_info {
+                    super::type_info::TypeInfo::List { element } => *element,
+                    _ => ori_types::Idx::INT,
+                };
+                let elem_llvm_ty = self.resolve_type(elem_idx);
+                let elem_size = self.type_info.get(elem_idx).size().unwrap_or(8);
+
+                let cap_val = self.builder.const_i64(count as i64);
+                let esize_val = self.builder.const_i64(elem_size as i64);
+
+                let data_ptr = if let Some(alloc_fn) =
+                    self.builder.scx().llmod.get_function("ori_list_alloc_data")
+                {
+                    let func_id = self.builder.intern_function(alloc_fn);
+                    self.builder
+                        .call(func_id, &[cap_val, esize_val], "list.data")
+                        .unwrap_or_else(|| self.builder.const_null_ptr())
+                } else {
+                    self.builder.const_null_ptr()
+                };
+
+                // Store each element into the data buffer
+                for (i, &val) in arg_vals.iter().enumerate() {
+                    let idx = self.builder.const_i64(i as i64);
+                    let elem_ptr =
+                        self.builder
+                            .gep(elem_llvm_ty, data_ptr, &[idx], "list.elem_ptr");
+                    self.builder.store(val, elem_ptr);
                 }
-                self.builder.const_null_ptr()
+
+                // Build list struct: {i64 len, i64 cap, ptr data}
+                self.builder
+                    .build_struct(llvm_ty, &[cap_val, cap_val, data_ptr], "list")
             }
 
             CtorKind::MapLiteral | CtorKind::SetLiteral => {

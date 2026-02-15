@@ -12,11 +12,25 @@ Review implementation hygiene against `.claude/rules/impl-hygiene.md` and genera
 
 ## Target
 
-`$ARGUMENTS` specifies the boundary or scope to review:
+`$ARGUMENTS` specifies the boundary or scope to review. There are two modes:
+
+### Path Mode (explicit crate/directory targets)
 - `/impl-hygiene-review compiler/ori_lexer compiler/ori_parse` — review lexer→parser boundary
 - `/impl-hygiene-review compiler/ori_parse compiler/ori_types` — review parser→type-checker boundary
 - `/impl-hygiene-review compiler/ori_types` — review internal phase boundaries within a crate
 - `/impl-hygiene-review compiler/ori_arc` — review ARC pass composition
+
+### Commit Mode (use a commit as a scope selector)
+- `/impl-hygiene-review last commit` — review files touched by the most recent commit
+- `/impl-hygiene-review last 3 commits` — review files touched by the last N commits
+- `/impl-hygiene-review <commit-hash>` — review files touched by a specific commit
+
+**CRITICAL: Commits are scope selectors, NOT content filters.** The commit determines WHICH files and areas to review. Once the files are identified, review them completely — report ALL hygiene findings in those files, regardless of whether the finding is "related to" or "caused by" the commit. The commit is a lens to focus on a region of the codebase, nothing more. Do NOT annotate findings with whether they relate to the commit. Do NOT deprioritize or exclude findings because they predate the commit.
+
+**Commit scoping procedure:**
+1. Use `git diff --name-only HEAD~N..HEAD` (or appropriate range) to get the list of changed `.rs` files
+2. Expand to include the full crate(s) those files belong to (e.g., if `compiler/ori_llvm/src/derive.rs` was touched, include all of `compiler/ori_llvm/`)
+3. Proceed with the standard review process using those crates as the target
 
 If no argument: ask the user what boundary to review.
 

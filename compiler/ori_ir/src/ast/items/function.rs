@@ -189,24 +189,26 @@ impl Spanned for TestDef {
 
 /// Constant definition.
 ///
-/// Syntax: `[pub] let $name = literal`
+/// Syntax: `[pub] let $name = expr`
 ///
-/// Constants are compile-time immutable bindings. The type is inferred from the literal.
-/// They can be imported via `use "./module" { $const_name }`.
+/// Constants are compile-time immutable bindings. The type is inferred from the
+/// initializer expression. They can be imported via `use "./module" { $const_name }`.
 ///
 /// # Fields
 ///
 /// - `name`: The interned name of the constant (without the `$` prefix).
-/// - `value`: The initializer expression ID (must resolve to a literal).
+/// - `value`: The initializer expression ID.
 /// - `span`: The source span covering the entire definition.
 /// - `visibility`: The visibility of this constant.
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct ConstDef {
     /// The interned name of the constant (without the `$` prefix).
     pub name: Name,
-    /// The initializer expression (must be a literal).
-    /// At parse time, this points to an `ExprKind::Int`, `ExprKind::Float`,
-    /// `ExprKind::String`, `ExprKind::Bool`, or similar literal node.
+    /// Optional explicit type annotation (`let $NAME: int = ...`).
+    pub ty: Option<ParsedType>,
+    /// The initializer expression. May be a literal or a computed constant
+    /// expression (arithmetic, comparison, logical, conditional, or references
+    /// to other constants). Constness validation happens in later phases.
     pub value: ExprId,
     /// Source span covering the entire constant definition (`let $name = value`).
     pub span: Span,
@@ -220,9 +222,80 @@ impl Spanned for ConstDef {
     }
 }
 
+/// Target conditional compilation attribute.
+///
+/// Used in both item-level (`#target(...)`) and file-level (`#!target(...)`) attributes.
+/// Contains the parsed target conditions — OS, architecture, family, and negation.
+///
+/// # Examples
+///
+/// ```ori
+/// #!target(os: "linux")
+/// #!target(os: "linux", arch: "x86_64")
+/// #target(not_os: "windows")
+/// ```
+#[derive(Clone, Debug, Default, Eq, PartialEq, Hash)]
+pub struct TargetAttr {
+    pub os: Option<Name>,
+    pub arch: Option<Name>,
+    pub family: Option<Name>,
+    pub any_os: Vec<Name>,
+    pub not_os: Option<Name>,
+}
+
+/// Config conditional compilation attribute.
+///
+/// Used in both item-level (`#cfg(...)`) and file-level (`#!cfg(...)`) attributes.
+/// Contains parsed config flags — debug/release mode, feature flags, and negation.
+///
+/// # Examples
+///
+/// ```ori
+/// #!cfg(debug)
+/// #!cfg(feature: "logging")
+/// #cfg(release, not_debug)
+/// ```
+#[derive(Clone, Debug, Default, Eq, PartialEq, Hash)]
+pub struct CfgAttr {
+    pub debug: bool,
+    pub release: bool,
+    pub not_debug: bool,
+    pub feature: Option<Name>,
+    pub any_feature: Vec<Name>,
+    pub not_feature: Option<Name>,
+}
+
+/// A file-level attribute applied to the entire module.
+///
+/// Grammar: `file_attribute = "#!" identifier "(" [ attribute_arg { "," attribute_arg } ] ")" .`
+///
+/// File-level attributes use the `#!` prefix (vs `#` for item-level) and must
+/// appear before any imports or declarations. Only `target` and `cfg` are valid
+/// at the file level.
+///
+/// Wraps the shared `TargetAttr`/`CfgAttr` types with a source span covering
+/// the entire attribute from `#!` through the closing `)`.
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub enum FileAttr {
+    /// `#!target(os: "linux")` — target conditional compilation.
+    Target { attr: TargetAttr, span: Span },
+    /// `#!cfg(debug)` — config conditional compilation.
+    Cfg { attr: CfgAttr, span: Span },
+}
+
+impl Spanned for FileAttr {
+    fn span(&self) -> Span {
+        match self {
+            FileAttr::Target { span, .. } | FileAttr::Cfg { span, .. } => *span,
+        }
+    }
+}
+
 /// A parsed module (collection of items).
 #[derive(Clone, Eq, PartialEq, Hash, Default)]
 pub struct Module {
+    /// File-level attribute (`#!target(...)`, `#!cfg(...)`)
+    pub file_attr: Option<FileAttr>,
     /// Import statements
     pub imports: Vec<UseDef>,
     /// Constant definitions
@@ -241,11 +314,16 @@ pub struct Module {
     pub def_impls: Vec<super::traits::DefImplDef>,
     /// Extension method blocks
     pub extends: Vec<super::traits::ExtendDef>,
+    /// Extension imports (`extension path { Type.method }`)
+    pub extension_imports: Vec<super::imports::ExtensionImport>,
+    /// Extern blocks (`extern "c" from "lib" { ... }`)
+    pub extern_blocks: Vec<super::extern_def::ExternBlock>,
 }
 
 impl Module {
     pub fn new() -> Self {
         Module {
+            file_attr: None,
             imports: Vec::new(),
             consts: Vec::new(),
             functions: Vec::new(),
@@ -255,6 +333,8 @@ impl Module {
             impls: Vec::new(),
             def_impls: Vec::new(),
             extends: Vec::new(),
+            extension_imports: Vec::new(),
+            extern_blocks: Vec::new(),
         }
     }
 
@@ -272,6 +352,7 @@ impl Module {
         let type_estimate = (func_estimate / 8).max(2);
 
         Module {
+            file_attr: None,
             imports: Vec::with_capacity(4),
             consts: Vec::with_capacity(2),
             functions: Vec::with_capacity(func_estimate),
@@ -281,15 +362,22 @@ impl Module {
             impls: Vec::with_capacity(type_estimate),
             def_impls: Vec::with_capacity(2),
             extends: Vec::with_capacity(2),
+            extension_imports: Vec::with_capacity(2),
+            extern_blocks: Vec::new(),
         }
     }
 }
 
 impl fmt::Debug for Module {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(attr) = &self.file_attr {
+            write!(f, "Module {{ file_attr: {attr:?}, ")?;
+        } else {
+            write!(f, "Module {{ ")?;
+        }
         write!(
             f,
-            "Module {{ {} consts, {} functions, {} tests, {} types, {} traits, {} impls, {} def_impls, {} extends }}",
+            "{} consts, {} functions, {} tests, {} types, {} traits, {} impls, {} def_impls, {} extends, {} ext_imports, {} extern_blocks }}",
             self.consts.len(),
             self.functions.len(),
             self.tests.len(),
@@ -297,7 +385,9 @@ impl fmt::Debug for Module {
             self.traits.len(),
             self.impls.len(),
             self.def_impls.len(),
-            self.extends.len()
+            self.extends.len(),
+            self.extension_imports.len(),
+            self.extern_blocks.len()
         )
     }
 }

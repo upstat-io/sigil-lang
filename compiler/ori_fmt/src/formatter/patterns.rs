@@ -32,7 +32,7 @@ impl<I: StringLookup> Formatter<'_, I> {
                     self.ctx.emit(")");
                 }
             }
-            MatchPattern::Struct { fields } => {
+            MatchPattern::Struct { fields, rest } => {
                 self.ctx.emit("{ ");
                 for (i, (field_name, pat_opt)) in fields.iter().enumerate() {
                     if i > 0 {
@@ -44,6 +44,12 @@ impl<I: StringLookup> Formatter<'_, I> {
                         let pat = self.arena.get_match_pattern(*pat_id);
                         self.emit_match_pattern(pat);
                     }
+                }
+                if *rest {
+                    if !fields.is_empty() {
+                        self.ctx.emit(", ");
+                    }
+                    self.ctx.emit("..");
                 }
                 self.ctx.emit(" }");
             }
@@ -121,7 +127,10 @@ impl<I: StringLookup> Formatter<'_, I> {
     /// Emit a binding pattern.
     pub(super) fn emit_binding_pattern(&mut self, pattern: &BindingPattern) {
         match pattern {
-            BindingPattern::Name(name) => {
+            BindingPattern::Name { name, mutable } => {
+                if !mutable {
+                    self.ctx.emit("$");
+                }
                 self.ctx.emit(self.interner.lookup(*name));
             }
             BindingPattern::Tuple(items) => {
@@ -140,12 +149,16 @@ impl<I: StringLookup> Formatter<'_, I> {
             }
             BindingPattern::Struct { fields } => {
                 self.ctx.emit("{ ");
-                for (i, (field_name, rename)) in fields.iter().enumerate() {
+                for (i, field) in fields.iter().enumerate() {
                     if i > 0 {
                         self.ctx.emit(", ");
                     }
-                    self.ctx.emit(self.interner.lookup(*field_name));
-                    if let Some(pat) = rename {
+                    // Shorthand with $ prefix: { $x }
+                    if !field.mutable && field.pattern.is_none() {
+                        self.ctx.emit("$");
+                    }
+                    self.ctx.emit(self.interner.lookup(field.name));
+                    if let Some(pat) = &field.pattern {
                         self.ctx.emit(": ");
                         self.emit_binding_pattern(pat);
                     }

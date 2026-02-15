@@ -32,9 +32,10 @@
 //! ```
 
 use super::ast::{
-    BindingPattern, CallArg, ConstDef, Expr, ExprKind, FieldInit, Function, FunctionExp,
-    FunctionSeq, ListElement, MapElement, MapEntry, MatchArm, MatchPattern, Module, NamedExpr,
-    Param, SeqBinding, Stmt, StmtKind, StructLitField, TestDef, UseDef,
+    BindingPattern, CallArg, ConstDef, Expr, ExprKind, ExtensionImport, ExternBlock, FieldInit,
+    FileAttr, Function, FunctionExp, FunctionSeq, ListElement, MapElement, MapEntry, MatchArm,
+    MatchPattern, Module, NamedExpr, Param, SeqBinding, Stmt, StmtKind, StructLitField, TestDef,
+    UseDef,
 };
 use super::{ExprArena, ExprId};
 
@@ -51,6 +52,12 @@ pub trait Visitor<'ast> {
         walk_module(self, module, arena);
     }
 
+    /// Visit a file-level attribute (`#!target(...)` or `#!cfg(...)`).
+    ///
+    /// Default implementation is a no-op. Override to inspect `Name` values
+    /// in file-level attributes (e.g., for symbol resolution or dead code analysis).
+    fn visit_file_attr(&mut self, _attr: &'ast FileAttr, _arena: &'ast ExprArena) {}
+
     /// Visit a function definition.
     fn visit_function(&mut self, function: &'ast Function, arena: &'ast ExprArena) {
         walk_function(self, function, arena);
@@ -65,6 +72,21 @@ pub trait Visitor<'ast> {
     fn visit_use(&mut self, use_def: &'ast UseDef, _arena: &'ast ExprArena) {
         // Use statements have no child expressions to walk
         let _ = use_def;
+    }
+
+    /// Visit an extension import statement.
+    fn visit_extension_import(
+        &mut self,
+        ext_import: &'ast ExtensionImport,
+        _arena: &'ast ExprArena,
+    ) {
+        // Extension imports have no child expressions to walk
+        let _ = ext_import;
+    }
+
+    /// Visit an extern block declaration.
+    fn visit_extern_block(&mut self, _extern_block: &'ast ExternBlock, _arena: &'ast ExprArena) {
+        // Extern blocks have no child expressions to walk
     }
 
     /// Visit a constant definition.
@@ -182,14 +204,20 @@ pub trait Visitor<'ast> {
 // child is visited before the right. For collections (lists, tuples), elements
 // are visited in declaration order.
 
-/// Walk a module's children (imports, consts, functions, tests in order).
+/// Walk a module's children (file attr, imports, consts, functions, tests in order).
 pub fn walk_module<'ast, V: Visitor<'ast> + ?Sized>(
     visitor: &mut V,
     module: &'ast Module,
     arena: &'ast ExprArena,
 ) {
+    if let Some(attr) = &module.file_attr {
+        visitor.visit_file_attr(attr, arena);
+    }
     for use_def in &module.imports {
         visitor.visit_use(use_def, arena);
+    }
+    for ext_import in &module.extension_imports {
+        visitor.visit_extension_import(ext_import, arena);
     }
     for const_def in &module.consts {
         visitor.visit_const(const_def, arena);
@@ -199,6 +227,9 @@ pub fn walk_module<'ast, V: Visitor<'ast> + ?Sized>(
     }
     for test in &module.tests {
         visitor.visit_test(test, arena);
+    }
+    for extern_block in &module.extern_blocks {
+        visitor.visit_extern_block(extern_block, arena);
     }
 }
 
@@ -265,12 +296,12 @@ pub fn walk_expr<'ast, V: Visitor<'ast> + ?Sized>(
         ExprKind::Cast { expr, .. } => {
             visitor.visit_expr_id(*expr, arena);
         }
-        ExprKind::Loop { body } => {
+        ExprKind::Loop { body, .. } => {
             visitor.visit_expr_id(*body, arena);
         }
-        ExprKind::Break(val) | ExprKind::Continue(val) => {
-            if val.is_present() {
-                visitor.visit_expr_id(*val, arena);
+        ExprKind::Break { value, .. } | ExprKind::Continue { value, .. } => {
+            if value.is_present() {
+                visitor.visit_expr_id(*value, arena);
             }
         }
         ExprKind::Ok(inner) | ExprKind::Err(inner) => {
@@ -530,15 +561,15 @@ pub fn walk_binding_pattern<'ast, V: Visitor<'ast> + ?Sized>(
     pattern: &'ast BindingPattern,
 ) {
     match pattern {
-        BindingPattern::Name(_) | BindingPattern::Wildcard => {}
+        BindingPattern::Name { .. } | BindingPattern::Wildcard => {}
         BindingPattern::Tuple(patterns) => {
             for p in patterns {
                 visitor.visit_binding_pattern(p);
             }
         }
         BindingPattern::Struct { fields, .. } => {
-            for (_, sub_pattern) in fields {
-                if let Some(p) = sub_pattern {
+            for field in fields {
+                if let Some(p) = &field.pattern {
                     visitor.visit_binding_pattern(p);
                 }
             }
@@ -577,9 +608,30 @@ pub fn walk_function_seq<'ast, V: Visitor<'ast> + ?Sized>(
 ) {
     match seq {
         FunctionSeq::Run {
-            bindings, result, ..
+            pre_checks,
+            bindings,
+            result,
+            post_checks,
+            ..
+        } => {
+            for check in arena.get_checks(*pre_checks) {
+                visitor.visit_expr_id(check.expr, arena);
+                if let Some(msg) = check.message {
+                    visitor.visit_expr_id(msg, arena);
+                }
+            }
+            for binding in arena.get_seq_bindings(*bindings) {
+                visitor.visit_seq_binding(binding, arena);
+            }
+            visitor.visit_expr_id(*result, arena);
+            for check in arena.get_checks(*post_checks) {
+                visitor.visit_expr_id(check.expr, arena);
+                if let Some(msg) = check.message {
+                    visitor.visit_expr_id(msg, arena);
+                }
+            }
         }
-        | FunctionSeq::Try {
+        FunctionSeq::Try {
             bindings, result, ..
         } => {
             for binding in arena.get_seq_bindings(*bindings) {

@@ -33,12 +33,13 @@ impl<'scx: 'ctx, 'ctx> ExprLowerer<'_, 'scx, 'ctx, '_> {
         if let CanExpr::Ident(func_name) = func_kind {
             let name_str = self.resolve_name(func_name);
 
-            // Built-in type conversion functions
+            // Built-in type conversion and testing functions
             match name_str {
                 "str" => return self.lower_builtin_str(args),
                 "int" => return self.lower_builtin_int(args),
                 "float" => return self.lower_builtin_float(args),
                 "byte" => return self.lower_builtin_byte(args),
+                "assert_eq" => return self.lower_builtin_assert_eq(args),
                 _ => {}
             }
 
@@ -60,6 +61,7 @@ impl<'scx: 'ctx, 'ctx> ExprLowerer<'_, 'scx, 'ctx, '_> {
             }
 
             tracing::warn!(name = name_str, "unresolved function in call");
+            self.builder.record_codegen_error();
             return None;
         }
 
@@ -324,16 +326,29 @@ impl<'scx: 'ctx, 'ctx> ExprLowerer<'_, 'scx, 'ctx, '_> {
 
     /// Ensure the personality function is set on the current LLVM function.
     ///
-    /// Looks up `__gxx_personality_v0` from the LLVM module, interns it,
+    /// Looks up `rust_eh_personality` from the LLVM module, interns it,
     /// and sets it as the personality function on the current function.
     /// Idempotent — calling multiple times on the same function is safe.
+    ///
+    /// If `rust_eh_personality` is not found (meaning `declare_runtime()` was
+    /// not called), declares it inline as a fallback so codegen can proceed
+    /// without crashing.
     fn ensure_personality(&mut self) -> FunctionId {
-        let personality_fn = self
-            .builder
-            .scx()
-            .llmod
-            .get_function("rust_eh_personality")
-            .expect("rust_eh_personality not declared — call declare_runtime() first");
+        let scx = self.builder.scx();
+        let personality_fn = if let Some(f) = scx.llmod.get_function("rust_eh_personality") {
+            f
+        } else {
+            tracing::error!(
+                "rust_eh_personality not declared — declare_runtime() should be called first"
+            );
+            // Declare inline as fallback so codegen can proceed.
+            let i32_ty = scx.type_i32();
+            scx.llmod.add_function(
+                "rust_eh_personality",
+                i32_ty.fn_type(&[i32_ty.into()], false),
+                Some(inkwell::module::Linkage::External),
+            )
+        };
         let personality_id = self.builder.intern_function(personality_fn);
         self.builder
             .set_personality(self.current_function, personality_id);
@@ -451,8 +466,8 @@ impl<'scx: 'ctx, 'ctx> ExprLowerer<'_, 'scx, 'ctx, '_> {
             }
 
             match &param_abi.passing {
-                ParamPassing::Reference => {
-                    // Borrowed: create alloca in caller's entry, store value, pass pointer
+                ParamPassing::Indirect { .. } | ParamPassing::Reference => {
+                    // Indirect or borrowed: create alloca in caller's entry, store value, pass pointer
                     let param_ty = self.type_resolver.resolve(param_abi.ty);
                     let param_ty_id = self.builder.register_type(param_ty);
                     let alloca =
@@ -462,7 +477,7 @@ impl<'scx: 'ctx, 'ctx> ExprLowerer<'_, 'scx, 'ctx, '_> {
                     result.push(alloca);
                     arg_idx += 1;
                 }
-                ParamPassing::Direct | ParamPassing::Indirect { .. } => {
+                ParamPassing::Direct => {
                     result.push(raw_args[arg_idx]);
                     arg_idx += 1;
                 }
@@ -508,7 +523,9 @@ impl<'scx: 'ctx, 'ctx> ExprLowerer<'_, 'scx, 'ctx, '_> {
                 let type_info = self.type_info.get(recv_type);
                 match &type_info {
                     TypeInfo::Option { .. } => self.lower_option_method(recv_val, method, args),
-                    TypeInfo::Result { .. } => self.lower_result_method(recv_val, method, args),
+                    TypeInfo::Result { ok, .. } => {
+                        self.lower_result_method(recv_val, *ok, method, args)
+                    }
                     TypeInfo::List { .. } => {
                         self.lower_list_method(recv_val, recv_type, method, args)
                     }
@@ -649,7 +666,7 @@ impl<'scx: 'ctx, 'ctx> ExprLowerer<'_, 'scx, 'ctx, '_> {
         &mut self,
         recv: ValueId,
         method: &str,
-        _args: CanRange,
+        args: CanRange,
     ) -> Option<ValueId> {
         let tag = self.builder.extract_value(recv, 0, "opt.tag")?;
         let zero = self.builder.const_i8(0);
@@ -661,14 +678,34 @@ impl<'scx: 'ctx, 'ctx> ExprLowerer<'_, 'scx, 'ctx, '_> {
                 // Extract payload (no runtime check in this simplified version)
                 self.builder.extract_value(recv, 1, "opt.unwrap")
             }
+            "unwrap_or" => {
+                // Some(v) → v, None → default
+                let is_some = self.builder.icmp_ne(tag, zero, "opt.is_some");
+                let payload = self.builder.extract_value(recv, 1, "opt.payload")?;
+                let arg_ids = self.canon.arena.get_expr_list(args);
+                let default_val = self.lower(*arg_ids.first()?)?;
+                Some(
+                    self.builder
+                        .select(is_some, payload, default_val, "opt.unwrap_or"),
+                )
+            }
             _ => None,
         }
     }
 
     /// Built-in Result methods.
+    ///
+    /// For `unwrap()`, the extracted payload is the `max(ok, err)` slot.
+    /// When ok and err have different sizes, the payload must be coerced
+    /// to the actual ok type via alloca reinterpretation.
+    ///
+    /// `ok_type` is passed from the dispatch site (`lower_builtin_method`)
+    /// which already destructured `TypeInfo::Result { ok, .. }`, avoiding
+    /// a redundant `TypeInfoStore::get` call.
     fn lower_result_method(
         &mut self,
         recv: ValueId,
+        ok_type: Idx,
         method: &str,
         _args: CanRange,
     ) -> Option<ValueId> {
@@ -678,7 +715,12 @@ impl<'scx: 'ctx, 'ctx> ExprLowerer<'_, 'scx, 'ctx, '_> {
         match method {
             "is_ok" => Some(self.builder.icmp_eq(tag, zero, "res.is_ok")),
             "is_err" => Some(self.builder.icmp_ne(tag, zero, "res.is_err")),
-            "unwrap" => self.builder.extract_value(recv, 1, "res.unwrap"),
+            "unwrap" => {
+                let payload = self.builder.extract_value(recv, 1, "res.unwrap")?;
+                // Coerce payload to ok type (payload slot may be larger than ok type
+                // due to Result's max(ok, err) layout)
+                Some(self.coerce_payload(payload, ok_type))
+            }
             _ => None,
         }
     }
@@ -739,6 +781,7 @@ impl<'scx: 'ctx, 'ctx> ExprLowerer<'_, 'scx, 'ctx, '_> {
             }
             _ => {
                 tracing::warn!(?arg_type, "str() conversion for unsupported type");
+                self.builder.record_codegen_error();
                 None
             }
         }
@@ -813,6 +856,50 @@ impl<'scx: 'ctx, 'ctx> ExprLowerer<'_, 'scx, 'ctx, '_> {
                 tracing::warn!(?arg_type, "byte() conversion for unsupported type");
                 Some(val)
             }
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Testing builtins
+    // -----------------------------------------------------------------------
+
+    /// Lower `assert_eq(actual, expected)` → typed runtime call.
+    ///
+    /// Generic `assert_eq<T: Eq>` can't be compiled by the LLVM backend (no
+    /// monomorphization). Instead, we dispatch to a concrete runtime function
+    /// based on the argument type: `ori_assert_eq_int`, `ori_assert_eq_bool`,
+    /// `ori_assert_eq_float`, or `ori_assert_eq_str`.
+    fn lower_builtin_assert_eq(&mut self, args: CanRange) -> Option<ValueId> {
+        let arg_ids = self.canon.arena.get_expr_list(args);
+        let actual_id = *arg_ids.first()?;
+        let expected_id = *arg_ids.get(1)?;
+
+        let actual_type = self.expr_type(actual_id);
+        let (func_name, pass_by_ptr) = match actual_type {
+            Idx::INT => ("ori_assert_eq_int", false),
+            Idx::BOOL => ("ori_assert_eq_bool", false),
+            Idx::FLOAT => ("ori_assert_eq_float", false),
+            Idx::STR => ("ori_assert_eq_str", true),
+            _ => {
+                tracing::warn!(?actual_type, "assert_eq: unsupported argument type");
+                self.builder.record_codegen_error();
+                return None;
+            }
+        };
+
+        let actual = self.lower(actual_id)?;
+        let expected = self.lower(expected_id)?;
+
+        let llvm_func = self.builder.scx().llmod.get_function(func_name)?;
+        let func_id = self.builder.intern_function(llvm_func);
+
+        if pass_by_ptr {
+            // Strings are {i64, ptr} structs — runtime expects pointers
+            let actual_ptr = self.alloca_and_store(actual, "assert_eq.actual");
+            let expected_ptr = self.alloca_and_store(expected, "assert_eq.expected");
+            self.builder.call(func_id, &[actual_ptr, expected_ptr], "")
+        } else {
+            self.builder.call(func_id, &[actual, expected], "")
         }
     }
 
@@ -1037,7 +1124,7 @@ impl<'scx: 'ctx, 'ctx> ExprLowerer<'_, 'scx, 'ctx, '_> {
                 }
                 self.collect_free_vars(result, params, captures, seen);
             }
-            CanExpr::Lambda { body, .. } | CanExpr::Loop { body } => {
+            CanExpr::Lambda { body, .. } | CanExpr::Loop { body, .. } => {
                 self.collect_free_vars(body, params, captures, seen);
             }
             CanExpr::Field { receiver, .. } => {
@@ -1067,8 +1154,8 @@ impl<'scx: 'ctx, 'ctx> ExprLowerer<'_, 'scx, 'ctx, '_> {
             | CanExpr::Some(e)
             | CanExpr::Try(e)
             | CanExpr::Await(e)
-            | CanExpr::Break(e)
-            | CanExpr::Continue(e) => {
+            | CanExpr::Break { value: e, .. }
+            | CanExpr::Continue { value: e, .. } => {
                 self.collect_free_vars(e, params, captures, seen);
             }
             CanExpr::Assign { target, value } => {

@@ -3,7 +3,7 @@
 //! Methods for emitting expressions in broken (multi-line) format.
 //! Used when expressions don't fit on a single line.
 
-use ori_ir::{BinaryOp, ExprId, ExprKind, StringLookup};
+use ori_ir::{BinaryOp, ExprId, ExprKind, Name, StringLookup};
 
 use crate::width::ALWAYS_STACKED;
 
@@ -67,9 +67,9 @@ impl<I: StringLookup> Formatter<'_, I> {
                 if items.is_empty() {
                     self.ctx.emit("[]");
                 } else {
-                    let items_vec: Vec<_> = self.arena.get_expr_list(*items).to_vec();
+                    let items_slice = self.arena.get_expr_list(*items);
                     self.ctx.emit("[");
-                    self.emit_broken_list(&items_vec);
+                    self.emit_broken_list(items_slice);
                     self.ctx.emit("]");
                 }
             }
@@ -157,15 +157,16 @@ impl<I: StringLookup> Formatter<'_, I> {
                 if items.is_empty() {
                     self.ctx.emit("()");
                 } else {
-                    let items_vec: Vec<_> = self.arena.get_expr_list(*items).to_vec();
+                    let items_slice = self.arena.get_expr_list(*items);
+                    let items_len = items_slice.len();
                     self.ctx.emit("(");
                     self.ctx.emit_newline();
                     self.ctx.indent();
-                    for (i, item) in items_vec.iter().enumerate() {
+                    for (i, &item) in items_slice.iter().enumerate() {
                         self.ctx.emit_indent();
-                        self.format(*item);
+                        self.format(item);
                         self.ctx.emit(",");
-                        if i < items_vec.len() - 1 {
+                        if i < items_len - 1 {
                             self.ctx.emit_newline();
                         }
                     }
@@ -285,13 +286,19 @@ impl<I: StringLookup> Formatter<'_, I> {
 
             // For - body on new line if needed
             ExprKind::For {
+                label,
                 binding,
                 iter,
                 guard,
                 body,
                 is_yield,
             } => {
-                self.ctx.emit("for ");
+                self.ctx.emit("for");
+                if *label != Name::EMPTY {
+                    self.ctx.emit(":");
+                    self.ctx.emit(self.interner.lookup(*label));
+                }
+                self.ctx.emit(" ");
                 self.ctx.emit(self.interner.lookup(*binding));
                 self.ctx.emit(" in ");
                 self.format_iter(*iter);

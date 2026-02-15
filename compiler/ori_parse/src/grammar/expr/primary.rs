@@ -10,8 +10,8 @@
 use crate::recovery::TokenSet;
 use crate::{committed, one_of, require, ParseError, ParseOutcome, Parser};
 use ori_ir::{
-    BindingPattern, DurationUnit, Expr, ExprId, ExprKind, ExprRange, Name, Param, ParamRange,
-    ParsedTypeId, SizeUnit, TemplatePart, TokenKind,
+    BindingPattern, DurationUnit, Expr, ExprId, ExprKind, ExprRange, FieldBinding, FunctionExpKind,
+    Name, Param, ParamRange, ParsedTypeId, SizeUnit, TemplatePart, TokenKind,
 };
 use tracing::{debug, trace};
 
@@ -120,6 +120,18 @@ impl Parser<'_> {
         if self.cursor.check(&TokenKind::With) && self.cursor.is_with_capability_syntax() {
             return self.parse_with_capability();
         }
+        // Channel constructors are context-sensitive identifiers (not lexer keywords).
+        // Detect `channel(`, `channel<`, `channel_in(`, etc. and parse as function_exp
+        // with optional generic type arguments.
+        if let TokenKind::Ident(name) = *self.cursor.current_kind() {
+            if let Some(channel_kind) = self.match_channel_kind(name) {
+                let next = self.cursor.peek_next_kind();
+                if matches!(next, TokenKind::LParen | TokenKind::Lt) {
+                    self.cursor.advance();
+                    return self.parse_channel_expr(channel_kind);
+                }
+            }
+        }
         if let Some(kind) = self.match_function_exp_kind() {
             self.cursor.advance();
             return self.parse_function_exp(kind);
@@ -226,7 +238,7 @@ impl Parser<'_> {
                     return ParseOutcome::consumed_err(
                         ParseError::new(
                             ori_diagnostic::ErrorCode::E1002,
-                            "integer literal too large".to_string(),
+                            "integer literal too large",
                             span,
                         ),
                         span,
@@ -440,6 +452,26 @@ impl Parser<'_> {
         }
     }
 
+    /// Parse optional label: `:identifier` (no space around colon).
+    ///
+    /// Called immediately after consuming the keyword (`break`, `continue`, `for`, `loop`).
+    /// Returns `Name::EMPTY` if no label is present.
+    fn parse_optional_label(&mut self) -> Name {
+        if self.cursor.check(&TokenKind::Colon) && self.cursor.current_flags().is_adjacent() {
+            self.cursor.advance(); // consume ':'
+            match self.cursor.expect_ident() {
+                Ok(name) => name,
+                Err(err) => {
+                    self.deferred_errors
+                        .push(err.with_context("expected label identifier after `:`"));
+                    Name::EMPTY
+                }
+            }
+        } else {
+            Name::EMPTY
+        }
+    }
+
     /// Parse control flow primaries: `break`, `continue`, `return`.
     ///
     /// Returns `EmptyErr` if the current token is not a control flow keyword.
@@ -459,6 +491,7 @@ impl Parser<'_> {
                     );
                 }
                 self.cursor.advance();
+                let label = self.parse_optional_label();
                 let value = if !self.cursor.check(&TokenKind::Comma)
                     && !self.cursor.check(&TokenKind::RParen)
                     && !self.cursor.check(&TokenKind::RBrace)
@@ -479,10 +512,10 @@ impl Parser<'_> {
                 } else {
                     span
                 };
-                ParseOutcome::consumed_ok(
-                    self.arena
-                        .alloc_expr(Expr::new(ExprKind::Break(value), span.merge(end_span))),
-                )
+                ParseOutcome::consumed_ok(self.arena.alloc_expr(Expr::new(
+                    ExprKind::Break { label, value },
+                    span.merge(end_span),
+                )))
             }
             TokenKind::Continue => {
                 if !self.context.in_loop() {
@@ -497,6 +530,7 @@ impl Parser<'_> {
                     );
                 }
                 self.cursor.advance();
+                let label = self.parse_optional_label();
                 let value = if !self.cursor.check(&TokenKind::Comma)
                     && !self.cursor.check(&TokenKind::RParen)
                     && !self.cursor.check(&TokenKind::RBrace)
@@ -517,10 +551,10 @@ impl Parser<'_> {
                 } else {
                     span
                 };
-                ParseOutcome::consumed_ok(
-                    self.arena
-                        .alloc_expr(Expr::new(ExprKind::Continue(value), span.merge(end_span))),
-                )
+                ParseOutcome::consumed_ok(self.arena.alloc_expr(Expr::new(
+                    ExprKind::Continue { label, value },
+                    span.merge(end_span),
+                )))
             }
             TokenKind::Return => {
                 self.cursor.advance();
@@ -980,17 +1014,54 @@ impl Parser<'_> {
     }
 
     /// Parse a binding pattern.
+    ///
+    /// Per grammar: `binding_pattern = [ "$" ] identifier | "_" | "{" ... "}" | ...`
+    /// The `$` prefix marks the binding as immutable.
     pub(crate) fn parse_binding_pattern(&mut self) -> Result<BindingPattern, ParseError> {
+        // Handle $ prefix for immutable bindings: $x, $name, etc.
+        if self.cursor.check(&TokenKind::Dollar) {
+            self.cursor.advance();
+            if let Some(name_str) = self.cursor.soft_keyword_to_name() {
+                let name = self.cursor.interner().intern(name_str);
+                self.cursor.advance();
+                return Ok(BindingPattern::Name {
+                    name,
+                    mutable: false,
+                });
+            }
+            if let TokenKind::Ident(name) = *self.cursor.current_kind() {
+                self.cursor.advance();
+                return Ok(BindingPattern::Name {
+                    name,
+                    mutable: false,
+                });
+            }
+            return Err(ParseError::new(
+                ori_diagnostic::ErrorCode::E1002,
+                format!(
+                    "expected identifier after $, found {}",
+                    self.cursor.current_kind().display_name()
+                ),
+                self.cursor.current_span(),
+            ));
+        }
+
         if let Some(name_str) = self.cursor.soft_keyword_to_name() {
             let name = self.cursor.interner().intern(name_str);
             self.cursor.advance();
-            return Ok(BindingPattern::Name(name));
+            return Ok(BindingPattern::Name {
+                name,
+                mutable: true,
+            });
         }
 
         match *self.cursor.current_kind() {
             TokenKind::Ident(name) => {
                 self.cursor.advance();
-                Ok(BindingPattern::Name(name))
+                Ok(BindingPattern::Name {
+                    name,
+                    mutable: true,
+                })
             }
             TokenKind::Underscore => {
                 self.cursor.advance();
@@ -1013,22 +1084,34 @@ impl Parser<'_> {
             TokenKind::LBrace => {
                 use crate::series::SeriesConfig;
                 self.cursor.advance();
-                let fields: Vec<(Name, Option<BindingPattern>)> =
+                let fields: Vec<FieldBinding> =
                     self.series(&SeriesConfig::comma(TokenKind::RBrace).no_newlines(), |p| {
                         if p.cursor.check(&TokenKind::RBrace) {
                             return Ok(None);
                         }
 
+                        // Per grammar: field_binding = [ "$" ] identifier [ ":" binding_pattern ]
+                        let mutable = if p.cursor.check(&TokenKind::Dollar) {
+                            p.cursor.advance();
+                            false
+                        } else {
+                            true
+                        };
+
                         let field_name = p.cursor.expect_ident()?;
 
-                        let binding = if p.cursor.check(&TokenKind::Colon) {
+                        let pattern = if p.cursor.check(&TokenKind::Colon) {
                             p.cursor.advance();
                             Some(p.parse_binding_pattern()?)
                         } else {
                             None // Shorthand: { x } binds field x to variable x
                         };
 
-                        Ok(Some((field_name, binding)))
+                        Ok(Some(FieldBinding {
+                            name: field_name,
+                            mutable,
+                            pattern,
+                        }))
                     })?;
                 self.cursor.expect(&TokenKind::RBrace)?;
                 Ok(BindingPattern::Struct { fields })
@@ -1213,6 +1296,9 @@ impl Parser<'_> {
         let span = self.cursor.current_span();
         committed!(self.cursor.expect(&TokenKind::For));
 
+        // Parse optional label: for:label
+        let label = self.parse_optional_label();
+
         // Parse binding name or wildcard (_)
         let binding = if self.cursor.check(&TokenKind::Underscore) {
             self.cursor.advance();
@@ -1246,7 +1332,7 @@ impl Parser<'_> {
             return ParseOutcome::consumed_err(
                 ParseError::new(
                     ori_diagnostic::ErrorCode::E1002,
-                    "expected `do` or `yield` after for loop iterator".to_string(),
+                    "expected `do` or `yield` after for loop iterator",
                     self.cursor.current_span(),
                 ),
                 span,
@@ -1265,6 +1351,7 @@ impl Parser<'_> {
         let end_span = self.arena.get_expr(body).span;
         ParseOutcome::consumed_ok(self.arena.alloc_expr(Expr::new(
             ExprKind::For {
+                label,
                 binding,
                 iter,
                 guard,
@@ -1275,7 +1362,7 @@ impl Parser<'_> {
         )))
     }
 
-    /// Parse loop expression: `loop(body)`
+    /// Parse loop expression: `loop(body)` or `loop:label(body)`
     ///
     /// The body is evaluated repeatedly until a `break` is encountered.
     ///
@@ -1292,6 +1379,10 @@ impl Parser<'_> {
 
         let span = self.cursor.current_span();
         committed!(self.cursor.expect(&TokenKind::Loop));
+
+        // Parse optional label: loop:label
+        let label = self.parse_optional_label();
+
         committed!(self.cursor.expect(&TokenKind::LParen));
         self.cursor.skip_newlines();
 
@@ -1306,10 +1397,10 @@ impl Parser<'_> {
         let end_span = self.cursor.current_span();
         committed!(self.cursor.expect(&TokenKind::RParen));
 
-        ParseOutcome::consumed_ok(
-            self.arena
-                .alloc_expr(Expr::new(ExprKind::Loop { body }, span.merge(end_span))),
-        )
+        ParseOutcome::consumed_ok(self.arena.alloc_expr(Expr::new(
+            ExprKind::Loop { label, body },
+            span.merge(end_span),
+        )))
     }
 
     /// Check if typed lambda params.
@@ -1341,12 +1432,27 @@ impl Parser<'_> {
                 _ => {
                     return Err(ParseError::new(
                         ori_diagnostic::ErrorCode::E1002,
-                        "expected identifier for lambda parameter".to_string(),
+                        "expected identifier for lambda parameter",
                         expr.span,
                     ));
                 }
             }
         }
         Ok(self.arena.alloc_params(params))
+    }
+
+    /// Check if an identifier name maps to a channel constructor kind.
+    fn match_channel_kind(&self, name: Name) -> Option<FunctionExpKind> {
+        if name == self.known.channel {
+            Some(FunctionExpKind::Channel)
+        } else if name == self.known.channel_in {
+            Some(FunctionExpKind::ChannelIn)
+        } else if name == self.known.channel_out {
+            Some(FunctionExpKind::ChannelOut)
+        } else if name == self.known.channel_all {
+            Some(FunctionExpKind::ChannelAll)
+        } else {
+            None
+        }
     }
 }

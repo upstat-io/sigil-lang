@@ -8,7 +8,7 @@
 //!
 //! ```text
 //! typed() query
-//!   └── type_check_with_imports()
+//!   └── type_check_with_imports_and_pool()
 //!       └── resolve_imports()  ← unified import pipeline
 //!           └── ori_types::check_module_with_imports(module, arena, interner, |checker| {
 //!                   register_builtins()
@@ -22,10 +22,11 @@
 
 use std::path::{Path, PathBuf};
 
-use ori_types::TypeCheckResult;
+use ori_types::{FunctionSig, TypeCheckResult};
 
 use crate::db::Db;
 use crate::imports;
+use crate::ir::{Name, Span, StringInterner};
 use crate::parser::ParseOutput;
 
 // Prelude Auto-Loading
@@ -48,35 +49,24 @@ pub(crate) fn is_prelude_file(file_path: &Path) -> bool {
             && file_path.parent().is_some_and(|p| p.ends_with("std")))
 }
 
-/// Type check a module with import support.
+/// Type check a module with import support, returning both the result and the Pool.
 ///
-/// This is the main entry point called by the `typed()` Salsa query.
-/// It creates a `ModuleChecker`, registers prelude and imported functions,
-/// then runs all type checking passes.
+/// This is the main entry point called by the `typed()` Salsa query and by
+/// the evaluator's module loading for imported modules. It creates a
+/// `ModuleChecker`, registers prelude and imported functions, then runs
+/// all type checking passes.
 ///
-/// The Pool is discarded — it's not part of the Salsa query result.
-/// For scenarios that need the Pool (e.g., error rendering, evaluation),
-/// use `type_check_with_imports_and_pool()` instead.
-pub fn type_check_with_imports(
+/// # Cache Safety
+///
+/// Requires a [`CacheGuard`] proving that session-scoped side-caches have
+/// been invalidated (or are not applicable for this module). This prevents
+/// callers from accidentally using stale `PoolCache`/`CanonCache`/`ImportsCache`
+/// entries after re-type-checking.
+pub(crate) fn type_check_with_imports_and_pool(
     db: &dyn Db,
     parse_result: &ParseOutput,
     current_file: &Path,
-) -> TypeCheckResult {
-    let (result, _pool) = type_check_with_imports_and_pool(db, parse_result, current_file);
-    result
-}
-
-/// Type check a module, returning both the result and the Pool.
-///
-/// Unlike `type_check_with_imports()`, this retains the Pool so callers
-/// can use it for error rendering, evaluation, or other Pool-dependent operations.
-///
-/// Used by `evaluated()` and the test runner where the Pool's type information
-/// may be needed alongside the type checking result.
-pub fn type_check_with_imports_and_pool(
-    db: &dyn Db,
-    parse_result: &ParseOutput,
-    current_file: &Path,
+    _guard: crate::query::CacheGuard,
 ) -> (TypeCheckResult, ori_types::Pool) {
     let interner = db.interner();
 
@@ -91,7 +81,7 @@ pub fn type_check_with_imports_and_pool(
         interner,
         |checker| {
             register_builtins(interner, checker);
-            register_resolved_imports(&resolved, checker);
+            register_resolved_imports(&resolved, checker, interner);
         },
     )
 }
@@ -101,8 +91,8 @@ pub fn type_check_with_imports_and_pool(
 /// These functions (type conversions, print, panic, etc.) are not defined in
 /// the prelude `.ori` file but are available in every Ori program. Their type
 /// signatures are registered here so type checking can validate calls.
-fn register_builtins(
-    interner: &ori_ir::StringInterner,
+pub(crate) fn register_builtins(
+    interner: &StringInterner,
     checker: &mut ori_types::ModuleChecker<'_>,
 ) {
     use ori_types::Idx;
@@ -156,6 +146,7 @@ fn register_builtins(
 fn register_resolved_imports(
     resolved: &imports::ResolvedImports,
     checker: &mut ori_types::ModuleChecker<'_>,
+    interner: &StringInterner,
 ) {
     // 1. Register prelude functions (all public)
     if let Some(ref prelude) = resolved.prelude {
@@ -167,10 +158,25 @@ fn register_resolved_imports(
     }
 
     // 2. Report any import resolution errors
+    //
+    // Span is guaranteed present: resolve_imports() always fills in the
+    // use-statement span via `e.span.unwrap_or(imp.span)` (imports.rs:210).
     for error in &resolved.errors {
+        debug_assert!(
+            error.span.is_some(),
+            "import errors from resolve_imports should always have spans"
+        );
+        let span = error.span.unwrap_or_else(|| {
+            tracing::error!(
+                message = %error.message,
+                "import error missing span — resolve_imports invariant violated"
+            );
+            Span::DUMMY
+        });
         checker.push_error(ori_types::TypeCheckError::import_error(
             error.message.clone(),
-            error.span,
+            span,
+            error.kind,
         ));
     }
 
@@ -197,6 +203,7 @@ fn register_resolved_imports(
             .iter()
             .find(|f| f.name == func_ref.original_name)
         else {
+            report_missing_import(checker, interner, func_ref, &module.module_path);
             continue;
         };
 
@@ -204,9 +211,99 @@ fn register_resolved_imports(
         if func_ref.local_name == func_ref.original_name {
             checker.register_imported_function(func, &imported_parsed.arena);
         } else {
-            let mut aliased_func = func.clone();
-            aliased_func.name = func_ref.local_name;
-            checker.register_imported_function(&aliased_func, &imported_parsed.arena);
+            checker.register_imported_function_as(
+                func,
+                &imported_parsed.arena,
+                func_ref.local_name,
+            );
         }
+    }
+}
+
+/// Report a missing imported function to the type checker.
+#[cold]
+fn report_missing_import(
+    checker: &mut ori_types::ModuleChecker<'_>,
+    interner: &StringInterner,
+    func_ref: &imports::ImportedFunctionRef,
+    module_path: &std::path::Path,
+) {
+    let func_name = interner.lookup(func_ref.original_name);
+    checker.push_error(ori_types::TypeCheckError::import_error(
+        format!(
+            "function '{func_name}' not found in module '{}'",
+            module_path.display()
+        ),
+        func_ref.span,
+        ori_types::ImportErrorKind::ItemNotFound,
+    ));
+}
+
+/// Build function signatures aligned with `module.functions` source order.
+///
+/// `typed.functions` is sorted by name (for Salsa determinism), while
+/// `module.functions` is in source order. `FunctionCompiler::declare_all`
+/// zips them, so they must be aligned.
+#[cfg_attr(
+    not(feature = "llvm"),
+    expect(
+        dead_code,
+        reason = "consumed by #[cfg(feature = \"llvm\")] paths in compile_common and test runner"
+    )
+)]
+pub(crate) fn build_function_sigs(
+    parse_result: &ParseOutput,
+    type_result: &TypeCheckResult,
+) -> Vec<FunctionSig> {
+    let sig_map: rustc_hash::FxHashMap<Name, &FunctionSig> = type_result
+        .typed
+        .functions
+        .iter()
+        .map(|ft| (ft.name, ft))
+        .collect();
+
+    parse_result
+        .module
+        .functions
+        .iter()
+        .map(|func| {
+            sig_map
+                .get(&func.name)
+                .copied()
+                .cloned()
+                .unwrap_or_else(|| dummy_sig(func.name))
+        })
+        .collect()
+}
+
+/// Fallback signature for functions missing from the type check result.
+///
+/// Should never be reached after successful type checking — only exists to
+/// prevent panics if the signature map is incomplete.
+#[cold]
+fn dummy_sig(name: Name) -> FunctionSig {
+    use ori_types::Idx;
+
+    debug_assert!(false, "function {name:?} has no type-checked signature");
+    tracing::warn!(
+        name = ?name,
+        "function missing from type check result — using dummy signature"
+    );
+    FunctionSig {
+        name,
+        type_params: vec![],
+        const_params: vec![],
+        param_names: vec![],
+        param_types: vec![],
+        return_type: Idx::UNIT,
+        capabilities: vec![],
+        is_public: false,
+        is_test: false,
+        is_main: false,
+        type_param_bounds: vec![],
+        where_clauses: vec![],
+        generic_param_mapping: vec![],
+        required_params: 0,
+        param_defaults: vec![],
     }
 }

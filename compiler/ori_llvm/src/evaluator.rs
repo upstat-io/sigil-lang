@@ -121,7 +121,10 @@ impl CompiledTestModule<'_> {
     /// # Safety
     ///
     /// The test function must exist in the compiled module and have signature `() -> void`.
-    #[allow(unsafe_code)]
+    #[allow(
+        unsafe_code,
+        reason = "JIT execution requires unsafe FFI: get_function, setjmp, and call"
+    )]
     pub fn run_test(&self, test_name: Name) -> LLVMEvalResult {
         // Reset panic state before running
         runtime::reset_panic_state();
@@ -306,7 +309,13 @@ impl<'tcx> OwnedLLVMEvaluator<'tcx> {
             // 7. Compile impl methods (declare + define)
             if !module.impls.is_empty() {
                 debug!("compiling impl methods");
-                fc.compile_impls(&module.impls, impl_sigs, canon);
+                fc.compile_impls(&module.impls, impl_sigs, canon, &module.traits);
+            }
+
+            // 7b. Compile derived trait methods
+            if module.types.iter().any(|t| !t.derives.is_empty()) {
+                debug!("compiling derived trait methods");
+                fc.compile_derives(module, user_types);
             }
 
             // 8. Define all function bodies (phase 2)
@@ -343,6 +352,9 @@ impl<'tcx> OwnedLLVMEvaluator<'tcx> {
         // Feeding malformed IR to LLVM's verifier or JIT can cause
         // heap corruption (SIGABRT) that kills the entire process.
         if codegen_errors > 0 {
+            // NOTE: scx (ManuallyDrop) is intentionally leaked here.
+            // Dropping an LLVM module with invalid IR (type-mismatched
+            // ret void, etc.) can itself trigger heap corruption.
             return Err(LLVMEvalError::new(format!(
                 "LLVM codegen had {codegen_errors} type-mismatch error(s) — skipping verification/JIT",
             )));
@@ -357,6 +369,7 @@ impl<'tcx> OwnedLLVMEvaluator<'tcx> {
 
         // 11. Verify IR
         if let Err(msg) = scx.llmod.verify() {
+            // NOTE: scx intentionally leaked — see codegen_errors note above.
             return Err(LLVMEvalError::new(format!(
                 "LLVM IR verification failed: {}",
                 msg.to_string()
@@ -421,6 +434,18 @@ fn add_runtime_mappings_to_engine(
         (
             "ori_assert_eq_bool",
             runtime::ori_assert_eq_bool as *const () as usize,
+        ),
+        (
+            "ori_assert_eq_float",
+            runtime::ori_assert_eq_float as *const () as usize,
+        ),
+        (
+            "ori_list_alloc_data",
+            runtime::ori_list_alloc_data as *const () as usize,
+        ),
+        (
+            "ori_list_free_data",
+            runtime::ori_list_free_data as *const () as usize,
         ),
         ("ori_list_new", runtime::ori_list_new as *const () as usize),
         (
