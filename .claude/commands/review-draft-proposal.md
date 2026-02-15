@@ -81,9 +81,9 @@ Read the proposal and related spec files. Identify:
 ### Step 4: Dependency Analysis
 
 **Check explicit dependencies** (from proposal's `Depends On:` field):
-- ✅ Approved — in `proposals/approved/`
-- 📝 Draft — in `proposals/drafts/` (review that first)
-- ❌ Missing — BLOCKER
+- [approved] — in `proposals/approved/`
+- [draft] — in `proposals/drafts/` (review that first)
+- [missing] — BLOCKER
 
 **Check implicit dependencies:**
 - Uses syntax that doesn't exist?
@@ -246,7 +246,7 @@ Brief description.
 - [ ] Remove from drafts section in `plans/roadmap/plan.md` (if listed)
 - [ ] Add to `plans/roadmap/priority-and-tracking.md`:
 ```markdown
-**Proposal Name** — ✅ APPROVED YYYY-MM-DD
+**Proposal Name** — APPROVED YYYY-MM-DD
 - Proposal: `proposals/approved/<name>-proposal.md`
 - Implementation: Section X.Y
 - [Key features]
@@ -404,8 +404,8 @@ If blockers exist, offer three options:
 Proposal: Duration factory methods as built-ins
 
 Q: Can Duration.from_seconds(s:) be pure Ori?
-- Requires Type.method() → Associated functions ✅ (approved)
-- Requires Duration + Duration → Operator traits ❌ (missing)
+- Requires Type.method() → Associated functions [approved]
+- Requires Duration + Duration → Operator traits [missing]
 
 Conclusion: BLOCKED by operator-traits-proposal
 Duration should move to library once operator traits exist.
