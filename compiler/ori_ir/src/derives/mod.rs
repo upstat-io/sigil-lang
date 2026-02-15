@@ -50,7 +50,7 @@ impl DerivedTrait {
 ///
 /// Unlike user-defined methods, derived methods don't have expression bodies.
 /// Instead, they operate on struct/enum field information.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct DerivedMethodInfo {
     /// The trait being derived.
     pub trait_kind: DerivedTrait,

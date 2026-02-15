@@ -7,9 +7,11 @@
 //! - `#[derive(Printable)]` -> `to_string` method
 //! - `#[derive(Default)]` -> `default` method
 
-use crate::errors::{default_requires_type_context, wrong_function_args};
-use crate::{EvalResult, Value};
-use ori_ir::{DerivedMethodInfo, DerivedTrait};
+use crate::derives::DefaultFieldType;
+use crate::errors::wrong_function_args;
+use crate::{EvalResult, StructValue, Value};
+use ori_ir::{DerivedMethodInfo, DerivedTrait, Name, TypeId};
+use rustc_hash::FxHashMap;
 
 use super::Interpreter;
 
@@ -29,7 +31,7 @@ impl Interpreter<'_> {
             DerivedTrait::Clone => self.eval_derived_clone(receiver, info),
             DerivedTrait::Hashable => self.eval_derived_hash(receiver, info),
             DerivedTrait::Printable => self.eval_derived_to_string(receiver, info),
-            DerivedTrait::Default => self.eval_derived_default(info),
+            DerivedTrait::Default => self.eval_derived_default(receiver, info),
         }
     }
 
@@ -203,17 +205,79 @@ impl Interpreter<'_> {
 
     /// Evaluate derived `default` method for structs.
     ///
-    /// Returns the default value for the type.
-    /// Note: This is currently a stub - a proper implementation would need
-    /// to recursively default-construct each field.
+    /// Constructs a struct with all fields set to their type's default value.
+    /// Called as a static method: `Point.default()` returns `Point { x: 0, y: 0 }`.
+    ///
+    /// Field types are looked up from the `DefaultFieldTypeRegistry` rather than
+    /// from `DerivedMethodInfo` — this keeps evaluator-specific data out of the IR.
     #[expect(
-        clippy::unused_self,
-        reason = "Method on Interpreter for organizational consistency with other derived methods"
+        clippy::needless_pass_by_value,
+        reason = "Consistent derived method dispatch signature"
     )]
-    fn eval_derived_default(&self, _info: &DerivedMethodInfo) -> EvalResult {
-        // Default is a static method that doesn't take self.
-        // For now, return an error since we'd need type information
-        // to construct the default struct.
-        Err(default_requires_type_context().into())
+    fn eval_derived_default(&mut self, receiver: Value, info: &DerivedMethodInfo) -> EvalResult {
+        let Value::TypeRef { type_name } = receiver else {
+            return Err(crate::errors::no_such_method("default", "non-type").into());
+        };
+
+        let default_name = self.interner.intern("default");
+
+        // Look up field types from the evaluator-local registry
+        let field_types = self
+            .default_field_types
+            .read()
+            .lookup(type_name, default_name)
+            .map(Vec::from);
+
+        let Some(field_types) = field_types else {
+            // No field types registered — fall back to empty struct
+            return Ok(Value::Struct(StructValue::new(
+                type_name,
+                FxHashMap::default(),
+            )));
+        };
+
+        let mut fields = FxHashMap::default();
+        for (name, field_type) in info.field_names.iter().zip(field_types.iter()) {
+            let value = self.default_value_for_field(type_name, field_type)?;
+            fields.insert(*name, value);
+        }
+
+        Ok(Value::Struct(StructValue::new(type_name, fields)))
+    }
+
+    /// Produce the default value for a single field based on its type.
+    fn default_value_for_field(
+        &mut self,
+        _parent_type: Name,
+        field_type: &DefaultFieldType,
+    ) -> EvalResult {
+        match field_type {
+            DefaultFieldType::Primitive(id) => Ok(primitive_default(*id)),
+            DefaultFieldType::Named(name) => {
+                let name_str = self.interner.lookup(*name);
+                if name_str == "Option" {
+                    return Ok(Value::None);
+                }
+                // Recursively call Type.default() for named types
+                let type_ref = Value::TypeRef { type_name: *name };
+                let default_name = self.interner.intern("default");
+                self.eval_method_call(type_ref, default_name, vec![])
+            }
+        }
+    }
+}
+
+/// Return the default `Value` for a primitive `TypeId`.
+fn primitive_default(id: TypeId) -> Value {
+    match id {
+        TypeId::INT => Value::int(0),
+        TypeId::FLOAT => Value::Float(0.0),
+        TypeId::BOOL => Value::Bool(false),
+        TypeId::STR => Value::string(String::new()),
+        TypeId::CHAR => Value::Char('\0'),
+        TypeId::BYTE => Value::Byte(0),
+        TypeId::DURATION => Value::Duration(0),
+        TypeId::SIZE => Value::Size(0),
+        _ => Value::Void,
     }
 }

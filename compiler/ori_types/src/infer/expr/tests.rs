@@ -2143,3 +2143,169 @@ fn test_resolve_empty_tuple_is_unit() {
 
     assert_eq!(ty, Idx::UNIT);
 }
+
+// ========================================================================
+// Trait Satisfaction Tests — Clone on compound types
+// ========================================================================
+
+#[test]
+fn test_clone_satisfied_by_list() {
+    let mut pool = Pool::new();
+    let list_ty = pool.list(Idx::INT);
+
+    assert!(
+        super::calls::type_satisfies_trait(list_ty, "Clone", &pool),
+        "[int] should satisfy Clone"
+    );
+}
+
+#[test]
+fn test_clone_satisfied_by_map() {
+    let mut pool = Pool::new();
+    let map_ty = pool.map(Idx::STR, Idx::INT);
+
+    assert!(
+        super::calls::type_satisfies_trait(map_ty, "Clone", &pool),
+        "{{str: int}} should satisfy Clone"
+    );
+}
+
+#[test]
+fn test_clone_satisfied_by_set() {
+    let mut pool = Pool::new();
+    let set_ty = pool.set(Idx::INT);
+
+    assert!(
+        super::calls::type_satisfies_trait(set_ty, "Clone", &pool),
+        "Set<int> should satisfy Clone"
+    );
+}
+
+#[test]
+fn test_clone_satisfied_by_option() {
+    let mut pool = Pool::new();
+    let opt_ty = pool.option(Idx::INT);
+
+    assert!(
+        super::calls::type_satisfies_trait(opt_ty, "Clone", &pool),
+        "Option<int> should satisfy Clone"
+    );
+}
+
+#[test]
+fn test_clone_satisfied_by_result() {
+    let mut pool = Pool::new();
+    let res_ty = pool.result(Idx::STR, Idx::INT);
+
+    assert!(
+        super::calls::type_satisfies_trait(res_ty, "Clone", &pool),
+        "Result<str, int> should satisfy Clone"
+    );
+}
+
+#[test]
+fn test_clone_satisfied_by_tuple() {
+    let mut pool = Pool::new();
+    let tuple_ty = pool.tuple(&[Idx::INT, Idx::STR]);
+
+    assert!(
+        super::calls::type_satisfies_trait(tuple_ty, "Clone", &pool),
+        "(int, str) should satisfy Clone"
+    );
+}
+
+#[test]
+fn test_clone_satisfied_by_tuple_triple() {
+    let mut pool = Pool::new();
+    let tuple_ty = pool.tuple(&[Idx::INT, Idx::BOOL, Idx::STR]);
+
+    assert!(
+        super::calls::type_satisfies_trait(tuple_ty, "Clone", &pool),
+        "(int, bool, str) should satisfy Clone"
+    );
+}
+
+#[test]
+fn test_clone_not_satisfied_by_range() {
+    let mut pool = Pool::new();
+    let range_ty = pool.range(Idx::INT);
+
+    assert!(
+        !super::calls::type_satisfies_trait(range_ty, "Clone", &pool),
+        "Range<int> should not satisfy Clone"
+    );
+}
+
+// ========================================================================
+// Trait Satisfaction Tests — Eq NOT satisfied by compound types
+// ========================================================================
+//
+// Compound types (List, Map, Set, Option, Result, Tuple) do NOT satisfy Eq
+// because no `.equals()` method implementation exists in downstream phases.
+// Re-add when roadmap 3.14 delivers `equals()` across all phases.
+
+#[test]
+fn test_eq_not_satisfied_by_list() {
+    let mut pool = Pool::new();
+    let list_ty = pool.list(Idx::INT);
+
+    assert!(
+        !super::calls::type_satisfies_trait(list_ty, "Eq", &pool),
+        "[int] should NOT satisfy Eq (no equals() in evaluator/codegen)"
+    );
+}
+
+#[test]
+fn test_eq_not_satisfied_by_map() {
+    let mut pool = Pool::new();
+    let map_ty = pool.map(Idx::STR, Idx::INT);
+
+    assert!(
+        !super::calls::type_satisfies_trait(map_ty, "Eq", &pool),
+        "{{str: int}} should NOT satisfy Eq (no equals() in evaluator/codegen)"
+    );
+}
+
+#[test]
+fn test_eq_not_satisfied_by_set() {
+    let mut pool = Pool::new();
+    let set_ty = pool.set(Idx::INT);
+
+    assert!(
+        !super::calls::type_satisfies_trait(set_ty, "Eq", &pool),
+        "Set<int> should NOT satisfy Eq (no equals() in evaluator/codegen)"
+    );
+}
+
+#[test]
+fn test_eq_not_satisfied_by_option() {
+    let mut pool = Pool::new();
+    let opt_ty = pool.option(Idx::INT);
+
+    assert!(
+        !super::calls::type_satisfies_trait(opt_ty, "Eq", &pool),
+        "Option<int> should NOT satisfy Eq (no equals() in evaluator/codegen)"
+    );
+}
+
+#[test]
+fn test_eq_not_satisfied_by_result() {
+    let mut pool = Pool::new();
+    let res_ty = pool.result(Idx::STR, Idx::INT);
+
+    assert!(
+        !super::calls::type_satisfies_trait(res_ty, "Eq", &pool),
+        "Result<str, int> should NOT satisfy Eq (no equals() in evaluator/codegen)"
+    );
+}
+
+#[test]
+fn test_eq_not_satisfied_by_tuple() {
+    let mut pool = Pool::new();
+    let tuple_ty = pool.tuple(&[Idx::INT, Idx::STR]);
+
+    assert!(
+        !super::calls::type_satisfies_trait(tuple_ty, "Eq", &pool),
+        "(int, str) should NOT satisfy Eq (no equals() in evaluator/codegen)"
+    );
+}

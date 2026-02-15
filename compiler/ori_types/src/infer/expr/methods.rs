@@ -31,7 +31,7 @@ pub(crate) fn resolve_builtin_method(
         Tag::Byte => resolve_byte_method(method_name),
         Tag::Char => resolve_char_method(method_name),
         Tag::Ordering => resolve_ordering_method(method_name),
-        Tag::Tuple => resolve_tuple_method(engine, receiver_ty, method_name),
+        Tag::Tuple => resolve_tuple_method(receiver_ty, method_name),
         _ => None,
     }
 }
@@ -46,9 +46,8 @@ fn resolve_list_method(
         "len" | "count" => Some(Idx::INT),
         "is_empty" | "contains" => Some(Idx::BOOL),
         "first" | "last" | "pop" | "get" => Some(engine.pool_mut().option(elem)),
-        "reverse" | "sort" | "sorted" | "unique" | "flatten" | "push" | "append" | "prepend" => {
-            Some(receiver_ty)
-        }
+        "reverse" | "sort" | "sorted" | "unique" | "flatten" | "push" | "append" | "prepend"
+        | "clone" => Some(receiver_ty),
         "join" => Some(Idx::STR),
         "enumerate" => {
             let pair = engine.pool_mut().tuple(&[Idx::INT, elem]);
@@ -84,7 +83,7 @@ fn resolve_option_method(
         "map" | "and_then" | "flat_map" | "filter" | "or_else" => {
             Some(engine.pool_mut().fresh_var())
         }
-        "or" => Some(receiver_ty),
+        "or" | "clone" => Some(receiver_ty),
         _ => None,
     }
 }
@@ -103,6 +102,7 @@ fn resolve_result_method(
         "ok" => Some(engine.pool_mut().option(ok_ty)),
         "err" => Some(engine.pool_mut().option(err_ty)),
         "map" | "map_err" | "and_then" | "or_else" => Some(engine.pool_mut().fresh_var()),
+        "clone" => Some(receiver_ty),
         _ => None,
     }
 }
@@ -120,7 +120,7 @@ fn resolve_map_method(engine: &mut InferEngine<'_>, receiver_ty: Idx, method: &s
             let pair = engine.pool_mut().tuple(&[key_ty, value_ty]);
             Some(engine.pool_mut().list(pair))
         }
-        "insert" | "remove" | "update" | "merge" => Some(receiver_ty),
+        "insert" | "remove" | "update" | "merge" | "clone" => Some(receiver_ty),
         _ => None,
     }
 }
@@ -130,7 +130,9 @@ fn resolve_set_method(engine: &mut InferEngine<'_>, receiver_ty: Idx, method: &s
     match method {
         "len" => Some(Idx::INT),
         "is_empty" | "contains" => Some(Idx::BOOL),
-        "insert" | "remove" | "union" | "intersection" | "difference" => Some(receiver_ty),
+        "insert" | "remove" | "union" | "intersection" | "difference" | "clone" => {
+            Some(receiver_ty)
+        }
         "to_list" => Some(engine.pool_mut().list(elem)),
         _ => None,
     }
@@ -138,10 +140,10 @@ fn resolve_set_method(engine: &mut InferEngine<'_>, receiver_ty: Idx, method: &s
 
 fn resolve_str_method(engine: &mut InferEngine<'_>, method: &str) -> Option<Idx> {
     match method {
-        "len" | "byte_len" => Some(Idx::INT),
-        "is_empty" | "starts_with" | "ends_with" | "contains" => Some(Idx::BOOL),
+        "len" | "byte_len" | "hash" => Some(Idx::INT),
+        "is_empty" | "starts_with" | "ends_with" | "contains" | "equals" => Some(Idx::BOOL),
         "to_upper" | "to_lower" | "trim" | "trim_start" | "trim_end" | "replace" | "repeat"
-        | "pad_start" | "pad_end" | "slice" | "substring" => Some(Idx::STR),
+        | "pad_start" | "pad_end" | "slice" | "substring" | "clone" => Some(Idx::STR),
         "chars" => Some(engine.pool_mut().list(Idx::CHAR)),
         "bytes" => Some(engine.pool_mut().list(Idx::BYTE)),
         "split" | "lines" => Some(engine.pool_mut().list(Idx::STR)),
@@ -156,11 +158,13 @@ fn resolve_str_method(engine: &mut InferEngine<'_>, method: &str) -> Option<Idx>
 
 fn resolve_int_method(method: &str) -> Option<Idx> {
     match method {
-        "abs" | "min" | "max" | "clamp" | "pow" | "signum" => Some(Idx::INT),
+        "abs" | "min" | "max" | "clamp" | "pow" | "signum" | "clone" | "hash" => Some(Idx::INT),
         "to_float" => Some(Idx::FLOAT),
         "to_str" => Some(Idx::STR),
         "to_byte" => Some(Idx::BYTE),
-        "is_positive" | "is_negative" | "is_zero" | "is_even" | "is_odd" => Some(Idx::BOOL),
+        "is_positive" | "is_negative" | "is_zero" | "is_even" | "is_odd" | "equals" => {
+            Some(Idx::BOOL)
+        }
         "compare" => Some(Idx::ORDERING),
         _ => None,
     }
@@ -169,13 +173,12 @@ fn resolve_int_method(method: &str) -> Option<Idx> {
 fn resolve_float_method(method: &str) -> Option<Idx> {
     match method {
         "abs" | "sqrt" | "cbrt" | "sin" | "cos" | "tan" | "asin" | "acos" | "atan" | "atan2"
-        | "ln" | "log2" | "log10" | "exp" | "pow" | "min" | "max" | "clamp" | "signum" => {
-            Some(Idx::FLOAT)
-        }
-        "floor" | "ceil" | "round" | "trunc" | "to_int" => Some(Idx::INT),
+        | "ln" | "log2" | "log10" | "exp" | "pow" | "min" | "max" | "clamp" | "signum"
+        | "clone" => Some(Idx::FLOAT),
+        "floor" | "ceil" | "round" | "trunc" | "to_int" | "hash" => Some(Idx::INT),
         "to_str" => Some(Idx::STR),
         "is_nan" | "is_infinite" | "is_finite" | "is_normal" | "is_positive" | "is_negative"
-        | "is_zero" => Some(Idx::BOOL),
+        | "is_zero" | "equals" => Some(Idx::BOOL),
         "compare" => Some(Idx::ORDERING),
         _ => None,
     }
@@ -188,13 +191,11 @@ fn resolve_duration_method(method: &str) -> Option<Idx> {
         | "as_micros" | "as_nanos" => Some(Idx::FLOAT),
         "to_str" | "format" => Some(Idx::STR),
         "abs" | "from_nanoseconds" | "from_microseconds" | "from_milliseconds" | "from_seconds"
-        | "from_minutes" | "from_hours" | "from_nanos" | "from_micros" | "from_millis" | "zero" => {
-            Some(Idx::DURATION)
-        }
-        "is_zero" | "is_negative" | "is_positive" => Some(Idx::BOOL),
-        "nanoseconds" | "microseconds" | "milliseconds" | "seconds" | "minutes" | "hours" => {
-            Some(Idx::INT)
-        }
+        | "from_minutes" | "from_hours" | "from_nanos" | "from_micros" | "from_millis" | "zero"
+        | "clone" => Some(Idx::DURATION),
+        "is_zero" | "is_negative" | "is_positive" | "equals" => Some(Idx::BOOL),
+        "nanoseconds" | "microseconds" | "milliseconds" | "seconds" | "minutes" | "hours"
+        | "hash" => Some(Idx::INT),
         "compare" => Some(Idx::ORDERING),
         _ => None,
     }
@@ -203,12 +204,12 @@ fn resolve_duration_method(method: &str) -> Option<Idx> {
 fn resolve_size_method(method: &str) -> Option<Idx> {
     match method {
         // Instance methods
-        "to_bytes" | "as_bytes" | "to_kb" | "to_mb" | "to_gb" | "to_tb" => Some(Idx::INT),
+        "to_bytes" | "as_bytes" | "to_kb" | "to_mb" | "to_gb" | "to_tb" | "hash" => Some(Idx::INT),
         "to_str" | "format" => Some(Idx::STR),
-        "is_zero" => Some(Idx::BOOL),
+        "is_zero" | "equals" => Some(Idx::BOOL),
         // Associated functions (static constructors): Size.from_bytes(b: 100)
         "from_bytes" | "from_kilobytes" | "from_megabytes" | "from_gigabytes"
-        | "from_terabytes" | "from_kb" | "from_mb" | "from_gb" | "from_tb" | "zero" => {
+        | "from_terabytes" | "from_kb" | "from_mb" | "from_gb" | "from_tb" | "zero" | "clone" => {
             Some(Idx::SIZE)
         }
         "compare" => Some(Idx::ORDERING),
@@ -291,7 +292,8 @@ fn resolve_ordering_method(method_name: &str) -> Option<Idx> {
 fn resolve_bool_method(method_name: &str) -> Option<Idx> {
     match method_name {
         "to_str" => Some(Idx::STR),
-        "to_int" => Some(Idx::INT),
+        "to_int" | "hash" => Some(Idx::INT),
+        "clone" | "equals" => Some(Idx::BOOL),
         "compare" => Some(Idx::ORDERING),
         _ => None,
     }
@@ -299,10 +301,13 @@ fn resolve_bool_method(method_name: &str) -> Option<Idx> {
 
 fn resolve_byte_method(method_name: &str) -> Option<Idx> {
     match method_name {
-        "to_int" => Some(Idx::INT),
+        "to_int" | "hash" => Some(Idx::INT),
         "to_char" => Some(Idx::CHAR),
         "to_str" => Some(Idx::STR),
-        "is_ascii" | "is_ascii_digit" | "is_ascii_alpha" | "is_ascii_whitespace" => Some(Idx::BOOL),
+        "is_ascii" | "is_ascii_digit" | "is_ascii_alpha" | "is_ascii_whitespace" | "equals" => {
+            Some(Idx::BOOL)
+        }
+        "clone" => Some(Idx::BYTE),
         "compare" => Some(Idx::ORDERING),
         _ => None,
     }
@@ -311,32 +316,19 @@ fn resolve_byte_method(method_name: &str) -> Option<Idx> {
 fn resolve_char_method(method_name: &str) -> Option<Idx> {
     match method_name {
         "to_str" => Some(Idx::STR),
-        "to_int" | "to_byte" => Some(Idx::INT),
+        "to_int" | "to_byte" | "hash" => Some(Idx::INT),
         "is_digit" | "is_alpha" | "is_whitespace" | "is_uppercase" | "is_lowercase"
-        | "is_ascii" => Some(Idx::BOOL),
-        "to_upper" | "to_lower" => Some(Idx::CHAR),
+        | "is_ascii" | "equals" => Some(Idx::BOOL),
+        "to_upper" | "to_lower" | "clone" => Some(Idx::CHAR),
         "compare" => Some(Idx::ORDERING),
         _ => None,
     }
 }
 
-fn resolve_tuple_method(
-    engine: &mut InferEngine<'_>,
-    receiver_ty: Idx,
-    method_name: &str,
-) -> Option<Idx> {
+fn resolve_tuple_method(receiver_ty: Idx, method_name: &str) -> Option<Idx> {
     match method_name {
         "len" => Some(Idx::INT),
-        "to_list" => {
-            // Only works if all elements are the same type
-            let count = engine.pool().tuple_elem_count(receiver_ty);
-            if count > 0 {
-                let first = engine.pool().tuple_elem(receiver_ty, 0);
-                Some(engine.pool_mut().list(first))
-            } else {
-                Some(engine.pool_mut().list(Idx::UNIT))
-            }
-        }
+        "clone" => Some(receiver_ty),
         _ => None,
     }
 }

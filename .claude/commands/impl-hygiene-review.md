@@ -92,11 +92,19 @@ Follow the data from producer to consumer:
 - [ ] No shared mutable state between passes?
 - [ ] Boundary invariants asserted?
 
+**Registration Sync Points:**
+- [ ] Any enum/variant that must appear in multiple locations has a single source of truth?
+- [ ] Parallel lists (match arms, arrays, maps) that must cover the same variants are derived from a shared source rather than manually mirrored?
+- [ ] New variants added in one location are present in all parallel locations? (e.g., new error code in enum → `from_str()` → `DOCS` → `explain`)
+- [ ] When centralization isn't feasible, is there a test enforcing completeness?
+- [ ] Operator→trait mappings, keyword→token mappings, error code→doc mappings — are these centralized or at risk of drift?
+
 ### Step 5: Compile Findings
 
 Organize findings by boundary/interface, categorized as:
 
 - **LEAK** — Data or control flow crossing a boundary it shouldn't (phase bleeding, backward reference, swallowed error)
+- **DRIFT** — Registration data present in one location but missing from a parallel location that must stay in sync (e.g., enum variant added but `from_str()`/docs/mapping not updated)
 - **WASTE** — Unnecessary allocation, clone, or transformation at boundary (extra copy, redundant conversion)
 - **EXPOSURE** — Internal state leaking through boundary types (parser state in AST, raw IDs without newtypes)
 - **NOTE** — Observation, not actionable (acceptable tradeoff, documented exception)
@@ -123,8 +131,9 @@ Use **EnterPlanMode** to create a fix plan. The plan should:
 **Entry points:** {list key functions}
 
 1. **[LEAK]** `file:line` — {description}
-2. **[WASTE]** `file:line` — {description}
-3. **[EXPOSURE]** `file:line` — {description}
+2. **[DRIFT]** `file:line` — {description}
+3. **[WASTE]** `file:line` — {description}
+4. **[EXPOSURE]** `file:line` — {description}
 ...
 
 ### {Next Boundary}
@@ -133,11 +142,12 @@ Use **EnterPlanMode** to create a fix plan. The plan should:
 ### Execution Order
 
 1. Phase bleeding fixes (may require interface changes)
-2. Error propagation fixes (may add error variants)
-3. Ownership/allocation fixes (perf, no API change)
-4. Type discipline fixes (newtypes, generics)
-5. Run `./test-all.sh` to verify no behavior changes
-6. Run `./clippy-all.sh` to verify no regressions
+2. Registration drift fixes (add missing mappings, centralize parallel lists)
+3. Error propagation fixes (may add error variants)
+4. Ownership/allocation fixes (perf, no API change)
+5. Type discipline fixes (newtypes, generics)
+6. Run `./test-all.sh` to verify no behavior changes
+7. Run `./clippy-all.sh` to verify no regressions
 ```
 
 ## Important Rules
