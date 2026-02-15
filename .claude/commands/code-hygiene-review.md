@@ -86,6 +86,7 @@ For each file, check and fix:
 - Module doc comment present?
 - Sections in correct order? (mods → imports → types → impls → fns → tests)
 - Imports in 3 groups with blank-line separators?
+- No inline test modules? (must be `#[cfg(test)] mod tests;` declaration only — if you find `#[cfg(test)] mod tests { ... }` with an inline body, extract it to a sibling `tests.rs` file)
 
 **Impl Block Ordering:**
 - Constructors first?
@@ -124,10 +125,28 @@ For each file, check and fix:
 
 - **No behavior changes** — Hygiene is purely cosmetic/organizational
 - **No refactoring** — Don't extract functions, move modules, or change APIs
-- **Test code is relaxed** — Section banners (`// === Section ===`) are OK in `#[cfg(test)]` modules
+- **Test code is relaxed** — Section banners (`// === Section ===`) are OK in `tests.rs` files
 - **Dispatch tables exempt** — Large match statements mapping tokens/tags are not "long functions"
 - **Be precise with edits** — Use Edit tool with exact old_string matches. Do not rewrite entire files unless necessary.
 - **If unsure, skip it** — When something is a judgment call and the current code is reasonable, leave it alone
+
+## Inline Test Extraction
+
+If you find `#[cfg(test)] mod tests { ... }` with an inline body, extract it:
+
+1. **Determine the sibling path:**
+   - `foo.rs` → `foo/tests.rs` (mkdir `foo/` if needed)
+   - `bar/mod.rs` → `bar/tests.rs`
+   - `lib.rs` / `main.rs` → `tests.rs` in the same directory
+2. **Skip** if the sibling `tests.rs` already exists
+3. **Extract** the inner content (everything between the outer `{` and `}`), dedent by one level (4 spaces)
+4. **Write** the extracted content to the sibling `tests.rs`
+5. **Replace** the inline block with just the declaration (preserve any attributes like `#[allow(...)]`):
+   ```rust
+   #[cfg(test)]
+   mod tests;
+   ```
+6. **Alternatively**, run `python3 scripts/extract_tests.py --file <path> --apply` which handles all of this automatically
 
 ## Output Format
 
