@@ -12,7 +12,7 @@ Review implementation hygiene against `.claude/rules/impl-hygiene.md` and genera
 
 ## Target
 
-`$ARGUMENTS` specifies the boundary or scope to review. There are two modes:
+`$ARGUMENTS` specifies the boundary or scope to review. **If empty or blank, default to last commit mode** (equivalent to `/impl-hygiene-review last commit`). Otherwise, there are two modes:
 
 ### Path Mode (explicit crate/directory targets)
 - `/impl-hygiene-review compiler/ori_lexer compiler/ori_parse` — review lexer→parser boundary
@@ -31,8 +31,6 @@ Review implementation hygiene against `.claude/rules/impl-hygiene.md` and genera
 1. Use `git diff --name-only HEAD~N..HEAD` (or appropriate range) to get the list of changed `.rs` files
 2. Expand to include the full crate(s) those files belong to (e.g., if `compiler/ori_llvm/src/derive.rs` was touched, include all of `compiler/ori_llvm/`)
 3. Proceed with the standard review process using those crates as the target
-
-If no argument: ask the user what boundary to review.
 
 ## Execution
 
