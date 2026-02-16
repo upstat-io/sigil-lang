@@ -142,6 +142,7 @@ Bottom type (uninhabited); coerces to any `T`
 **Suspend**: `uses Suspend` = may suspend; no `uses` = sync; concurrency via `parallel(...)`
 **Standard**: `Http`, `FileSystem`, `Clock`, `Random`, `Crypto`, `Cache`, `Print` (default), `Logger`, `Env`, `Intrinsics`, `Suspend`, `FFI`
 **Intrinsics**: SIMD/bit ops; `Intrinsics.simd_add_f32x4(a:, b:)`, `count_ones(value:)`, `cpu_has_feature(feature:)`
+**Capsets**: `capset Net = Http, Dns, Tls` — transparent alias, expanded in `uses` before type checking; `@f uses Net` expands to `@f uses Http, Dns, Tls`; capsets can include other capsets; not a trait (no `impl`, no `with`, no `def impl`)
 
 ## Comments
 
