@@ -17,6 +17,12 @@ paths:
 8. Free functions
 9. `#[cfg(test)] mod tests;` at bottom (declaration only — test body lives in sibling `tests.rs`)
 
+**Allowed `#[cfg(test)]` exceptions in source files** (NOT violations of the sibling pattern):
+- Helper functions that need private access: `#[cfg(test)] fn make_test_pool() -> Pool { ... }`
+- Test-only imports: `#[cfg(test)] use crate::test_helpers::MockExecutor;`
+- Compile-time assertions: `#[cfg(test)] const _: () = { assert!(size_of::<Item>() <= 8); };`
+- Shared test utility modules: `#[cfg(test)] pub(crate) mod test_helpers;`
+
 ## Import Organization (3 groups, blank-line separated)
 
 1. External crate imports (alphabetical)
