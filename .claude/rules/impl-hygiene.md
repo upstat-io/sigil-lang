@@ -55,6 +55,13 @@ paths:
 - **Compile-time or test-time enforcement**: When centralization isn't possible (e.g., docs files that may not exist yet), add a test that iterates the source-of-truth list and checks each derived location for completeness.
 - **Flag drift as a finding**: When a new variant, mapping, or registration is added in one location but missing from a parallel location, that's a **DRIFT** finding — the plumbing equivalent of a phase leak, but for registration data instead of control flow.
 
+## Gap Detection
+
+- **Cross-phase capability mismatch**: When one phase supports a feature but another blocks it, that's a **GAP** finding. Example: type checker and evaluator handle numeric field access `.0` but the parser rejects it. Gaps are invisible to users and to the roadmap — they look like "not implemented" when really it's "partially implemented with a bottleneck."
+- **Never silently work around a gap**: If a feature doesn't work end-to-end, don't restructure code to avoid the broken path. Flag it immediately. A workaround hides the gap from the roadmap and from future implementers.
+- **Audit across phases**: When adding a new capability to any phase, verify the full pipeline: lexer → parser → type checker → evaluator → codegen. A feature that works in isolation but fails end-to-end is a gap.
+- **Track with specificity**: A gap finding must name: (1) which phase blocks, (2) which phases already support, (3) what the user-visible symptom is. Vague "doesn't work" is not a finding.
+
 ## Phase-Specific Purity
 
 **Lexer**: Stateless scanning. Produces structural facts (`tag`, `len`). Does NOT judge keywords, resolve names, or track nesting context beyond what's needed for tokenization.

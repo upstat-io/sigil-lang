@@ -99,12 +99,18 @@ Follow the data from producer to consumer:
 - [ ] When centralization isn't feasible, is there a test enforcing completeness?
 - [ ] Operator→trait mappings, keyword→token mappings, error code→doc mappings — are these centralized or at risk of drift?
 
+**Gap Detection:**
+- [ ] Features supported in downstream phases (type checker, evaluator, codegen) also supported in upstream phases (parser, lexer)?
+- [ ] No silent workarounds for missing capabilities? (e.g., destructuring instead of `.0` because parser blocks it)
+- [ ] Full pipeline works end-to-end for each feature? (lexer → parser → type checker → evaluator → codegen)
+
 ### Step 5: Compile Findings
 
 Organize findings by boundary/interface, categorized as:
 
 - **LEAK** — Data or control flow crossing a boundary it shouldn't (phase bleeding, backward reference, swallowed error)
 - **DRIFT** — Registration data present in one location but missing from a parallel location that must stay in sync (e.g., enum variant added but `from_str()`/docs/mapping not updated)
+- **GAP** — Feature supported in one phase but blocked or missing in another, breaking end-to-end functionality (e.g., type checker handles `.0` but parser rejects it)
 - **WASTE** — Unnecessary allocation, clone, or transformation at boundary (extra copy, redundant conversion)
 - **EXPOSURE** — Internal state leaking through boundary types (parser state in AST, raw IDs without newtypes)
 - **NOTE** — Observation, not actionable (acceptable tradeoff, documented exception)
@@ -123,7 +129,7 @@ Use **EnterPlanMode** to create a fix plan. The plan should:
 ```
 ## Implementation Hygiene Review: {target}
 
-**Scope:** N boundaries reviewed, ~M findings (X leak, Y waste, Z exposure)
+**Scope:** N boundaries reviewed, ~M findings (X leak, Y drift, Z gap, W waste, V exposure)
 
 ### {Boundary: Phase A → Phase B}
 
@@ -132,8 +138,9 @@ Use **EnterPlanMode** to create a fix plan. The plan should:
 
 1. **[LEAK]** `file:line` — {description}
 2. **[DRIFT]** `file:line` — {description}
-3. **[WASTE]** `file:line` — {description}
-4. **[EXPOSURE]** `file:line` — {description}
+3. **[GAP]** `file:line` — {description}
+4. **[WASTE]** `file:line` — {description}
+5. **[EXPOSURE]** `file:line` — {description}
 ...
 
 ### {Next Boundary}
@@ -143,9 +150,10 @@ Use **EnterPlanMode** to create a fix plan. The plan should:
 
 1. Phase bleeding fixes (may require interface changes)
 2. Registration drift fixes (add missing mappings, centralize parallel lists)
-3. Error propagation fixes (may add error variants)
-4. Ownership/allocation fixes (perf, no API change)
-5. Type discipline fixes (newtypes, generics)
+3. Gap fixes (unblock end-to-end feature paths)
+4. Error propagation fixes (may add error variants)
+5. Ownership/allocation fixes (perf, no API change)
+6. Type discipline fixes (newtypes, generics)
 6. Run `./test-all.sh` to verify no behavior changes
 7. Run `./clippy-all.sh` to verify no regressions
 ```
