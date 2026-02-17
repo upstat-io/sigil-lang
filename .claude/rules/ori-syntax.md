@@ -186,7 +186,7 @@ Bottom type (uninhabited); coerces to any `T`
 **TraceEntry**: `{ function, file, line, column: int }` — `@` prefix; most recent first
 **PanicInfo**: `{ message, location: TraceEntry, stack_trace: [TraceEntry], thread_id: Option<int> }`
 **Drop**: `@drop (self) -> void` — refcount zero; not async; panic during unwind aborts
-**Index**: `@index (self, key: Key) -> Value` — `x[k]`→`x.index(key: k)`; return `T`/`Option<T>`/`Result<T, E>`; `#` built-in only
+**Index**: `@index (self, key: Key) -> Value` — `x[k]`→`x.index(key: k)`; return `T`/`Option<T>`/`Result<T, E>`; `#` built-in only; multiple impls per type OK: `impl Index<int, V>` + `impl Index<str, V>` disambiguated by key type at compile time
 **Eq**: `@equals (self, other: Self) -> bool` — reflexive/symmetric/transitive; derives `==`/`!=`
 **Comparable**: `trait: Eq { @compare (self, other: Self) -> Ordering }` — total order; derives `<`/`<=`/`>`/`>=`; NaN > all; `None < Some`; `Ok < Err`
 **Hashable**: `trait: Eq { @hash (self) -> int }` — `a == b` ⇒ same hash; +0.0/-0.0 same; use `hash_combine`
