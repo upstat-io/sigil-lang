@@ -5,8 +5,11 @@ Stage, commit, and push all changes to the remote repository using conventional 
 ## Usage
 
 ```
-/commit-push
+/commit-push           # Commit and push immediately (no confirmation)
+/commit-push preview   # Show summary and ask for confirmation before committing
 ```
+
+**Arguments:** `$ARGUMENTS`
 
 ---
 
@@ -50,19 +53,16 @@ Review the changes and create a commit message following conventional commit for
 
 **Scope** is optional. Use the primary module affected (e.g., `typeck`, `parser`, `llvm`).
 
-### Step 3: Present to User and Get Confirmation
+### Step 3: Preview Mode (only if `preview` argument is passed)
 
-Show the user:
-1. Summary of files changed
-2. The proposed commit message
+**If `$ARGUMENTS` contains `preview`:**
+1. Show the user a summary of files changed and the proposed commit message
+2. Ask: "Shall I proceed with this commit?"
+3. **Do NOT commit until user confirms.**
 
-Ask: "Shall I proceed with this commit?"
-
-**Do NOT commit until user confirms.**
+**Otherwise (default):** Skip directly to Step 4 — no confirmation needed.
 
 ### Step 4: Commit Main Changes
-
-After user confirms:
 
 ```bash
 git add -A
@@ -88,7 +88,7 @@ Before completing, verify:
 
 - [ ] `git status` was checked (Step 1)
 - [ ] Commit message follows conventional format (Step 2)
-- [ ] User confirmed before committing (Step 3)
+- [ ] If preview mode: user confirmed before committing (Step 3)
 - [ ] Main changes committed (Step 4)
 - [ ] Changes pushed (Step 5)
 
@@ -110,7 +110,8 @@ perf(typeck): optimize line lookup and hash map usage
 ## Rules
 
 - Always run `git status` before committing
-- Always get user confirmation before the main commit
+- Default mode: commit and push without confirmation (user trusts the process)
+- Preview mode (`/commit-push preview`): show summary and wait for confirmation
 - Never force push or use destructive git operations
 - Keep the first line of commit message under 72 characters
 - Do NOT include `Co-Authored-By` lines in commit messages
