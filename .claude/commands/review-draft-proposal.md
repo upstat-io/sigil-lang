@@ -25,8 +25,9 @@ Review a draft proposal, analyze implications, and (if approved) integrate into 
 7. Walk through recommendations one-by-one
 8. Confirm approval
 9. Execute approval workflow
-10. **Sync spec and grammar** (invoke `/sync-spec` and `/sync-grammar`) ← CRITICAL
-11. Verify documentation formatting (final step)
+10. **Propagation audit** — find and fix ALL stale references across repo ← CRITICAL
+11. **Sync spec and grammar** (invoke `/sync-spec` and `/sync-grammar`)
+12. Verify documentation formatting (final step)
 
 ---
 
@@ -253,11 +254,62 @@ Brief description.
 - Blocked on: [deps or "None"]
 ```
 
-### Step 15: Update Spec, Grammar, and Ori Syntax Reference
+### Step 15: Propagation Audit — Find and Fix All Downstream/Upstream Drift
+
+**CRITICAL STEP.** When a proposal changes language semantics, naming, behavior, or invariants, the change must propagate to EVERY document and code location that references the old assumptions. Failure to propagate creates silent contradictions that compound over time.
+
+**Why this matters:** The `simplified-bindings-proposal` changed Ori's mutability model from "immutable by default" to "mutable by default with `$` for immutable". That fundamental change was never propagated — leaving contradictions in 5+ documents, 2 approved proposals with stale reasoning, phantom API references (`list.set()`), and misleading compiler error messages. All discovered months later.
+
+**Audit scope — check ALL of these for references to the old behavior:**
+
+| Location | What to check | How to search |
+|----------|--------------|---------------|
+| **Other approved proposals** | Reasoning, examples, API references that assume old behavior | `grep -r` in `proposals/approved/` for key terms |
+| **Spec files** | Sections describing affected semantics | `grep -r` in `docs/ori_lang/0.1-alpha/spec/` |
+| **Roadmap** | Overview, design pillars, section descriptions | `grep -r` in `plans/roadmap/` |
+| **CLAUDE.md files** | Project instructions referencing old behavior | Check root and `.claude/` CLAUDE.md files |
+| **Rules files** | `.claude/rules/*.md` files with stale assumptions | `grep -r` in `.claude/rules/` |
+| **Compiler error messages** | Error factories, help text, diagnostic strings | `grep -r` in `compiler/` for key terms |
+| **Test skip reasons** | `#skip("...")` comments referencing old behavior | `grep -r '#skip'` in `tests/` |
+| **Ori syntax reference** | `.claude/rules/ori-syntax.md` | Read affected sections |
+
+**Procedure:**
+
+1. **Identify key terms** — Extract 3-5 terms/phrases that the proposal changes or invalidates (e.g., "immutable by default", "set() method", "mutable reference")
+
+2. **Search broadly** — For each term, search the entire repo:
+   ```bash
+   grep -r "term" docs/ plans/ .claude/ compiler/ tests/ --include="*.md" --include="*.rs" --include="*.ori" -l
+   ```
+
+3. **Classify each hit:**
+   - **STALE** — Directly contradicts the new proposal → must fix
+   - **ADJACENT** — References the area but doesn't contradict → review, may need updating
+   - **UNRELATED** — Same term, different context → skip
+
+4. **Fix all STALE references** before proceeding:
+   - Update spec language to match new semantics
+   - Add errata sections to approved proposals that had stale reasoning (do NOT rewrite approved proposals — add errata)
+   - Update roadmap descriptions
+   - Update compiler error messages and help text
+   - Update test skip reasons
+
+5. **Document what was updated** — List all files changed in the propagation audit. This becomes part of the commit message.
+
+**Errata format for approved proposals:**
+```markdown
+## Errata (added YYYY-MM-DD)
+
+> **Superseded by [proposal-name]**: [Brief description of what changed and why the original reasoning is stale. Reference the new proposal.]
+```
+
+**If the audit reveals more than 10 stale references**, the proposal is touching a fundamental invariant. Use `AskUserQuestion` to confirm the user wants to proceed with all fixes before making changes.
+
+### Step 16: Update Spec, Grammar, and Ori Syntax Reference
 
 If proposal introduces new syntax/types/semantics, **invoke the sync skills**:
 
-**Step 15a: Sync Spec (if semantics changed)**
+**Step 16a: Sync Spec (if semantics changed)**
 
 If the proposal affects language semantics, types, or behavior:
 
@@ -267,7 +319,7 @@ Invoke: `Skill(skill: "sync-spec")`
 
 This ensures spec files use formal, declarative language and follow `.claude/rules/spec.md`.
 
-**Step 15b: Sync Grammar (if syntax changed)**
+**Step 16b: Sync Grammar (if syntax changed)**
 
 If the proposal introduces or modifies syntax:
 
@@ -277,13 +329,13 @@ Invoke: `Skill(skill: "sync-grammar")`
 
 This ensures `grammar.ebnf` stays synchronized as the single source of truth.
 
-**Step 15c: Update Ori Syntax Reference (manual)**
+**Step 16c: Update Ori Syntax Reference (manual)**
 
 - [ ] Update `.claude/rules/ori-syntax.md` if syntax/types/patterns affected
 - [ ] Follow rules in `.claude/rules/ori-lang.md`
 - [ ] Verify consistency between spec, grammar.ebnf, and ori-syntax.md
 
-### Step 16: Verify Documentation Formatting
+### Step 17: Verify Documentation Formatting
 
 **Before committing**, verify all modified documentation follows formatting rules.
 
@@ -328,7 +380,7 @@ Use `AskUserQuestion` to resolve each formatting issue before proceeding.
 | "When you write `type T = Self`..." | "The syntax `type T = Self`..." |
 | "Don't forget to..." | "It is an error if..." |
 
-### Step 17: Commit and Push
+### Step 18: Commit and Push
 
 Invoke: `Skill(skill: "commit-push")`
 
@@ -339,6 +391,7 @@ docs(proposal): approve <proposal-name>
 - Move from drafts/ to approved/
 - Add implementation plan to Section X
 - Update roadmap tracking
+- Propagation audit: updated N files with stale references
 - Update spec ([affected files])
 - Update ori-syntax.md with [feature]
 
@@ -370,8 +423,12 @@ Proposal: docs/ori_lang/proposals/approved/<name>-proposal.md
 - [ ] Implementation tasks added to section file(s)
 - [ ] `plan.md` updated (if applicable)
 - [ ] `priority-and-tracking.md` updated
-- [ ] **`/sync-spec` invoked** (if affects semantics) ← CRITICAL
-- [ ] **`/sync-grammar` invoked** (if affects syntax) ← CRITICAL
+- [ ] **Propagation audit completed** — searched ALL docs/specs/proposals/roadmap/compiler for stale references ← CRITICAL
+- [ ] Errata added to any approved proposals with stale reasoning
+- [ ] Compiler error messages updated if they reference old behavior
+- [ ] Test skip reasons updated if they reference old behavior
+- [ ] **`/sync-spec` invoked** (if affects semantics)
+- [ ] **`/sync-grammar` invoked** (if affects syntax)
 - [ ] `.claude/rules/ori-syntax.md` updated (if affects syntax/types/patterns)
 
 **Formatting Verification (final step):**
