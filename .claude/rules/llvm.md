@@ -5,7 +5,7 @@ paths:
 
 **NO WORKAROUNDS/HACKS/SHORTCUTS.** Proper fixes only. When unsure, STOP and ask. Fact-check against spec. Consult `~/projects/reference_repos/lang_repos/` (includes Swift for ARC, Koka for effects, Lean 4 for RC).
 
-**Ori tooling is under construction** — bugs are usually in compiler, not user code. Fix every issue you encounter.
+**Ori tooling is under construction** — bugs are usually in compiler, not user code. This is one system: every piece must fit for any piece to work. Fix every issue you encounter — no "unrelated", no "out of scope", no "pre-existing." If it's broken, research why and fix it.
 
 # LLVM Development
 
@@ -71,6 +71,15 @@ entry → header → body → latch → header (or exit)
 **Critical**: `continue` must jump to `latch` (not `header`) to ensure index increments. Jumping directly to header skips increment → infinite loop.
 
 **Break** jumps to `exit` block (correct as-is).
+
+## Derive Codegen
+
+`codegen/derive_codegen.rs` generates synthetic LLVM functions for `#[derive(...)]` attributes. This is a **sync point** — it must handle every `DerivedTrait` variant that the evaluator handles.
+
+**Currently supported**: Eq, Clone, Hashable, Printable
+**NOT yet supported**: Debug, Default (evaluator handles these but LLVM codegen does not)
+
+**DO NOT** add derive codegen for a trait without first verifying the evaluator and type checker support it. See CLAUDE.md "Adding a New Derived Trait" checklist.
 
 ## Tracing / Debugging
 

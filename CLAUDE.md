@@ -1,6 +1,6 @@
 **Ori is under construction.** Rust tooling (cargo, rustc) is trusted and stable. Ori tooling (lexer, parser, type checker, evaluator, test runner) is NOT—all are being built from scratch. When something fails, investigate the Ori infrastructure first. Do not assume user code or tests are wrong; the bug is often in the compiler/tooling itself.
 
-**Broken Window Policy**: Fix EVERY issue you encounter—no exceptions. Never say "this is pre-existing", "this is unrelated", or "outside the scope". If you see it, you own it. Add discovered issues to your todo list and fix them before completing your task. Leaving broken code because "it was already broken" is explicitly forbidden.
+**This system is ONE thing.** The compiler, type checker, evaluator, codegen, tests, spec, stdlib — they are not separate projects. They are one machine. A broken piece anywhere means the whole machine is broken. There is no "my change" vs "someone else's code." There is no "unrelated." There is no "pre-existing." There is no "outside scope." If you encounter something broken, it is your problem right now. Do not label it and move on. Investigate why it's broken. Understand the cause. Fix it. Every single piece must fit together to form a complete, working whole — a puzzle with even one missing piece is an incomplete puzzle. Add discovered issues to your todo list and fix them before completing your task.
 
 **Do it properly, not just simply. Correct architecture over quick hacks; no shortcuts or "good enough" solutions.**
 
@@ -77,7 +77,7 @@ For Ori syntax, types, patterns, and prelude:
 
 **Match Extraction**: No 20+ arm match in single file; group related arms; 3+ similar → extract helper
 
-**Continuous Improvement**: Fix ALL issues in code you touch—dead code, unclear names, duplicated logic, style violations. "Pre-existing" and "unrelated" are not valid reasons to skip fixes. If you opened the file, you're responsible for its quality. Refactor when patterns emerge.
+**Continuous Improvement**: Fix ALL issues in code you touch — dead code, unclear names, duplicated logic, style violations. There is no boundary between "your code" and "other code." Every file you open, every function you read, every test you run is part of the same system you are building. If it's broken, fix it. If it's messy, clean it. If it drifted, sync it. Do not narrow your vision to a single function or file — zoom out, see the whole system, and make it coherent. Refactor when patterns emerge.
 
 ---
 
