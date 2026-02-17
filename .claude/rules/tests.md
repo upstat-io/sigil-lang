@@ -43,6 +43,8 @@ paths:
   - `foo.rs` → `foo/tests.rs`
   - `mod.rs` in `bar/` → `bar/tests.rs`
   - `lib.rs` / `main.rs` → `tests.rs` in same directory
+  - **Allowed in source**: `#[cfg(test)]` helper fns (private access), test-only imports, const assertions, `pub(crate) mod test_helpers;`
+  - **Never in source**: `#[cfg(test)] mod tests { #[test] fn ... }` — always extract to sibling file
 - Ori tests live in `_test/` subdirectories: `foo.ori` → `_test/foo.test.ori`
 - Clear naming: `test_parses_nested_generics`
 - AAA structure

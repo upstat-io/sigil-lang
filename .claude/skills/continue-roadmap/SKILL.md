@@ -219,6 +219,43 @@ Checking off items without verification defeats the purpose of the roadmap.
 
 ---
 
+## Gap Detection and Escalation Protocol
+
+When implementing a roadmap item and you discover that a required language feature
+is missing, incomplete, or blocks the current work:
+
+### STOP — Do Not Work Around
+
+**Never silently substitute a workaround.** If `.0` syntax doesn't work, don't
+quietly switch to destructuring. If a pattern form panics, don't restructure the
+test to avoid it. The workaround hides the gap from the user and from the roadmap.
+
+### Flag Immediately
+
+Use AskUserQuestion to escalate:
+
+1. **What's missing**: Describe the exact gap (e.g., "parser rejects `.0` after dot — tuple field access not implemented")
+2. **Where it's documented** (or not): Check spec, EBNF, roadmap for the feature
+3. **Impact**: What current work is blocked or degraded
+4. **Recommendation**: Fix now (if small, < 30 min), track and fix later (if large), or ask user
+
+### Track in Roadmap
+
+If the gap is deferred (not fixed immediately):
+1. Add a `<!-- gap: description -->` comment on the blocked roadmap item
+2. Add a `- [ ]` checkbox for the missing feature in the appropriate section
+3. Add blocker references (`<!-- blocked-by:X -->` / `<!-- unblocks:X.Y -->`)
+
+### Why This Matters
+
+Silent workarounds create invisible technical debt. A gap that isn't flagged:
+- Won't appear in the roadmap scanner output
+- Won't be prioritized for implementation
+- Will surprise users when they try the "supported" syntax
+- Forces every future implementer to discover and work around it independently
+
+---
+
 ## Updating Section File Frontmatter
 
 Section files use YAML frontmatter for machine-readable status tracking. **You must keep this in sync** when completing tasks.

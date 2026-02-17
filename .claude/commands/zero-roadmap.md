@@ -19,7 +19,7 @@ No arguments. Operates on all section files in `plans/roadmap/`.
 Before making any changes, confirm:
 
 ```
-⚠️  ROADMAP ZERO RESET
+WARNING: ROADMAP ZERO RESET
 
 This will reset ALL roadmap items to pending status:
 - All section `status:` → `not-started`
@@ -108,7 +108,7 @@ Also update any completion statistics in the overview if present.
 After processing all files, report:
 
 ```
-✅ Roadmap Reset Complete
+Roadmap Reset Complete
 
 Processed X section files:
 - Section 1: Type System — 45 items reset

@@ -38,7 +38,7 @@ paths:
 **Primitives**: `int` (i64), `float` (f64), `bool`, `str` (UTF-8), `char`, `byte`, `void`, `Never`
 **Special**: `Duration` (`100ns`/`us`/`ms`/`s`/`m`/`h`), `Size` (`100b`/`kb`/`mb`/`gb`/`tb`)
 **Collections**: `[T]` list, `[T, max N]` fixed-capacity, `{K: V}` map, `Set<T>`
-**Compound**: `(T, U)` tuple, `()` unit, `(T) -> U` fn, `Trait` object, `impl Trait` existential
+**Compound**: `(T, U)` tuple (access: `.0`, `.1`), `()` unit, `(T) -> U` fn, `Trait` object, `impl Trait` existential
 **Generic**: `Option<T>`, `Result<T, E>`, `Range<T>`, `Ordering`
 **Const Generics**: `$N: int` | `@f<T, $N: int>` | `$B: bool` | `where N > 0` | `where N > 0 && N <= 100`
 **Const Bounds**: comparison (`==`/`!=`/`<`/`<=`/`>`/`>=`), logical (`&&`/`||`/`!`), arithmetic (`+`/`-`/`*`/`/`/`%`), bitwise (`&`/`|`/`^`/`<<`/`>>`) | multiple `where` = AND
@@ -97,7 +97,8 @@ Bottom type (uninhabited); coerces to any `T`
 **Conditionals**: `if c then e else e` | `if c then e` (void)
 **Bindings**: `let x = v` mutable | `let $x` immutable | `let x: T` | shadowing OK | `let { x, y }` | `let { x: px }` | `let (a, b)` | `let [$h, ..t]`
 **Indexing**: `list[0]`, `list[# - 1]` (`#`=length, panics OOB) | `map["k"]` → `Option<V>`
-**Access**: `v.field`, `v.method(arg: v)` — named args required except: fn variables, single-param with inline lambda
+**Index/Field Assignment**: `list[i] = x` → `list = list.updated(key: i, value: x)` | `state.field = x` → `state = { ...state, field: x }` | mixed chains: `state.items[i] = x`, `list[i].name = x` | compound: `list[i] += 1` | root must be mutable (non-`$`)
+**Access**: `v.field`, `v.0` (tuple), `v.method(arg: v)` — named args required except: fn variables, single-param with inline lambda
 **Lambdas**: `x -> x + 1` | `(a, b) -> a + b` | `() -> 42` | `(x: int) -> int = x * 2` — capture by value
 **Ranges**: `0..10` excl | `0..=10` incl | `0..10 by 2` | descending: `10..0 by -1` | infinite: `0..`, `0.. by -1` | int only
 **Loops**: `for i in items do e` | `for x in items yield x * 2` | `for x in items if g yield x` | nested `for` | `loop(body)` + `break`/`continue` | `break value` | `continue value`
@@ -142,6 +143,7 @@ Bottom type (uninhabited); coerces to any `T`
 **Suspend**: `uses Suspend` = may suspend; no `uses` = sync; concurrency via `parallel(...)`
 **Standard**: `Http`, `FileSystem`, `Clock`, `Random`, `Crypto`, `Cache`, `Print` (default), `Logger`, `Env`, `Intrinsics`, `Suspend`, `FFI`
 **Intrinsics**: SIMD/bit ops; `Intrinsics.simd_add_f32x4(a:, b:)`, `count_ones(value:)`, `cpu_has_feature(feature:)`
+**Capsets**: `capset Net = Http, Dns, Tls` — transparent alias, expanded in `uses` before type checking; `@f uses Net` expands to `@f uses Http, Dns, Tls`; capsets can include other capsets; not a trait (no `impl`, no `with`, no `def impl`)
 
 ## Comments
 
@@ -161,7 +163,7 @@ Bottom type (uninhabited); coerces to any `T`
 ## Prelude
 
 **Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `TraceEntry`, `Ordering`, `PanicInfo`, `CancellationError`, `CancellationReason`, `FormatSpec`, `Alignment`, `Sign`, `FormatType`
-**Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Formattable`, `Debug`, `Clone`, `Default`, `Drop`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`, `Index`
+**Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Formattable`, `Debug`, `Clone`, `Default`, `Drop`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`, `Index`, `IndexSet`
 
 **Built-ins**: `print(msg:)`, `len(collection:)`, `is_empty(collection:)`, `is_some/is_none(option:)`, `is_ok/is_err(result:)`, `assert(condition:)`, `assert_eq(actual:, expected:)`, `assert_ne(actual:, unexpected:)`, `assert_some/none/ok/err(...)`, `assert_panics(f:)`, `assert_panics_with(f:, msg:)`, `panic(msg:)`→`Never`, `todo()`/`todo(reason:)`→`Never`, `unreachable()`/`unreachable(reason:)`→`Never`, `dbg(value:)`/`dbg(value:, label:)`→`T`, `compare(left:, right:)`→`Ordering`, `min/max(left:, right:)`, `hash_combine(seed:, value:)`→`int`, `repeat(value:)`→iter, `is_cancelled()`→`bool`, `compile_error(msg:)`, `drop_early(value:)`
 

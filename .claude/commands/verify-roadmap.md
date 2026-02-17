@@ -153,26 +153,26 @@ For each item, determine how to verify it:
    |---------|---------|--------|
    | **Sound** | Tests are correct, assertions match spec, reasonable coverage | Mark `[x]` |
    | **Weak** | Tests pass but coverage is insufficient or assertions are shallow | Leave `[ ]`, annotate with specific gaps |
-   | **Wrong** | Tests have incorrect assertions or test wrong behavior | Leave `[ ]`, annotate as ⚠️ WRONG TEST |
-   | **Stale** | Tests reference outdated syntax/features | Leave `[ ]`, annotate as ⚠️ STALE TEST |
+   | **Wrong** | Tests have incorrect assertions or test wrong behavior | Leave `[ ]`, annotate as WRONG TEST |
+   | **Stale** | Tests reference outdated syntax/features | Leave `[ ]`, annotate as STALE TEST |
 
 #### 2d. Update Item Status
 
 **If Verified (tests pass AND are sound):**
 ```markdown
-- [x] **Implement**: Feature X ✅ (verified 2026-02-08)
+- [x] **Implement**: Feature X [done] (verified 2026-02-08)
 ```
 
 **If Not Verified (regression — tests fail):**
 ```markdown
 - [ ] **Implement**: Feature X
-  - ⚠️ REGRESSION: Tests exist but fail. Needs investigation.
+  - REGRESSION: Tests exist but fail. Needs investigation.
 ```
 
 **If Tests Weak (pass but insufficient):**
 ```markdown
 - [ ] **Implement**: Feature X
-  - 🔍 WEAK TESTS: Tests pass but coverage is insufficient
+  - WEAK TESTS: Tests pass but coverage is insufficient
     - [ ] Add test: [specific missing coverage]
     - [ ] Strengthen assertion in [test file]: assert actual value, not just Ok
 ```
@@ -180,7 +180,7 @@ For each item, determine how to verify it:
 **If Tests Wrong (incorrect assertions):**
 ```markdown
 - [ ] **Implement**: Feature X
-  - ⚠️ WRONG TEST: [test file] — [what's wrong]
+  - WRONG TEST: [test file] — [what's wrong]
     - Expected per spec: [correct behavior]
     - Test asserts: [what test currently checks]
 ```
@@ -188,13 +188,13 @@ For each item, determine how to verify it:
 **If Tests Stale (outdated syntax/features):**
 ```markdown
 - [ ] **Implement**: Feature X
-  - ⚠️ STALE TEST: [test file] — references removed/changed syntax
+  - STALE TEST: [test file] — references removed/changed syntax
 ```
 
 **If Cannot Verify (no tests):**
 ```markdown
 - [ ] **Implement**: Feature X
-  - 🔍 NEEDS TESTS: Add verification tests before marking complete
+  - NEEDS TESTS: Add verification tests before marking complete
     - [ ] Add test: [specific test description]
     - [ ] Add test: [edge case description]
 ```
@@ -266,7 +266,7 @@ ALL of the following must be true:
 
 Good:
 ```markdown
-- 🔍 WEAK TESTS:
+- WEAK TESTS:
   - [ ] Add test: Duration + Duration returns Duration (only int + int tested)
   - [ ] Add test: Duration overflow panics
   - [ ] Strengthen: tests/spec/types/duration.ori line 12 — assert actual value not just Ok
@@ -274,7 +274,7 @@ Good:
 
 Bad:
 ```markdown
-- 🔍 NEEDS TESTS: Add more tests
+- NEEDS TESTS: Add more tests
 ```
 
 ---
@@ -297,7 +297,7 @@ Bad:
 ### If You Find a Bug:
 ```markdown
 - [ ] **Implement**: Feature X
-  - ⚠️ BUG FOUND: [brief description]
+  - BUG FOUND: [brief description]
   - Should be fixed before marking complete
 ```
 
