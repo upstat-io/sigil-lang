@@ -139,6 +139,8 @@ Bottom type (uninhabited); coerces to any `T`
 
 **Declare**: `@f (...) -> T uses Http = ...` | `uses FileSystem, Suspend`
 **Provide**: `with Http = RealHttp { } in expr` | `with Http = mock, Cache = mock in expr`
+**Stateful Handlers**: `with Cap = handler(state: init) { op: (s) -> (s', val), ... } in expr` — state replaces `self`; returns `(S, R)` tuple; frame-local mutable state; `with...in` returns body type only
+**Handler Rules**: context-sensitive keyword; single state value (compose via structs); all trait methods required (defaults used if omitted); no `self`; errors E1204-E1207
 **Resolution**: with...in > imported `def impl` > module-local `def impl`
 **Suspend**: `uses Suspend` = may suspend; no `uses` = sync; concurrency via `parallel(...)`
 **Standard**: `Http`, `FileSystem`, `Clock`, `Random`, `Crypto`, `Cache`, `Print` (default), `Logger`, `Env`, `Intrinsics`, `Suspend`, `FFI`
@@ -157,7 +159,7 @@ Bottom type (uninhabited); coerces to any `T`
 
 **Reserved**: `as break continue def div do else extend extension extern false for if impl in let loop match pub self Self suspend tests then trait true type unsafe use uses void where with yield`
 **Reserved (future)**: `asm inline static union view` (reserved for future low-level features)
-**Context-sensitive**: `args body by cache catch collect default expr filter find fold from map max nursery on_error over parallel pre_check post_check recurse retry run spawn timeout try validate without`
+**Context-sensitive**: `args body by cache catch collect default expr filter find fold from handler map max nursery on_error over parallel pre_check post_check recurse retry run spawn timeout try validate without`
 **Built-in names**: `int float str byte len is_empty is_some is_none is_ok is_err assert assert_eq assert_ne assert_some assert_none assert_ok assert_err assert_panics assert_panics_with compare min max print panic todo unreachable dbg compile_error`
 
 ## Prelude
