@@ -61,7 +61,7 @@ ORI_LOG=ori_eval=trace ori run file.ori             # See how IR nodes are consu
 
 `derives/mod.rs` defines `DerivedTrait` — the **canonical list of all derivable traits**. This enum is consumed by 4 downstream crates. It is the single source of truth.
 
-**Current variants**: Eq, Clone, Hashable, Printable, Debug, Default
+**Current variants**: Eq, Clone, Hashable, Printable, Debug, Default, Comparable
 
 **Sync points** (all must be updated when adding a variant):
 - `ori_types/check/registration/` — trait + impl registration
