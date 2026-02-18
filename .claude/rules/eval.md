@@ -5,7 +5,7 @@ paths:
 
 **NO WORKAROUNDS/HACKS/SHORTCUTS.** Proper fixes only. When unsure, STOP and ask. Fact-check against spec. Consult `~/projects/reference_repos/lang_repos/` (includes Swift for ARC, Koka for effects, Lean 4 for RC).
 
-**Ori tooling is under construction** — bugs are usually in compiler, not user code. Fix every issue you encounter.
+**Ori tooling is under construction** — bugs are usually in compiler, not user code. This is one system: every piece must fit for any piece to work. Fix every issue you encounter — no "unrelated", no "out of scope", no "pre-existing." If it's broken, research why and fix it.
 
 **Expression-based — NO `return`**: Body result IS return value. Exit via `?`/`break`/`panic`.
 
@@ -58,7 +58,17 @@ ORI_LOG=ori_eval=debug,ori_types=debug ori run file.ori  # Eval + type checking 
 - Method not found? Use `debug` to see which resolver in the dispatch chain is checked
 - Infinite loop? Use `timeout 5 ORI_LOG=ori_eval=trace ori run file.ori` to see last eval before hang
 
+## Derived Method Dispatch
+
+`interpreter/derived_methods.rs` dispatches `#[derive(...)]` methods by matching on `DerivedTrait` variants from `ori_ir`. This is a **sync point** — every `DerivedTrait` variant must have a match arm here.
+
+**Current handlers**: eval_derived_eq, eval_derived_clone, eval_derived_hash, eval_derived_to_str, eval_derived_debug, eval_derived_default
+
+**DO NOT** add a DerivedTrait variant in `ori_ir` without adding the corresponding handler here. See CLAUDE.md "Adding a New Derived Trait" checklist.
+
 ## Key Files
 - `lib.rs`: Interpreter, eval dispatch
 - `interpreter/resolvers/`: MethodDispatcher
+- `interpreter/derived_methods.rs`: Derived trait method dispatch (sync point)
+- `derives/mod.rs`: Derive processing pipeline
 - `environment.rs`: Environment, scopes

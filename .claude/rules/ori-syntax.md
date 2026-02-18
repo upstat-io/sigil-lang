@@ -178,7 +178,7 @@ Bottom type (uninhabited); coerces to any `T`
 **Iterator**: `type Item; @next (self) -> (Option<Self.Item>, Self)` — fused, copy elision, lazy
 **DoubleEndedIterator**: `trait: Iterator { @next_back (self) -> (Option<Self.Item>, Self) }`
 **Iterable**: `type Item; @iter (self) -> impl Iterator` | **Collect**: `@from_iter (iter: impl Iterator) -> Self`
-**Iterator methods**: `.map`, `.filter`, `.fold`, `.find`, `.for_each`, `.collect`, `.count`, `.any`, `.all`, `.take`, `.skip`, `.enumerate`, `.zip`, `.chain`, `.flatten`, `.flat_map`, `.cycle`
+**Iterator methods**: `.map`, `.filter`, `.fold`, `.find`, `.for_each`, `.collect`, `.count`, `.any`, `.all`, `.take`, `.skip`, `.enumerate`, `.zip`, `.chain`, `.flatten`, `.flat_map`, `.cycle`, `.join`
 **DoubleEnded methods**: `.rev`, `.last`, `.rfind`, `.rfold`
 **Infinite**: `repeat(value:)`, `(0..).iter()` — bound with `.take(count:)` before `.collect()`
 **Into**: `@into (self) -> T` — lossless, explicit `.into()`, standard: str→Error, int→float, Set<T>→[T]; no identity/chaining
@@ -186,7 +186,7 @@ Bottom type (uninhabited); coerces to any `T`
 **TraceEntry**: `{ function, file, line, column: int }` — `@` prefix; most recent first
 **PanicInfo**: `{ message, location: TraceEntry, stack_trace: [TraceEntry], thread_id: Option<int> }`
 **Drop**: `@drop (self) -> void` — refcount zero; not async; panic during unwind aborts
-**Index**: `@index (self, key: Key) -> Value` — `x[k]`→`x.index(key: k)`; return `T`/`Option<T>`/`Result<T, E>`; `#` built-in only
+**Index**: `@index (self, key: Key) -> Value` — `x[k]`→`x.index(key: k)`; return `T`/`Option<T>`/`Result<T, E>`; `#` built-in only; multiple impls per type OK: `impl Index<int, V>` + `impl Index<str, V>` disambiguated by key type at compile time
 **Eq**: `@equals (self, other: Self) -> bool` — reflexive/symmetric/transitive; derives `==`/`!=`
 **Comparable**: `trait: Eq { @compare (self, other: Self) -> Ordering }` — total order; derives `<`/`<=`/`>`/`>=`; NaN > all; `None < Some`; `Ok < Err`
 **Hashable**: `trait: Eq { @hash (self) -> int }` — `a == b` ⇒ same hash; +0.0/-0.0 same; use `hash_combine`

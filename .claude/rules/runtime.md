@@ -5,7 +5,7 @@ paths:
 
 **NO WORKAROUNDS/HACKS/SHORTCUTS.** Proper fixes only. When unsure, STOP and ask. Fact-check against spec. Consult `~/projects/reference_repos/lang_repos/` (includes Swift for ARC, Koka for effects, Lean 4 for RC).
 
-**Ori tooling is under construction** — bugs are usually in compiler, not user code. Fix every issue you encounter.
+**Ori tooling is under construction** — bugs are usually in compiler, not user code. This is one system: every piece must fit for any piece to work. Fix every issue you encounter — no "unrelated", no "out of scope", no "pre-existing." If it's broken, research why and fix it.
 
 # Runtime Library (ori_rt)
 

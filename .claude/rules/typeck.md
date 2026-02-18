@@ -5,7 +5,7 @@ paths:
 
 **NO WORKAROUNDS/HACKS/SHORTCUTS.** Proper fixes only. When unsure, STOP and ask. Fact-check against spec. Consult `~/projects/reference_repos/lang_repos/` (includes Swift for ARC, Koka for effects, Lean 4 for RC).
 
-**Ori tooling is under construction** — bugs are usually in compiler, not user code. Fix every issue you encounter.
+**Ori tooling is under construction** — bugs are usually in compiler, not user code. This is one system: every piece must fit for any piece to work. Fix every issue you encounter — no "unrelated", no "out of scope", no "pre-existing." If it's broken, research why and fix it.
 
 **Expression-based — NO `return`**: Body type IS return type. Exit via `?`/`break`/`panic`.
 
@@ -21,6 +21,12 @@ paths:
 ## Registries
 - **TypeRegistry**: `register_struct()`, `get_by_name()`, O(1) variant lookup
 - **TraitRegistry**: coherence (E2010), assoc types, method cache (RefCell)
+
+## Derived Trait Registration (Sync Point)
+
+`check/registration/mod.rs` registers trait definitions and derived impl signatures. This is a **sync point** — every `DerivedTrait` variant from `ori_ir` must be registered here with correct method signatures.
+
+**DO NOT** modify derived trait registration without checking that the evaluator (`ori_eval/interpreter/derived_methods.rs`) and codegen (`ori_llvm/codegen/derive_codegen.rs`) agree on method signatures. See CLAUDE.md "Adding a New Derived Trait" checklist.
 
 ## RAII Scope Guards
 - `with_capability_scope(caps, |c| { ... })`

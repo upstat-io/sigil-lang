@@ -5,7 +5,7 @@ paths:
 
 **NO WORKAROUNDS/HACKS/SHORTCUTS.** Proper fixes only. When unsure, STOP and ask. Fact-check against spec. Consult `~/projects/reference_repos/lang_repos/` (includes Swift for ARC, Koka for effects, Lean 4 for RC).
 
-**Ori tooling is under construction** — bugs are usually in compiler, not user code. Fix every issue you encounter.
+**Ori tooling is under construction** — bugs are usually in compiler, not user code. This is one system: every piece must fit for any piece to work. Fix every issue you encounter — no "unrelated", no "out of scope", no "pre-existing." If it's broken, research why and fix it.
 
 **Expression-based — NO `return`**: Last expression IS the value. Exit via `?`/`break`/`panic`.
 
@@ -118,6 +118,7 @@ ORI_LOG=ori_types=debug,ori_eval=debug ori run f.ori    # Multiple targets
 - Expression: `ori_parse/grammar/expr/`, `ori_types/infer/expr.rs`, `ori_eval/interpreter/`
 - Type: `ori_ir/type_id.rs`, `ori_types/pool/`, `ori_types/check/`
 - Method: `ori_types/registry/methods.rs`, `ori_eval/interpreter/method_dispatch.rs`
+- Derive: `ori_ir/derives/mod.rs` (source of truth), `ori_types/check/registration/`, `ori_eval/interpreter/derived_methods.rs`, `ori_llvm/codegen/derive_codegen.rs`
 
 ## Source of Truth
 1. `docs/ori_lang/0.1-alpha/spec/` — authoritative
