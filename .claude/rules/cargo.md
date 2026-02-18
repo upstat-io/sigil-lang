@@ -1,6 +1,7 @@
 ---
 paths:
   - "**/Cargo.toml"
+  - "**/clippy.toml"
 ---
 
 **NO WORKAROUNDS/HACKS/SHORTCUTS.** Proper fixes only. When unsure, STOP and ask. Fact-check against spec. Consult `~/projects/reference_repos/lang_repos/` (includes Swift for ARC, Koka for effects, Lean 4 for RC).
@@ -9,7 +10,7 @@ paths:
 
 # Cargo Configuration
 
-**Do NOT edit Cargo.toml without explicit user permission.**
+**Do NOT edit Cargo.toml or clippy.toml without explicit user permission.**
 
 ## Aliases (`.cargo/config.toml`)
 - `cargo t`: `test --workspace`

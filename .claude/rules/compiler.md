@@ -84,7 +84,7 @@ ORI_LOG=ori_types=debug,ori_eval=debug ori run f.ori    # Multiple targets
 - Salsa `#[tracked]` functions: use manual `tracing::debug!()` events (not `#[instrument]`)
 
 ## Style
-- Functions < 50 lines (target < 30)
+- Functions < 100 lines (strongly prefer shorter — target < 50)
 - No dead code, no `#[allow(clippy)]` without reason
 - Use `//!`/`///` docs
 

@@ -69,7 +69,7 @@ For Ori syntax, types, patterns, and prelude:
 
 **Performance**: O(n²) → O(n) or O(n log n); hash lookups not linear scans; no allocation in hot loops; iterators over indexing
 
-**Style**: No `#[allow(clippy)]` without justification; functions < 50 lines (target < 30); no dead/commented code or banners; `//!`/`///` docs
+**Style**: No `#[allow(clippy)]` without justification; functions < 100 lines (strongly prefer shorter — target < 50); no dead/commented code or banners; `//!`/`///` docs
 
 **File Size — 500 line recommended limit**: Source files (excluding tests) should stay under 500 lines. When writing code that would push a file past this limit, **stop and split first** — do not add the code and plan to split later. Extract logical groups (e.g., a set of related methods, a submodule's types, a match arm group) into a new sibling file/submodule. When touching a file already over 500 lines, take the opportunity to split it. Use `scripts/extract_tests.py` for test extraction; for production code, create submodules with `mod foo;` and move the extracted code there.
 
