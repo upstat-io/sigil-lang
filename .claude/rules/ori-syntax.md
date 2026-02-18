@@ -165,7 +165,7 @@ Bottom type (uninhabited); coerces to any `T`
 ## Prelude
 
 **Types**: `Option<T>` (`Some`/`None`), `Result<T, E>` (`Ok`/`Err`), `Error`, `TraceEntry`, `Ordering`, `PanicInfo`, `CancellationError`, `CancellationReason`, `FormatSpec`, `Alignment`, `Sign`, `FormatType`
-**Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Formattable`, `Debug`, `Clone`, `Default`, `Drop`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`, `Index`, `IndexSet`
+**Traits**: `Eq`, `Comparable`, `Hashable`, `Printable`, `Formattable`, `Debug`, `Clone`, `Default`, `Drop`, `Len`, `Iterator`, `DoubleEndedIterator`, `Iterable`, `Collect`, `Into`, `Traceable`, `Index`, `IndexSet`
 
 **Built-ins**: `print(msg:)`, `len(collection:)`, `is_empty(collection:)`, `is_some/is_none(option:)`, `is_ok/is_err(result:)`, `assert(condition:)`, `assert_eq(actual:, expected:)`, `assert_ne(actual:, unexpected:)`, `assert_some/none/ok/err(...)`, `assert_panics(f:)`, `assert_panics_with(f:, msg:)`, `panic(msg:)`→`Never`, `todo()`/`todo(reason:)`→`Never`, `unreachable()`/`unreachable(reason:)`→`Never`, `dbg(value:)`/`dbg(value:, label:)`→`T`, `compare(left:, right:)`→`Ordering`, `min/max(left:, right:)`, `hash_combine(seed:, value:)`→`int`, `repeat(value:)`→iter, `is_cancelled()`→`bool`, `compile_error(msg:)`, `drop_early(value:)`
 
