@@ -38,7 +38,34 @@ Review implementation hygiene against `.claude/rules/impl-hygiene.md` and genera
 
 Read `.claude/rules/impl-hygiene.md` and `.claude/rules/compiler.md` to have the full rule set in context.
 
-### Step 2: Map the Boundary
+### Step 2: Load Plan Context
+
+Gather context from active and recently-modified plan files so the review doesn't flag work that is already planned, in-progress, or intentionally deferred.
+
+**Procedure:**
+1. Run `git diff --name-only HEAD` and `git diff --name-only --cached` to find uncommitted modified files in `plans/`
+2. Run `git diff --name-only HEAD~3..HEAD -- plans/` to find plan files changed in recent commits
+3. Combine both lists (deduplicate) to get all recently-touched plan files
+4. Read each discovered plan file (skip files > 1000 lines — read the `00-overview.md` or `index.md` instead)
+
+**How to use plan context:**
+
+Plan context does NOT suppress or deprioritize findings. Instead, it **annotates** them:
+
+- If a finding falls within scope of an active plan, append `→ covered by plans/{plan}/` to the finding
+- If a plan has an active reroute or suspension notice (e.g., "all work suspended until X"), note this in the review preamble so the user knows which areas are in flux
+- If a plan explicitly describes a refactor that would resolve a finding, mark it as `[PLANNED]` instead of proposing a separate fix — but still list it so nothing falls through cracks
+- Findings NOT covered by any plan are reported normally — these are the high-value discoveries
+
+**Example annotation:**
+```
+3. **[DRIFT]** `compiler/ori_types/src/check/registration/mod.rs:142` — Missing sync for new `Serialize` variant
+   → covered by plans/trait_arch/ (Section 3: Registration Overhaul)
+```
+
+This ensures the review adds value by distinguishing "known debt being addressed" from "unknown debt needing attention."
+
+### Step 3: Map the Boundary
 
 Identify the phase boundary being reviewed:
 1. What types cross the boundary? (tokens, AST nodes, IR types)
@@ -47,7 +74,7 @@ Identify the phase boundary being reviewed:
 
 For each crate in the target, read `lib.rs` and the key interface files to understand the public API surface.
 
-### Step 3: Trace Data Flow
+### Step 4: Trace Data Flow
 
 Follow the data from producer to consumer:
 1. **Read the producer's output types** — What does the upstream phase emit?
@@ -55,7 +82,7 @@ Follow the data from producer to consumer:
 3. **Check the boundary types** — Are they minimal? Do they carry unnecessary baggage?
 4. **Check ownership** — Is data moved, borrowed, or cloned? Are clones necessary?
 
-### Step 4: Audit Each Rule Category
+### Step 5: Audit Each Rule Category
 
 **Phase Boundary Discipline:**
 - [ ] Data flows one way? (no callbacks to earlier phase, no reaching back)
@@ -102,7 +129,7 @@ Follow the data from producer to consumer:
 - [ ] No silent workarounds for missing capabilities? (e.g., destructuring instead of `.0` because parser blocks it)
 - [ ] Full pipeline works end-to-end for each feature? (lexer → parser → type checker → evaluator → codegen)
 
-### Step 5: Compile Findings
+### Step 6: Compile Findings
 
 Organize findings by boundary/interface, categorized as:
 
@@ -113,7 +140,7 @@ Organize findings by boundary/interface, categorized as:
 - **EXPOSURE** — Internal state leaking through boundary types (parser state in AST, raw IDs without newtypes)
 - **NOTE** — Observation, not actionable (acceptable tradeoff, documented exception)
 
-### Step 6: Generate Plan
+### Step 7: Generate Plan
 
 Use **EnterPlanMode** to create a fix plan. The plan should:
 
@@ -129,6 +156,13 @@ Use **EnterPlanMode** to create a fix plan. The plan should:
 
 **Scope:** N boundaries reviewed, ~M findings (X leak, Y drift, Z gap, W waste, V exposure)
 
+### Active Plan Context
+
+{List each plan file read and its relevance. If a plan has a reroute/suspension, note it here.}
+- `plans/trait_arch/` — Active reroute: all roadmap work suspended until trait architecture refactor completes
+- `plans/roadmap/section-03-traits.md` — Recently modified, covers trait registration changes
+- (none) — if no plan files were found
+
 ### {Boundary: Phase A → Phase B}
 
 **Interface types:** {list types crossing this boundary}
@@ -136,9 +170,12 @@ Use **EnterPlanMode** to create a fix plan. The plan should:
 
 1. **[LEAK]** `file:line` — {description}
 2. **[DRIFT]** `file:line` — {description}
-3. **[GAP]** `file:line` — {description}
-4. **[WASTE]** `file:line` — {description}
-5. **[EXPOSURE]** `file:line` — {description}
+   → covered by plans/{plan}/ ({section name})
+3. **[DRIFT] [PLANNED]** `file:line` — {description}
+   → fix described in plans/{plan}/{section}.md
+4. **[GAP]** `file:line` — {description}
+5. **[WASTE]** `file:line` — {description}
+6. **[EXPOSURE]** `file:line` — {description}
 ...
 
 ### {Next Boundary}
