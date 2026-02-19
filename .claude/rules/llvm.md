@@ -433,10 +433,7 @@ ID-based wrapper around inkwell's Builder. All LLVM values stored in `ValueArena
 
 `codegen/derive_codegen/` generates synthetic LLVM functions for `#[derive(...)]`. This is a **sync point** — it must handle every `DerivedTrait` variant that the evaluator handles.
 
-**Currently supported**: Eq, Comparable, Clone, Hashable, Printable
-**NOT yet supported**: Debug, Default (evaluator handles these but LLVM codegen does not)
-
-**Strategy-driven architecture** (from `DerivedTrait::strategy()` in `ori_ir`):
+**All 7 derived traits supported** via strategy-driven dispatch from `DerivedTrait::strategy()` in `ori_ir`:
 - `ForEachField` → Eq, Comparable, Hashable
 - `FormatFields` → Printable, Debug
 - `CloneFields` → Clone
