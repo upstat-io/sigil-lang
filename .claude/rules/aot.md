@@ -44,3 +44,7 @@ Format: `_ori_<module>$<function>[<suffix>]`
 - `mangle.rs`: Symbol mangling
 - `runtime.rs`: Runtime discovery
 - `linker/`: Linker drivers
+
+## LLVM Debugging
+
+For LLVM IR debugging workflow, tools, common bug categories, and verification strategy, see @llvm.md

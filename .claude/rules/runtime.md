@@ -35,3 +35,7 @@ Both built with `cargo build -p ori_rt`.
 - Strings: `ori_str_concat`, `ori_str_eq`
 - I/O: `ori_print`, `ori_print_int`
 - Panic: `ori_panic`, `ori_assert`
+
+## LLVM Debugging
+
+For LLVM IR debugging workflow, tools, common bug categories, and verification strategy, see @llvm.md

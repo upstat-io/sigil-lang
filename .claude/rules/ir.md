@@ -77,3 +77,7 @@ ORI_LOG=ori_eval=trace ori run file.ori             # See how IR nodes are consu
 - `name.rs`: Name interning
 - `visitor.rs`: Visitor trait
 - `derives/mod.rs`: DerivedTrait enum (source of truth for all derivable traits)
+
+## LLVM Debugging
+
+For LLVM IR debugging workflow (especially derive codegen issues that originate in `ori_ir`), see @llvm.md
