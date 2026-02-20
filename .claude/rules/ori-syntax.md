@@ -113,13 +113,13 @@ Bottom type (uninhabited); coerces to any `T`
 **Semicolons**: Rust-style — `;` terminates statements; last expression (no `;`) is block value; all `;` = void block
 **Semicolon rule**: Ends with `}`? No `;`. Everything else: `;`. Applies to `use`, `let $`, functions, types, methods.
 **Blocks**: `{ let $x = 1; let $y = 2; x + y }` — `;` on statements, no `;` on result
-**Match**: `match expr { P1 -> e1 \n P2 -> e2 }` — scrutinee before block, newline-separated arms
+**Match**: `match expr { P1 -> e1, P2 -> e2 }` — scrutinee before block, comma-separated arms (trailing comma optional)
 **Try**: `try { let $x = f()?; Ok(x) }` — error-propagating block
 **Contracts**: `pre(condition)` | `pre(condition | "message")` | `post(r -> condition)` — on function declaration, between signature and `=`
 **function_exp**: `recurse(condition:, base:, step:, memo:, parallel:)` | `parallel(tasks:, max_concurrent:, timeout:)` → `[Result]` | `spawn(tasks:, max_concurrent:)` → `void` | `timeout(op:, after:)` | `cache(key:, op:, ttl:)` | `with(acquire:, action:, release:)` | `for(over:, match:, default:)` | `catch(expr:)` → `Result<T, str>` | `nursery(body:, on_error:, timeout:)`
 **Channels**: `channel<T>(buffer:)` → `(Producer, Consumer)` | `channel_in` | `channel_out` | `channel_all`
 **Conversions**: `42 as float` infallible | `"42" as? int` fallible → `Option`
-**Match patterns**: literal | `x` | `_` | `Some(x)` | `{ x, y }` | `[a, ..rest]` | `1..10` | `A | B` | `x @ pat` | `x.match(guard)`
+**Match patterns**: literal | `x` | `_` | `Some(x)` | `{ x, y }` | `[a, ..rest]` | `1..10` | `A | B` | `x @ pat` | `x if guard`
 **Exhaustiveness**: match exhaustive; guards need `_`; `let` patterns irrefutable
 
 ## Imports
