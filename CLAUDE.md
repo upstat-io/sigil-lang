@@ -44,7 +44,7 @@ For Ori syntax, types, patterns, and prelude:
 ### Design Pillars
 
 1. **Expression-Based**: Everything is an expression; last expression is the block's value; no `return` keyword
-2. **Mandatory Verification**: Functions need tests; contracts (`pre_check:`/`post_check:`)
+2. **Mandatory Verification**: Functions need tests; contracts (`pre()`/`post()` on function declarations)
 3. **Dependency-Aware Integrity**: Tests in dep graph; changes propagate
 4. **Explicit Effects**: Capabilities (`uses Http`); trivial mocking (`with Http = Mock in`)
 5. **ARC-Safe**: No GC/borrow checker; capture by value; no shared mutable refs

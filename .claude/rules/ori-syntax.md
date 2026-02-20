@@ -101,15 +101,19 @@ Bottom type (uninhabited); coerces to any `T`
 **Access**: `v.field`, `v.0` (tuple), `v.method(arg: v)` — named args required except: fn variables, single-param with inline lambda
 **Lambdas**: `x -> x + 1` | `(a, b) -> a + b` | `() -> 42` | `(x: int) -> int = x * 2` — capture by value
 **Ranges**: `0..10` excl | `0..=10` incl | `0..10 by 2` | descending: `10..0 by -1` | infinite: `0..`, `0.. by -1` | int only
-**Loops**: `for i in items do e` | `for x in items yield x * 2` | `for x in items if g yield x` | nested `for` | `loop(body)` + `break`/`continue` | `break value` | `continue value`
-**Loop body**: single expression; `loop(run(...))` for sequences | type: `void` (break no value), inferred (break value), `Never` (no break) | `continue value` error (E0861)
+**Blocks**: `{ let $x = 1 \n x + 2 }` — newlines separate expressions, commas for one-liners | last expression is value | `ori fmt` enforces blank line before result | empty `{ }` = empty map
+**Loops**: `for i in items do e` | `for x in items yield x * 2` | `for x in items if g yield x` | nested `for` | `loop { body }` + `break`/`continue` | `break value` | `continue value`
+**Loop body**: block expression; `loop { a \n b \n c }` for sequences | type: `void` (break no value), inferred (break value), `Never` (no break) | `continue value` error (E0861)
 **Yield control**: `continue` skips | `continue value` substitutes | `break` stops | `break value` adds final | `{K: V}` from `(K, V)` tuples
 **Labels**: `loop:name` | `for:name` | `break:name` | `continue:name` | no shadowing | `continue:name value` in yield → outer
 **Spread**: `[...a, ...b]` | `{...a, ...b}` | `P { ...orig, x: 10 }` — later wins, literal contexts only | `fn(...list)` into variadic only
 
-## Patterns (compiler constructs)
+## Block expressions
 
-**function_seq**: `run(let x = a, result)` | `run(pre_check:, body, post_check:)` | `try(let x = f()?, Ok(x))` | `match(v, P -> e, _ -> d)`
+**Blocks**: `{ expr1 \n expr2 \n result }` — newlines separate, last expression is value | `{ a, b, c }` one-liner with commas
+**Match**: `match expr { P1 -> e1 \n P2 -> e2 }` — scrutinee before block, newline-separated arms | `match x { A -> 1, B -> 2 }` one-liner
+**Try**: `try { let $x = f()? \n Ok(x) }` — error-propagating block
+**Contracts**: `pre(condition)` | `pre(condition | "message")` | `post(r -> condition)` — on function declaration, between signature and `=`
 **function_exp**: `recurse(condition:, base:, step:, memo:, parallel:)` | `parallel(tasks:, max_concurrent:, timeout:)` → `[Result]` | `spawn(tasks:, max_concurrent:)` → `void` | `timeout(op:, after:)` | `cache(key:, op:, ttl:)` | `with(acquire:, action:, release:)` | `for(over:, match:, default:)` | `catch(expr:)` → `Result<T, str>` | `nursery(body:, on_error:, timeout:)`
 **Channels**: `channel<T>(buffer:)` → `(Producer, Consumer)` | `channel_in` | `channel_out` | `channel_all`
 **Conversions**: `42 as float` infallible | `"42" as? int` fallible → `Option`
@@ -153,13 +157,13 @@ Bottom type (uninhabited); coerces to any `T`
 
 ## Formatting
 
-4 spaces, 100 char limit, trailing commas multi-line only | Space around: binary ops, arrows, colons/commas, `pub`, struct braces, `as`/`by`/`|`, `=` in `<T = Self>` | No space: parens/brackets, `.`/`..`/`?`, empty delimiters | Break at 100; `run` width-based; `try`/`match`/`recurse`/`parallel`/`spawn`/`nursery` always stacked | Params/args/generics/where/fields/variants one-per-line; chains break at `.method()`; binary break before op; `if...then` together, `else` newline; chained `else if` each on own line | Parens preserved when semantically required: `(for x in items yield x).fold(...)`, `(x -> x * 2)(5)`, `for x in (inner) yield x`
+4 spaces, 100 char limit, trailing commas multi-line only | Space around: binary ops, arrows, colons/commas, `pub`, struct braces, `as`/`by`/`|`, `=` in `<T = Self>` | No space: parens/brackets, `.`/`..`/`?`, empty delimiters | Break at 100; blocks 4-space indent; blank line before result in setup+result blocks; `match`/`recurse`/`parallel`/`spawn`/`nursery` always stacked | Params/args/generics/where/fields/variants one-per-line; chains break at `.method()`; binary break before op; `if...then` together, `else` newline; chained `else if` each on own line | Parens preserved when semantically required: `(for x in items yield x).fold(...)`, `(x -> x * 2)(5)`, `for x in (inner) yield x`
 
 ## Keywords
 
-**Reserved**: `as break continue def div do else extend extension extern false for if impl in let loop match pub self Self suspend tests then trait true type unsafe use uses void where with yield`
+**Reserved**: `as break continue def div do else extend extension extern false for if impl in let loop match pre post pub self Self suspend tests then trait true try type unsafe use uses void where with yield`
 **Reserved (future)**: `asm inline static union view` (reserved for future low-level features)
-**Context-sensitive**: `args body by cache catch collect default embed expr filter find fold from handler has_embed map max nursery on_error over parallel pre_check post_check recurse retry run spawn timeout try validate without`
+**Context-sensitive**: `args body by cache catch collect default embed expr filter find fold from handler has_embed map max nursery on_error over parallel recurse retry spawn timeout validate without`
 **Built-in names**: `int float str byte len is_empty is_some is_none is_ok is_err assert assert_eq assert_ne assert_some assert_none assert_ok assert_err assert_panics assert_panics_with compare min max print panic todo unreachable dbg compile_error embed has_embed`
 
 ## Prelude
