@@ -95,7 +95,7 @@ Bottom type (uninhabited); coerces to any `T`
 ## Expressions
 
 **Conditionals**: `if c then e else e` | `if c then e` (void)
-**Bindings**: `let x = v` mutable | `let $x` immutable | `let x: T` | shadowing OK | `let { x, y }` | `let { x: px }` | `let (a, b)` | `let [$h, ..t]`
+**Bindings**: `let x = v` mutable | `let $x` immutable | `let x: T` | shadowing OK | `let { x, y }` | `let { x: px }` | `let (a, b)` | `let [$h, ..t]` | `let [$h, ..$t]` immutable rest
 **Indexing**: `list[0]`, `list[# - 1]` (`#`=length, panics OOB) | `map["k"]` → `Option<V>`
 **Index/Field Assignment**: `list[i] = x` → `list = list.updated(key: i, value: x)` | `state.field = x` → `state = { ...state, field: x }` | mixed chains: `state.items[i] = x`, `list[i].name = x` | compound: `list[i] += 1` | root must be mutable (non-`$`)
 **Access**: `v.field`, `v.0` (tuple), `v.method(arg: v)` — named args required except: fn variables, single-param with inline lambda
