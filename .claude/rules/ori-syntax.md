@@ -11,10 +11,10 @@ paths:
 
 ## Declarations
 
-**Functions**: `@name (p: T) -> R = expr` | `pub @name` | `@name<T>` | `@name<T: Trait>` | `@name<T: A + B>` | `where T: Clone` | `uses Capability` | `(x: int = 10)` defaults
+**Functions**: `@name (p: T) -> R = expr;` | `@name (p: T) -> R = { ... }` (no `;`) | `pub @name` | `@name<T>` | `@name<T: Trait>` | `@name<T: A + B>` | `where T: Clone` | `uses Capability` | `(x: int = 10)` defaults
 **Variadics**: `@sum (nums: ...int) -> int` | receives as `[T]` | call: `sum(1, 2, 3)` | spread: `sum(...list)` | trait objects: `...Printable` | empty calls need explicit type for generics
 **Clauses**: `@f (0: int) -> int = 1` then `@f (n) = n * f(n-1)` | `if guard` | exhaustive, top-to-bottom
-**Constants**: `let $name = value` | `pub let $name` | module-level must be `$`
+**Constants**: `let $name = value;` | `pub let $name` | module-level must be `$`
 **Const Functions**: `$name (p: T) -> R = expr` — pure, comptime, limits: 1M steps/1000 depth/100MB/10s
 **Types**: `type N = { f: T }` struct | `A | B | C(f: T)` sum | `type N = Existing` newtype | `type N<T>` | `#derive(Eq)` | `pub type`
 **Newtypes**: `type UserId = int` | construct: `UserId(42)` | `.inner` (always public) | no trait/method inheritance | `#derive(Eq, Clone)` required | zero cost
@@ -101,7 +101,7 @@ Bottom type (uninhabited); coerces to any `T`
 **Access**: `v.field`, `v.0` (tuple), `v.method(arg: v)` — named args required except: fn variables, single-param with inline lambda
 **Lambdas**: `x -> x + 1` | `(a, b) -> a + b` | `() -> 42` | `(x: int) -> int = x * 2` — capture by value
 **Ranges**: `0..10` excl | `0..=10` incl | `0..10 by 2` | descending: `10..0 by -1` | infinite: `0..`, `0.. by -1` | int only
-**Blocks**: `{ let $x = 1 \n x + 2 }` — newlines separate expressions, commas for one-liners | last expression is value | `ori fmt` enforces blank line before result | empty `{ }` = empty map
+**Blocks**: `{ let $x = 1; x + 2 }` — `;` terminates statements, last expression (no `;`) is value | all `;` = void block | `ori fmt` enforces blank line before result | empty `{ }` = empty map
 **Loops**: `for i in items do e` | `for x in items yield x * 2` | `for x in items if g yield x` | nested `for` | `loop { body }` + `break`/`continue` | `break value` | `continue value`
 **Loop body**: block expression; `loop { a \n b \n c }` for sequences | type: `void` (break no value), inferred (break value), `Never` (no break) | `continue value` error (E0861)
 **Yield control**: `continue` skips | `continue value` substitutes | `break` stops | `break value` adds final | `{K: V}` from `(K, V)` tuples
@@ -110,9 +110,11 @@ Bottom type (uninhabited); coerces to any `T`
 
 ## Block expressions
 
-**Blocks**: `{ expr1 \n expr2 \n result }` — newlines separate, last expression is value | `{ a, b, c }` one-liner with commas
-**Match**: `match expr { P1 -> e1 \n P2 -> e2 }` — scrutinee before block, newline-separated arms | `match x { A -> 1, B -> 2 }` one-liner
-**Try**: `try { let $x = f()? \n Ok(x) }` — error-propagating block
+**Semicolons**: Rust-style — `;` terminates statements; last expression (no `;`) is block value; all `;` = void block
+**Semicolon rule**: Ends with `}`? No `;`. Everything else: `;`. Applies to `use`, `let $`, functions, types, methods.
+**Blocks**: `{ let $x = 1; let $y = 2; x + y }` — `;` on statements, no `;` on result
+**Match**: `match expr { P1 -> e1 \n P2 -> e2 }` — scrutinee before block, newline-separated arms
+**Try**: `try { let $x = f()?; Ok(x) }` — error-propagating block
 **Contracts**: `pre(condition)` | `pre(condition | "message")` | `post(r -> condition)` — on function declaration, between signature and `=`
 **function_exp**: `recurse(condition:, base:, step:, memo:, parallel:)` | `parallel(tasks:, max_concurrent:, timeout:)` → `[Result]` | `spawn(tasks:, max_concurrent:)` → `void` | `timeout(op:, after:)` | `cache(key:, op:, ttl:)` | `with(acquire:, action:, release:)` | `for(over:, match:, default:)` | `catch(expr:)` → `Result<T, str>` | `nursery(body:, on_error:, timeout:)`
 **Channels**: `channel<T>(buffer:)` → `(Producer, Consumer)` | `channel_in` | `channel_out` | `channel_all`
@@ -122,10 +124,10 @@ Bottom type (uninhabited); coerces to any `T`
 
 ## Imports
 
-**Relative**: `use "./math" { add }` | `"../utils"` | `"./http/client"`
-**Module**: `use std.math { sqrt }` | `use std.net.http as http`
-**Private**: `use "./m" { ::internal }` | **Alias**: `{ add as plus }` | **Re-export**: `pub use`
-**Without default**: `use "m" { Trait without def }` — import without `def impl`
+**Relative**: `use "./math" { add };` | `"../utils"` | `"./http/client"`
+**Module**: `use std.math { sqrt };` | `use std.net.http as http;`
+**Private**: `use "./m" { ::internal };` | **Alias**: `{ add as plus }` | **Re-export**: `pub use`
+**Without default**: `use "m" { Trait without def };` — import without `def impl`
 **Extensions**: `extension std.iter.extensions { Iterator.count }` — method-level, no wildcards | `pub extension`
 
 ## FFI
@@ -157,7 +159,7 @@ Bottom type (uninhabited); coerces to any `T`
 
 ## Formatting
 
-4 spaces, 100 char limit, trailing commas multi-line only | Space around: binary ops, arrows, colons/commas, `pub`, struct braces, `as`/`by`/`|`, `=` in `<T = Self>` | No space: parens/brackets, `.`/`..`/`?`, empty delimiters | Break at 100; blocks 4-space indent; blank line before result in setup+result blocks; `match`/`recurse`/`parallel`/`spawn`/`nursery` always stacked | Params/args/generics/where/fields/variants one-per-line; chains break at `.method()`; binary break before op; `if...then` together, `else` newline; chained `else if` each on own line | Parens preserved when semantically required: `(for x in items yield x).fold(...)`, `(x -> x * 2)(5)`, `for x in (inner) yield x`
+4 spaces, 100 char limit, trailing commas multi-line only | `;` terminates statements in blocks, `use`, `let $`, expression-bodied declarations | Space around: binary ops, arrows, colons/commas, `pub`, struct braces, `as`/`by`/`|`, `=` in `<T = Self>` | No space: parens/brackets, `.`/`..`/`?`, empty delimiters, before `;` | Break at 100; blocks 4-space indent; blank line before result in setup+result blocks; `match`/`recurse`/`parallel`/`spawn`/`nursery` always stacked | Params/args/generics/where/fields/variants one-per-line; chains break at `.method()`; binary break before op; `if...then` together, `else` newline; chained `else if` each on own line | Parens preserved when semantically required: `(for x in items yield x).fold(...)`, `(x -> x * 2)(5)`, `for x in (inner) yield x`
 
 ## Keywords
 
