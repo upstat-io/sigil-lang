@@ -9,6 +9,8 @@ paths:
 
 **Spec is authoritative**: `docs/ori_lang/0.1-alpha/spec/` (`grammar.ebnf` for syntax, `operator-rules.md` for semantics)
 
+> **Pending**: `capability-unification-generics-proposal` (approved 2026-02-20) will change: `#derive(Trait)` → `type T with Trait = {...}`, `T: Trait` → `T with Trait`, `trait Foo: Bar` → `trait Foo with Bar`. Syntax below reflects CURRENT compiler behavior until implementation.
+
 ## Declarations
 
 **Functions**: `@name (p: T) -> R = expr;` | `@name (p: T) -> R = { ... }` (no `;`) | `pub @name` | `@name<T>` | `@name<T: Trait>` | `@name<T: A + B>` | `where T: Clone` | `uses Capability` | `(x: int = 10)` defaults
