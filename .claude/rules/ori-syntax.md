@@ -102,6 +102,7 @@ Bottom type (uninhabited); coerces to any `T`
 **Indexing**: `list[0]`, `list[# - 1]` (`#`=length, panics OOB) | `map["k"]` → `Option<V>`
 **Index/Field Assignment**: `list[i] = x` → `list = list.updated(key: i, value: x)` | `state.field = x` → `state = { ...state, field: x }` | mixed chains: `state.items[i] = x`, `list[i].name = x` | compound: `list[i] += 1` | root must be mutable (non-`$`)
 **Access**: `v.field`, `v.0` (tuple), `v.method(arg: v)` — named args required except: fn variables, single-param with inline lambda
+**Argument Punning**: `f(x:)` = `f(x: x)` when variable matches param name | `f(x:, y: 42)` mixed | trailing `:` distinguishes from positional `f(x)`
 **Lambdas**: `x -> x + 1` | `(a, b) -> a + b` | `() -> 42` | `(x: int) -> int = x * 2` — capture by value
 **Ranges**: `0..10` excl | `0..=10` incl | `0..10 by 2` | descending: `10..0 by -1` | infinite: `0..`, `0.. by -1` | int only
 **Blocks**: `{ let $x = 1; x + 2 }` — `;` terminates statements, last expression (no `;`) is value | all `;` = void block | `ori fmt` enforces blank line before result | empty `{ }` = empty map
@@ -122,7 +123,7 @@ Bottom type (uninhabited); coerces to any `T`
 **function_exp**: `recurse(condition:, base:, step:, memo:, parallel:)` | `parallel(tasks:, max_concurrent:, timeout:)` → `[Result]` | `spawn(tasks:, max_concurrent:)` → `void` | `timeout(op:, after:)` | `cache(key:, op:, ttl:)` | `with(acquire:, action:, release:)` | `for(over:, match:, default:)` | `catch(expr:)` → `Result<T, str>` | `nursery(body:, on_error:, timeout:)`
 **Channels**: `channel<T>(buffer:)` → `(Producer, Consumer)` | `channel_in` | `channel_out` | `channel_all`
 **Conversions**: `42 as float` infallible | `"42" as? int` fallible → `Option`
-**Match patterns**: literal | `x` | `_` | `Some(x)` | `{ x, y }` | `[a, ..rest]` | `1..10` | `A | B` | `x @ pat` | `x if guard`
+**Match patterns**: literal | `x` | `_` | `Some(x)` | `{ x, y }` | `[a, ..rest]` | `1..10` | `A | B` | `x @ pat` | `x if guard` | variant punning: `Circle(radius:)` = `Circle(radius: radius)`, `Some(value:)` = `Some(value: value)`
 **Exhaustiveness**: match exhaustive; guards need `_`; `let` patterns irrefutable
 
 ## Imports
