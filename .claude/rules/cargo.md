@@ -1,6 +1,7 @@
 ---
 paths:
   - "**/Cargo.toml"
+  - "**/clippy.toml"
 ---
 
 **NO WORKAROUNDS/HACKS/SHORTCUTS.** Proper fixes only. When unsure, STOP and ask. Fact-check against spec. Consult `~/projects/reference_repos/lang_repos/` (includes Swift for ARC, Koka for effects, Lean 4 for RC).
@@ -9,23 +10,28 @@ paths:
 
 # Cargo Configuration
 
-**Do NOT edit Cargo.toml without explicit user permission.**
+**Do NOT edit Cargo.toml or clippy.toml without explicit user permission.**
 
 ## Aliases (`.cargo/config.toml`)
-- `cargo t`: `test --workspace`
-- `cargo st`: `run -p oric -- test tests/`
-- `cargo c`: `check --workspace`
-- `cargo b`: `build --workspace`
-- `cargo cl`: `clippy --workspace`
-- `cargo bl`: `build -p oric -p ori_rt --features llvm`
-- `cargo blr`: `build -p oric -p ori_rt --features llvm --release`
-- `cargo cll`: `clippy -p ori_llvm -p ori_rt`
 
-## Workspace Lints
-- `unsafe_code = "deny"` (except `ori_rt`)
-- `dead_code = "deny"`
-- `clippy::unwrap_used = "deny"`
-- `clippy::expect_used = "deny"`
+| Alias | Command | Purpose |
+|-------|---------|---------|
+| `cargo t` | `test --workspace` | All Rust unit tests |
+| `cargo tv` | `test --workspace -- --nocapture` | Rust tests with output |
+| `cargo tc` | `test -p` | Tests for specific crate (e.g., `cargo tc ori_parse`) |
+| `cargo st` | `run -p oric --bin ori -- test tests/` | Ori spec tests |
+| `cargo stv` | `run -p oric --bin ori -- test --verbose` | Spec tests verbose |
+| `cargo stf` | `run -p oric --bin ori -- test --filter` | Spec tests filtered |
+| `cargo c` | `check --workspace` | Check all crates |
+| `cargo b` | `build --workspace` | Build all crates |
+| `cargo cl` | `clippy --workspace --all-targets` | Clippy all crates |
+| `cargo bl` | `build -p oric -p ori_rt --features llvm` | LLVM debug build |
+| `cargo blr` | `build -p oric -p ori_rt --features llvm --release` | LLVM release build |
+| `cargo rl` | `run -p oric --features llvm --bin ori --` | Run with LLVM |
+| `cargo cll` | `clippy --manifest-path compiler/ori_llvm/Cargo.toml --all-targets` | Clippy LLVM crate |
+
+## Workspace Lints (deny level)
+`unsafe_code` (except `ori_rt`), `dead_code`, `unused`, `clippy::unwrap_used`, `clippy::expect_used`, `clippy::todo`, `clippy::unimplemented`, `clippy::dbg_macro`
 
 ## Key Files
 - `Cargo.toml`: Workspace config

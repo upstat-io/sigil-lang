@@ -11,60 +11,54 @@ paths:
 
 # Type Checking
 
-## Architecture (5 Components)
-- **CheckContext**: immutable arena/interner refs
-- **InferenceState**: mutable ctx, env, expr_types
-- **Registries**: pattern, type, trait
-- **DiagnosticState**: errors, queue, source
-- **ScopeContext**: function sigs, impl Self, capabilities
+> **Note**: The core type checker lives in `ori_types/` (see `types.md`). This file covers the type checking architecture and the `oric/src/reporting/typeck/` diagnostic formatting.
 
-## Registries
-- **TypeRegistry**: `register_struct()`, `get_by_name()`, O(1) variant lookup
-- **TraitRegistry**: coherence (E2010), assoc types, method cache (RefCell)
+## Architecture (ori_types)
 
-## Derived Trait Registration (Sync Point)
+- **Pool + Idx**: Interned types, O(1) equality
+- **InferEngine**: Mutable state, fresh vars, union-find unification
+- **Registries**: TypeRegistry, TraitRegistry, MethodRegistry
+- **ModuleChecker**: `check_module()` orchestrates registration → signatures → body checking
 
-`check/registration/mod.rs` registers trait definitions and derived impl signatures. This is a **sync point** — every `DerivedTrait` variant from `ori_ir` must be registered here with correct method signatures.
+## Inference
 
-**DO NOT** modify derived trait registration without checking that the evaluator (`ori_eval/interpreter/derived_methods.rs`) and codegen (`ori_llvm/codegen/derive_codegen.rs`) agree on method signatures. See CLAUDE.md "Adding a New Derived Trait" checklist.
+- Hindley-Milner with extensions
+- Bidirectional: check mode (`Expected`) vs infer mode
+- Unification with occurs check + path compression
+- Generalization: free vars → quantified (rank-based)
 
 ## RAII Scope Guards
+
 - `with_capability_scope(caps, |c| { ... })`
 - `with_impl_scope(self_ty, |c| { ... })`
 - `with_infer_env_scope(|c| { ... })`
 
-## Type Inference
-- Hindley-Milner with extensions
-- Bidirectional: check mode vs infer mode
-- Unification with occurs check
-- Generalization: free vars → quantified
+## Derived Trait Registration (Sync Point)
+
+`check/registration/` registers trait definitions and derived impl signatures. Every `DerivedTrait` from `ori_ir` must be registered with correct signatures.
+
+**DO NOT** modify derived trait registration without checking eval and codegen agree. See CLAUDE.md "Adding a New Derived Trait".
 
 ## Error Codes
+
 - E2001: Type mismatch
 - E2009: Trait bound not satisfied
 - E2010: Coherence violation
 
 ## Debugging / Tracing
 
-**Always use `ORI_LOG` first when debugging type checking issues.** Tracing target: `ori_types` (typeck lives in the same crate).
-
 ```bash
-ORI_LOG=ori_types=debug ori check file.ori          # Module-level checking phases
-ORI_LOG=ori_types=trace ori check file.ori          # Per-expression inference/checking
-ORI_LOG=ori_types=trace ORI_LOG_TREE=1 ori check file.ori  # Full call tree with nesting
+ORI_LOG=ori_types=debug ori check file.ori          # Module-level phases
+ORI_LOG=ori_types=trace ORI_LOG_TREE=1 ori check f.ori  # Per-expression call tree
 ```
 
-**What each level shows**:
-- `debug`: Module check start/end, signature collection, body checking phases, type errors
-- `trace`: Every `infer_expr()` and `check_expr()` call — very verbose, use for specific files
-
-**Tips**:
-- Unification failure? Trace shows both sides before unify
-- Wrong type inferred? Use tree output to see bidirectional check/infer flow
-- Salsa cache issues? Add `oric=debug` to see query re-execution
+- `debug`: Module check, signature collection, body checking, type errors
+- `trace`: Every `infer_expr()`/`check_expr()` — very verbose
 
 ## Key Files
-- `checker/components.rs`: TypeChecker struct
-- `checker/expressions/`: Expression checking
-- `operators.rs`: Operator type rules
-- `registry/trait_registry.rs`: TraitRegistry
+
+- `ori_types/src/check/`: Module checker, registration, bodies, signatures
+- `ori_types/src/infer/`: InferEngine, expression inference
+- `ori_types/src/registry/`: Type/trait/method registries
+- `ori_types/src/unify/`: Unification engine
+- `oric/src/reporting/typeck/`: Type error diagnostic formatting

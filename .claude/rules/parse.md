@@ -55,6 +55,8 @@ ORI_LOG=ori_parse=trace ori check file.ori          # Parser-level tracing (as i
 
 ## Key Files
 - `ori_lexer/src/lib.rs`: Tokens
-- `context.rs`: ParseContext flags
-- `grammar/`: Parsing
-- `grammar.ebnf`: Unified grammar
+- `context/`: ParseContext flags
+- `grammar/`: Parsing (expr, decl, pattern, type)
+- `error/`: Parse error reporting
+- `recovery/`: Error recovery strategies
+- `grammar.ebnf`: Unified grammar (in spec)

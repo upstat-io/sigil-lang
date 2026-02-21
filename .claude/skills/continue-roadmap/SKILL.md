@@ -26,6 +26,22 @@ Use `plans/roadmap/index.md` to find sections by keyword. The index contains sea
 
 ## Workflow
 
+### Step 0: Check for Active Reroute
+
+Before scanning the roadmap, read `plans/roadmap/index.md` and check for an **ACTIVE REROUTE** block. If one exists:
+
+1. **Read the reroute** — it specifies a plan directory (e.g., `plans/trait_arch/`) that must be completed first
+2. **Switch to the rerouted plan** — read its `index.md` and `00-overview.md`
+3. **Run the rerouted plan's scanner** (if it has section files with checkboxes):
+   ```bash
+   .claude/skills/continue-roadmap/roadmap-scan.sh plans/<rerouted-plan>
+   ```
+4. **Follow the rerouted plan's execution order** — use the plan's recommended section order, not the roadmap's
+5. **Present the rerouted plan status** to the user, making clear this is a reroute from the main roadmap
+6. **When the rerouted plan is complete** — inform the user that the reroute is done and the `ACTIVE REROUTE` block in `plans/roadmap/index.md` should be removed to resume normal roadmap work
+
+**Do NOT skip the reroute.** The reroute exists because continuing normal roadmap work without completing the rerouted plan would compound the architectural debt.
+
 ### Step 1: Run the Scanner
 
 Run the roadmap scanner script to get current status:

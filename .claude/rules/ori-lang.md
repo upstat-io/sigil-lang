@@ -11,13 +11,10 @@ paths:
 
 # Ori Documentation
 
-Design docs archived to `archived-design/`. Do not update.
-
 ## Sync Rules
 
 **If `spec/` changed:**
 - Sync to `.claude/rules/ori-syntax.md` if syntax/types/patterns affected
-- Update `guide/` examples
 - Ask: "Create draft proposal?"
 
 **If `.claude/rules/ori-syntax.md` changed:**
@@ -31,9 +28,8 @@ Design docs archived to `archived-design/`. Do not update.
 
 **If changing operator behavior:**
 - Update `operator-rules.md`
-- Verify: `ori_types/infer/expr.rs`, `ori_eval/interpreter/`
+- Verify: `ori_types/infer/expr/`, `ori_eval/interpreter/`
 
 ## Never Do
 - Examples that don't match spec
 - Update docs without updating `.claude/rules/ori-syntax.md`
-- Update `archived-design/`

@@ -30,10 +30,10 @@ New codes: increment within range, add doc in `errors/EXXX.md`.
 - Imperative: "try using X"
 - Three-part: problem → context → guidance
 
-## Emitters
-- `AriadneEmitter`: Terminal
-- `JsonEmitter`: JSON
-- `LspEmitter`: LSP
+## Emitters (`emitter/`)
+- `terminal/`: Terminal (Ariadne-based)
+- `json/`: JSON
+- `sarif/`: SARIF
 
 ## Debugging / Tracing
 
@@ -52,5 +52,5 @@ ORI_LOG=debug ori check file.ori                    # See all phase-level diagno
 ## Key Files
 - `error_code.rs`: Error codes
 - `diagnostic.rs`: Builder
-- `emitters/`: Output formats
+- `emitter/`: Output formats (terminal, json, sarif)
 - `queue.rs`: Accumulation

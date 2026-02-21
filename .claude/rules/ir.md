@@ -61,7 +61,7 @@ ORI_LOG=ori_eval=trace ori run file.ori             # See how IR nodes are consu
 
 `derives/mod.rs` defines `DerivedTrait` — the **canonical list of all derivable traits**. This enum is consumed by 4 downstream crates. It is the single source of truth.
 
-**Current variants**: Eq, Clone, Hashable, Printable, Debug, Default
+**Current variants**: Eq, Clone, Hashable, Printable, Debug, Default, Comparable
 
 **Sync points** (all must be updated when adding a variant):
 - `ori_types/check/registration/` — trait + impl registration
@@ -72,8 +72,14 @@ ORI_LOG=ori_eval=trace ori run file.ori             # See how IR nodes are consu
 **DO NOT** modify `DerivedTrait` without updating all sync points. See CLAUDE.md "Adding a New Derived Trait" checklist.
 
 ## Key Files
-- `arena.rs`: ExprArena, ranges
-- `type_id.rs`: TypeId (parser-level type index, aligned with Idx)
-- `name.rs`: Name interning
+- `arena/`: ExprArena, ranges
+- `type_id/`: TypeId (parser-level type index, aligned with Idx)
+- `name/`: Name interning
+- `ast/`: AST node definitions
 - `visitor.rs`: Visitor trait
-- `derives/mod.rs`: DerivedTrait enum (source of truth for all derivable traits)
+- `derives/`: DerivedTrait enum (source of truth for all derivable traits)
+- `builtin_methods/`: Built-in method name constants
+
+## LLVM Debugging
+
+For LLVM IR debugging workflow (especially derive codegen issues that originate in `ori_ir`), see @llvm.md

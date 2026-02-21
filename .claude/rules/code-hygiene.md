@@ -104,6 +104,6 @@ Inline comments on struct fields when purpose isn't obvious from the name.
 ## Style
 
 - No `#[allow(clippy)]` without `reason = "..."` (use `#[expect]` when possible)
-- Functions target < 30 lines, max 50 (dispatch tables exempt)
+- Functions < 100 lines (strongly prefer shorter — target < 50; dispatch tables exempt)
 - Consistent patterns across similar code within same file
 - No dead/commented-out code
