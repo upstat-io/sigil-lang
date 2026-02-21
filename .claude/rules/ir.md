@@ -72,11 +72,13 @@ ORI_LOG=ori_eval=trace ori run file.ori             # See how IR nodes are consu
 **DO NOT** modify `DerivedTrait` without updating all sync points. See CLAUDE.md "Adding a New Derived Trait" checklist.
 
 ## Key Files
-- `arena.rs`: ExprArena, ranges
-- `type_id.rs`: TypeId (parser-level type index, aligned with Idx)
-- `name.rs`: Name interning
+- `arena/`: ExprArena, ranges
+- `type_id/`: TypeId (parser-level type index, aligned with Idx)
+- `name/`: Name interning
+- `ast/`: AST node definitions
 - `visitor.rs`: Visitor trait
-- `derives/mod.rs`: DerivedTrait enum (source of truth for all derivable traits)
+- `derives/`: DerivedTrait enum (source of truth for all derivable traits)
+- `builtin_methods/`: Built-in method name constants
 
 ## LLVM Debugging
 

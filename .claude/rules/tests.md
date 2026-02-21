@@ -68,9 +68,8 @@ cargo blr && ./target/release/ori test --backend=llvm tests/
 
 ## Attributes
 - `#skip("reason")`: Skip with explanation
-- `#compile_fail("error")`: Expect compile failure
-- `#fail("error")`: Expect runtime failure
-- `#timeout(5s)`: Set timeout
+- `#compile_fail("message substring")`: Expect compile failure containing substring
+- `#fail("message substring")`: Expect runtime failure containing substring
 
 ## Debugging / Tracing
 

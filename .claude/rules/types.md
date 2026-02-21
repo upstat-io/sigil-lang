@@ -82,12 +82,14 @@ ORI_LOG=ori_types=debug,oric=debug ori check file.ori      # Types + Salsa query
 
 ## Key Files
 - `pool/mod.rs`: Pool, interning, query methods
-- `pool/construct.rs`: Type construction helpers
+- `pool/construct/`: Type construction helpers
 - `idx.rs`: Idx type handle
 - `tag.rs`: Tag enum
 - `flags.rs`: TypeFlags bitflags
 - `infer/mod.rs`: InferEngine
-- `infer/expr.rs`: Expression inference
-- `unify.rs`: Unification engine
+- `infer/expr/`: Expression inference (identifiers, calls, operators, etc.)
+- `unify/`: Unification engine
 - `check/mod.rs`: Module-level type checker
-- `registry/`: Type, trait, method registries
+- `check/registration/`: Type/trait/impl registration passes
+- `check/bodies/`: Function body checking
+- `registry/`: Type (`types/`), trait (`traits/`), method (`methods/`) registries

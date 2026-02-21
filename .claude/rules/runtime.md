@@ -28,13 +28,27 @@ Both built with `cargo build -p ori_rt`.
 - `Option<T>` → `{ tag: i8, value: T }`
 
 ## Functions
-- Memory: `ori_alloc`, `ori_free`, `ori_realloc`
-- RefCount (V2): `ori_rc_alloc(size, align)`, `ori_rc_inc(data_ptr)`, `ori_rc_dec(data_ptr, drop_fn)`, `ori_rc_free(data_ptr, size, align)`
-  - 8-byte header: `strong_count` at `data_ptr - 8`, data pointer returned directly
-  - `drop_fn`: type-specialized, handles child Dec + calls `ori_rc_free`
-- Strings: `ori_str_concat`, `ori_str_eq`
-- I/O: `ori_print`, `ori_print_int`
-- Panic: `ori_panic`, `ori_assert`
+
+| Category | Functions |
+|----------|-----------|
+| Memory | `ori_alloc`, `ori_free`, `ori_realloc` |
+| RefCount | `ori_rc_alloc`, `ori_rc_inc`, `ori_rc_dec`, `ori_rc_free` (8-byte header, `drop_fn` for children) |
+| Strings | `ori_str_concat`, `ori_str_eq`, `ori_str_ne`, `ori_str_compare`, `ori_str_hash`, `ori_str_from_int/bool/float`, `ori_str_next_char` |
+| I/O | `ori_print`, `ori_print_int`, `ori_print_float`, `ori_print_bool` |
+| Lists | `ori_list_new`, `ori_list_free`, `ori_list_len`, `ori_list_alloc_data`, `ori_list_free_data` |
+| Comparison | `ori_compare_int`, `ori_min_int`, `ori_max_int` |
+| Assertions | `ori_assert`, `ori_assert_eq_int/bool/float/str` |
+| Panic | `ori_panic`, `ori_panic_cstr`, `ori_register_panic_handler` |
+| Entry | `ori_run_main`, `ori_args_from_argv` |
+
+## Submodules
+
+- `format/` — Template string interpolation (`ori_format_int/float/str/bool/char`)
+- `iterator.rs` — Iterator runtime (`ori_iter_from_list/range`, `ori_iter_next`, `ori_iter_map/filter/take/skip/enumerate/collect/count/drop`)
+
+## JIT Panic Recovery
+- `JmpBuf` + `jit_setjmp`/`enter_jit_mode`/`leave_jit_mode` for `setjmp`/`longjmp`-based recovery
+- `did_panic`, `get_panic_message`, `reset_panic_state` for test assertions
 
 ## LLVM Debugging
 
