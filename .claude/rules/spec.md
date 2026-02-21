@@ -43,9 +43,13 @@ Style: [Go Language Specification](https://go.dev/ref/spec). Sync rules in `.cla
 ## EBNF Conventions
 `snake_case` names | `"keyword"` tokens | `|` alt | `[ ]` opt | `{ }` repeat | `.` terminates
 
+## Spec Files
+27 numbered sections (01–27, skipping 26). `README.md` lists all sections. `grammar.ebnf` and `operator-rules.md` are companion files.
+
 ## Checklist
 - Update `grammar.ebnf` if syntax changed
 - Update `operator-rules.md` if operator changed
+- Update `README.md` if adding/renaming sections
 - Mark informative: `> **Note:**`
 - SYNC: design docs, guide, modules
 

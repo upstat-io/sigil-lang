@@ -28,22 +28,35 @@ cargo blr  # release
 Format: `_ori_<module>$<function>[<suffix>]`
 - `@main` → `_ori_main`
 - `math.@add` → `_ori_math$add`
+- Trait impl: `_ori_int$$Eq$equals`
+- Extension: `_ori_list_int_$$ext$count`
+- Generic: `$G` suffix, associated: `$A$` marker
 
 ## Linker Drivers
 - Linux/macOS: `GccLinker`
 - Windows: `MsvcLinker`
-- WASM: `WasmLinker`
+- WASM: `WasmLinker` (+ `JsBindingGenerator`, `WasmOptRunner`)
 
 ## Optimization
 - `OptimizationLevel`: None, Less, Default, Aggressive
 - `LtoMode`: None, ThinLocal, Thin, Full
+- `run_optimization_passes()`, `optimize_module()`, `run_lto_pipeline()`
 
-## Key Files
-- `target.rs`: Target triple
-- `object.rs`: Object emission
-- `mangle.rs`: Symbol mangling
-- `runtime.rs`: Runtime discovery
-- `linker/`: Linker drivers
+## Key Subsystems
+
+| Directory | Purpose |
+|-----------|---------|
+| `target.rs` | Target triple, feature support |
+| `object.rs` | Object emission (`OutputFormat` enum) |
+| `mangle.rs` | Symbol mangling/demangling |
+| `passes.rs` | Optimization pass pipeline |
+| `runtime.rs` | Runtime discovery |
+| `linker/` | Platform linker drivers (gcc, msvc, wasm) |
+| `debug/` | Debug info generation (DWARF/CodeView) — `DebugInfoBuilder`, `DebugLevel` |
+| `wasm.rs` | WebAssembly config (`WasmConfig`, `WasiConfig`) |
+| `incremental/` | Incremental compilation (caching, deps, parallel) |
+| `multi_file/` | Multi-file compilation, module dependency graphs |
+| `syslib/` | System library discovery |
 
 ## LLVM Debugging
 

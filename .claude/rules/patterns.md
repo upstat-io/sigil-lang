@@ -53,5 +53,7 @@ ORI_LOG=debug ORI_LOG_TREE=1 ori run file.ori       # Full hierarchical trace ac
 
 ## Key Files
 - `lib.rs`: PatternDefinition trait
-- `registry.rs`: Pattern lookup
-- `recurse.rs`: Example impl
+- `registry/`: Pattern lookup dispatch
+- `recurse/`: Recurse pattern impl
+- `value/`: Value types, iterators, `IteratorValue`
+- `errors/`: Error factories (`wrong_arg_type`, `wrong_arg_count`)

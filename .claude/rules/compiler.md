@@ -115,11 +115,11 @@ ORI_LOG=ori_types=debug,ori_eval=debug ori run f.ori    # Multiple targets
 - `oric`: CLI, Salsa
 
 ## Change Locations
-- Expression: `ori_parse/grammar/expr/`, `ori_types/infer/expr.rs`, `ori_eval/interpreter/`
+- Expression: `ori_parse/grammar/expr/`, `ori_types/infer/expr/`, `ori_eval/interpreter/`
 - Type: `ori_ir/type_id.rs`, `ori_types/pool/`, `ori_types/check/`
-- Method: `ori_types/registry/methods.rs`, `ori_eval/interpreter/method_dispatch.rs`
-- Derive: `ori_ir/derives/mod.rs` (source of truth), `ori_types/check/registration/`, `ori_eval/interpreter/derived_methods.rs`, `ori_llvm/codegen/derive_codegen.rs`
+- Method: `ori_types/registry/methods/`, `ori_eval/interpreter/method_dispatch/`
+- Derive: `ori_ir/derives/mod.rs` (source of truth), `ori_types/check/registration/`, `ori_eval/interpreter/derived_methods.rs`, `ori_llvm/codegen/derive_codegen/`
 
 ## Source of Truth
 1. `docs/ori_lang/0.1-alpha/spec/` — authoritative
-2. `~/projects/reference_repos/lang_repos/` — Rust, Go, TS, Zig, Gleam, Elm, Roc, Swift, Koka, Lean 4, Swift, Koka, Lean 4
+2. `~/projects/reference_repos/lang_repos/` — Rust, Go, TS, Zig, Gleam, Elm, Roc, Swift, Koka, Lean 4

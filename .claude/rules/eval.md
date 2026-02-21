@@ -60,15 +60,16 @@ ORI_LOG=ori_eval=debug,ori_types=debug ori run file.ori  # Eval + type checking 
 
 ## Derived Method Dispatch
 
-`interpreter/derived_methods.rs` dispatches `#[derive(...)]` methods by matching on `DerivedTrait` variants from `ori_ir`. This is a **sync point** — every `DerivedTrait` variant must have a match arm here.
+`interpreter/derived_methods.rs` dispatches `#[derive(...)]` methods using strategy-based dispatch from `DerivedTrait::strategy()` (defined in `ori_ir`). Strategies (FieldOp + CombineOp) drive a unified `eval_derived_method()` — no per-trait handler functions.
 
-**Current handlers**: eval_derived_eq, eval_derived_clone, eval_derived_hash, eval_derived_to_str, eval_derived_debug, eval_derived_default
-
-**DO NOT** add a DerivedTrait variant in `ori_ir` without adding the corresponding handler here. See CLAUDE.md "Adding a New Derived Trait" checklist.
+**DO NOT** add a DerivedTrait variant in `ori_ir` without verifying the strategy dispatch covers it. See CLAUDE.md "Adding a New Derived Trait" checklist.
 
 ## Key Files
 - `lib.rs`: Interpreter, eval dispatch
-- `interpreter/resolvers/`: MethodDispatcher
+- `interpreter/resolvers/`: MethodDispatcher (priority chain)
+- `interpreter/method_dispatch/`: Method dispatch implementation + iterator methods
 - `interpreter/derived_methods.rs`: Derived trait method dispatch (sync point)
+- `methods/`: Built-in method implementations (collections, numeric, compare, etc.)
 - `derives/mod.rs`: Derive processing pipeline
 - `environment.rs`: Environment, scopes
+- `function_val.rs`: Built-in function registrations (prelude)
