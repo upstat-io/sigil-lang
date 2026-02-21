@@ -146,6 +146,18 @@ Bottom type (uninhabited); coerces to any `T`
 **Unsafe**: `unsafe { ptr_read(...) }` | **Capability**: `uses Unsafe` (marker, like `Suspend` — cannot be bound via `with...in`)
 **Async WASM**: `JsPromise<T>` implicitly resolved at binding sites | **Compile Error**: `compile_error("msg")`
 
+### Deep FFI (opt-in annotations on extern blocks)
+
+**Error Protocols**: `extern "c" from "lib" #error(errno) { ... }` — block-level; `#error(none)` per-function opt-out
+**Error Variants**: `#error(errno | nonzero | null | negative | success: N | none)` — auto-generates `Result<T, FfiError>`
+**FfiError**: `use std.ffi { FfiError }` — `{ code: int, message: str, source: str }`
+**Out Params**: `@f (name: str, db: out CPtr) -> c_int` — `out` params folded into return type
+**Ownership**: `owned` / `borrowed` on params/returns | str returns default to `borrowed` (copy, don't free)
+**Free**: `#free(fn)` on block or per-function — auto-generates `Drop` impl for `owned CPtr`
+**[byte] Elision**: `[byte]` in extern generates adjacent `(ptr, len)` C args | `mut [byte]` generates `(ptr, &len)`
+**Parametric FFI**: `uses FFI("sqlite3")` per-library | `uses FFI` shorthand for all | each `from "lib"` is distinct capability
+**Mocking**: `with FFI("lib") = handler { fn: (...) -> T = ..., } in { ... }` — handler-based mock; stateless is sugar for `handler(state: ())`
+
 ## Capabilities
 
 **Declare**: `@f (...) -> T uses Http = ...` | `uses FileSystem, Suspend`
@@ -168,7 +180,7 @@ Bottom type (uninhabited); coerces to any `T`
 
 ## Keywords
 
-**Reserved**: `as break continue def div do else extend extension extern false for if impl in let loop match pre post pub self Self suspend tests then trait true try type unsafe use uses void where with yield`
+**Reserved**: `as borrowed break continue def div do else extend extension extern false for if impl in let loop match out owned pre post pub self Self suspend tests then trait true try type unsafe use uses void where with yield`
 **Reserved (future)**: `asm inline static union view` (reserved for future low-level features)
 **Context-sensitive**: `args body by cache catch collect default embed expr filter find fold from handler has_embed map max nursery on_error over parallel recurse retry spawn timeout validate without`
 **Built-in names**: `int float str byte len is_empty is_some is_none is_ok is_err assert assert_eq assert_ne assert_some assert_none assert_ok assert_err assert_panics assert_panics_with compare min max print panic todo unreachable dbg compile_error embed has_embed`
