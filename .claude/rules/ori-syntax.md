@@ -93,6 +93,7 @@ Bottom type (uninhabited); coerces to any `T`
 **Unary**: `!` (Not), `-` (Neg), `~` (BitNot) | **Bitwise**: `&`/`|`/`^` (BitAnd/Or/Xor), `<<`/`>>` (Shl/Shr)
 **Shift overflow**: negative count panics; count ≥ bit width panics; `1 << 63` panics
 **Operator traits**: desugar to trait methods; user types implement for operator support
+**Compound assignment**: `x op= y` desugars to `x = x op y` (parser-level) | `+=` `-=` `*=` `/=` `%=` `@=` `&=` `|=` `^=` `<<=` `>>=` `&&=` `||=` | statement, not expression | target must be mutable (no `$`) | `&&=`/`||=` preserve short-circuit
 
 ## Expressions
 
