@@ -88,7 +88,7 @@ Bottom type (uninhabited); coerces to any `T`
 
 ## Operators (precedence high→low)
 
-1. `.` `[]` `()` `?` — 2. `!` `-` `~` — 3. `*` `/` `%` `div` — 4. `+` `-` — 5. `<<` `>>` — 6. `..` `..=` `by` — 7. `<` `>` `<=` `>=` — 8. `==` `!=` — 9. `&` — 10. `^` — 11. `|` — 12. `&&` — 13. `||` — 14. `??`
+1. `.` `[]` `()` `?` — 2. `!` `-` `~` — 3. `*` `/` `%` `div` `@` — 4. `+` `-` — 5. `<<` `>>` — 6. `..` `..=` `by` — 7. `<` `>` `<=` `>=` — 8. `==` `!=` — 9. `&` — 10. `^` — 11. `|` — 12. `&&` — 13. `||` — 14. `??`
 
 **Unary**: `!` (Not), `-` (Neg), `~` (BitNot) | **Bitwise**: `&`/`|`/`^` (BitAnd/Or/Xor), `<<`/`>>` (Shl/Shr)
 **Shift overflow**: negative count panics; count ≥ bit width panics; `1 << 63` panics
@@ -200,5 +200,5 @@ Bottom type (uninhabited); coerces to any `T`
 **Eq**: `@equals (self, other: Self) -> bool` — reflexive/symmetric/transitive; derives `==`/`!=`
 **Comparable**: `trait: Eq { @compare (self, other: Self) -> Ordering }` — total order; derives `<`/`<=`/`>`/`>=`; NaN > all; `None < Some`; `Ok < Err`
 **Hashable**: `trait: Eq { @hash (self) -> int }` — `a == b` ⇒ same hash; +0.0/-0.0 same; use `hash_combine`
-**Operator traits**: `Add`/`Sub`/`Mul`/`Div`/`FloorDiv`/`Rem<Rhs = Self>` — binary; `Neg`/`Not`/`BitNot` — unary; `BitAnd`/`BitOr`/`BitXor<Rhs = Self>`, `Shl`/`Shr<Rhs = int>` — bitwise; all default `type Output = Self`
-**Operator methods**: `add`/`subtract`/`multiply`/`divide`/`floor_divide`/`remainder` — arithmetic; `negate`/`not`/`bit_not` — unary; `bit_and`/`bit_or`/`bit_xor`/`shift_left`/`shift_right` — bitwise
+**Operator traits**: `Add`/`Sub`/`Mul`/`Div`/`FloorDiv`/`Rem<Rhs = Self>` — binary; `MatMul<Rhs = Self>` — matrix multiply (`@`); `Neg`/`Not`/`BitNot` — unary; `BitAnd`/`BitOr`/`BitXor<Rhs = Self>`, `Shl`/`Shr<Rhs = int>` — bitwise; all default `type Output = Self`
+**Operator methods**: `add`/`subtract`/`multiply`/`divide`/`floor_divide`/`remainder` — arithmetic; `matrix_multiply` — matmul (`@`); `negate`/`not`/`bit_not` — unary; `bit_and`/`bit_or`/`bit_xor`/`shift_left`/`shift_right` — bitwise
