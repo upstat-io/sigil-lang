@@ -88,12 +88,13 @@ Bottom type (uninhabited); coerces to any `T`
 
 ## Operators (precedence high→low)
 
-1. `.` `[]` `()` `?` — 2. `**` (right) — 3. `!` `-` `~` — 4. `*` `/` `%` `div` `@` — 5. `+` `-` — 6. `<<` `>>` — 7. `..` `..=` `by` — 8. `<` `>` `<=` `>=` — 9. `==` `!=` — 10. `&` — 11. `^` — 12. `|` — 13. `&&` — 14. `||` — 15. `??`
+1. `.` `[]` `()` `?` — 2. `**` (right) — 3. `!` `-` `~` — 4. `*` `/` `%` `div` `@` — 5. `+` `-` — 6. `<<` `>>` — 7. `..` `..=` `by` — 8. `<` `>` `<=` `>=` — 9. `==` `!=` — 10. `&` — 11. `^` — 12. `|` — 13. `&&` — 14. `||` — 15. `??` — 16. `|>` (pipe)
 
 **Unary**: `!` (Not), `-` (Neg), `~` (BitNot) | **Bitwise**: `&`/`|`/`^` (BitAnd/Or/Xor), `<<`/`>>` (Shl/Shr)
 **Shift overflow**: negative count panics; count ≥ bit width panics; `1 << 63` panics
 **Operator traits**: desugar to trait methods; user types implement for operator support
 **Compound assignment**: `x op= y` desugars to `x = x op y` (parser-level) | `+=` `-=` `*=` `/=` `%=` `**=` `@=` `&=` `|=` `^=` `<<=` `>>=` `&&=` `||=` | statement, not expression | target must be mutable (no `$`) | `&&=`/`||=` preserve short-circuit
+**Pipe**: `x |> f(a: v)` fills single unspecified param | `x |> .method()` calls method on piped value | `x |> (a -> expr)` lambda fallback | prec 16 (lowest) | left-assoc | desugars to let-binding + call in type checker | "unspecified" = no value AND no default
 
 ## Expressions
 
