@@ -140,7 +140,7 @@ Bottom type (uninhabited); coerces to any `T`
 **Types**: `CPtr` opaque | `Option<CPtr>` nullable | `JsValue` handle | `JsPromise<T>` async
 **C Types**: `c_char`, `c_short`, `c_int`, `c_long`, `c_longlong`, `c_float`, `c_double`, `c_size`
 **Layout**: `#repr("c")` C-compatible | `#repr("packed")` no padding | `#repr("transparent")` same as single field | `#repr("aligned", N)` minimum alignment (power of two) | struct types only; newtypes implicitly transparent
-**Unsafe**: `unsafe(ptr_read(...))` | **Capability**: `uses FFI`
+**Unsafe**: `unsafe { ptr_read(...) }` | **Capability**: `uses Unsafe` (marker, like `Suspend` — cannot be bound via `with...in`)
 **Async WASM**: `JsPromise<T>` implicitly resolved at binding sites | **Compile Error**: `compile_error("msg")`
 
 ## Capabilities
